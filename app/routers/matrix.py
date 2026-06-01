@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends
 
@@ -14,7 +15,9 @@ from ..nexus_client import NexusClient, NexusError
 router = APIRouter(prefix="/api", tags=["matrix"])
 
 
-async def _fetch_repos(instance) -> tuple[MatrixColumn, list[Repository] | None]:
+async def _fetch_repos(
+    instance,
+) -> Tuple[MatrixColumn, Optional[List[Repository]]]:
     """Fetch one instance's repositories, capturing errors into the column."""
     column = MatrixColumn(id=instance.id, name=instance.name)
     client = NexusClient(instance, timeout=get_settings().request_timeout)

@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import yaml
 from pydantic import BaseModel, Field, ValidationError
@@ -19,7 +19,7 @@ class InstanceConfig(BaseModel):
     base_url: str = Field(..., description="Root URL of the Nexus instance.")
     username: str = Field(..., description="Account used for management calls.")
     password: str = Field(..., description="Password or token for the account.")
-    verify_tls: bool | None = Field(
+    verify_tls: Optional[bool] = Field(
         default=None,
         description="Per-instance TLS verification override.",
     )
@@ -56,7 +56,7 @@ def get_settings() -> Settings:
     return Settings()
 
 
-def load_instances(settings: Settings | None = None) -> List[InstanceConfig]:
+def load_instances(settings: Optional[Settings] = None) -> List[InstanceConfig]:
     """Load and validate managed instances from the configured YAML file.
 
     Returns an empty list when the file is absent so the app can still start
