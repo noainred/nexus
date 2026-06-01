@@ -1,0 +1,115 @@
+# Nexus 통합 관리 (Nexus Integrated Manager)
+
+여러 개의 **Sonatype Nexus Repository Manager 3** 인스턴스를 하나의 웹
+대시보드에서 통합 관리하는 도구입니다. FastAPI 백엔드가 각 인스턴스의
+REST API를 호출하고, 가벼운 단일 페이지(SPA) 프런트엔드가 이를 시각화합니다.
+
+## 주요 기능
+
+| 영역 | 설명 |
+| --- | --- |
+| **상태/모니터링** | 모든 인스턴스의 도달 가능성·응답 시간·서브시스템 health를 동시 점검하고, Blob Store 사용량을 표시 |
+| **저장소 관리** | 저장소 목록 조회, 삭제, 컴포넌트(아티팩트) 탐색 및 삭제 (페이지네이션 지원) |
+| **정리(Cleanup) 정책** | 정책 목록 조회 및 신규 정책 생성 (마지막 업데이트/다운로드 경과일 기준) |
+
+## 아키텍처
+
+```
+브라우저 SPA (app/static)
+        │  fetch /api/...
+        ▼
+FastAPI (app/main.py)
+  ├─ routers/instances.py     인스턴스 목록
+  ├─ routers/repositories.py  저장소 · 컴포넌트
+  ├─ routers/cleanup.py       정리 정책
+  └─ routers/monitoring.py    상태 · Blob Store
+        │
+        ▼
+NexusClient (app/nexus_client.py)  ── httpx ──▶  Nexus REST API
+                                                 /service/rest/v1
+```
+
+- 자격 증명은 서버의 `instances.yaml`에만 존재하며, `/api/instances`
+  응답에는 절대 포함되지 않습니다.
+- 모든 Nexus 호출은 비동기(httpx)이며, 상태 점검은 여러 인스턴스를
+  동시에 병렬 조회합니다.
+- 네트워크/HTTP 오류는 `NexusError`로 정규화되어 일관된 형태로
+  프런트엔드에 전달됩니다.
+
+## 설치 및 실행
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# 관리할 인스턴스 정의
+cp instances.example.yaml instances.yaml
+$EDITOR instances.yaml        # base_url / username / password 입력
+
+# (선택) 환경 변수
+cp .env.example .env
+
+# 개발 서버 실행
+uvicorn app.main:app --reload --port 8000
+```
+
+브라우저에서 <http://localhost:8000> 에 접속하면 대시보드가, 
+<http://localhost:8000/docs> 에서 OpenAPI 문서가 열립니다.
+
+## 설정
+
+### `instances.yaml`
+
+관리 대상 인스턴스를 정의합니다. 형식은 `instances.example.yaml` 참고.
+
+```yaml
+instances:
+  - id: prod                  # URL-safe 고유 식별자 (API 경로에 사용)
+    name: "Production Nexus"   # 화면 표시 이름
+    base_url: "https://nexus.example.com"
+    username: "admin"
+    password: "..."
+    verify_tls: true           # 선택, 인스턴스별 TLS 검증 오버라이드
+```
+
+> `instances.yaml`, `.env` 는 `.gitignore`에 포함되어 있어 자격 증명이
+> 커밋되지 않습니다.
+
+### 환경 변수 (`NEXUS_MANAGER_` 접두사)
+
+| 변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| `NEXUS_MANAGER_INSTANCES_FILE` | `instances.yaml` | 인스턴스 정의 파일 경로 |
+| `NEXUS_MANAGER_REQUEST_TIMEOUT` | `15` | Nexus 호출 타임아웃(초) |
+| `NEXUS_MANAGER_VERIFY_TLS` | `true` | 전역 TLS 검증 기본값 |
+
+## REST API 요약
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| `GET` | `/api/instances` | 관리 인스턴스 목록 (자격 증명 제외) |
+| `GET` | `/api/status` | 전체 인스턴스 상태 동시 점검 |
+| `GET` | `/api/instances/{id}/status` | 단일 인스턴스 상태 |
+| `GET` | `/api/instances/{id}/blobstores` | Blob Store 사용량 |
+| `GET` | `/api/instances/{id}/repositories` | 저장소 목록 |
+| `DELETE` | `/api/instances/{id}/repositories/{name}` | 저장소 삭제 |
+| `GET` | `/api/instances/{id}/components?repository=` | 컴포넌트 목록(페이지네이션) |
+| `DELETE` | `/api/instances/{id}/components/{component_id}` | 컴포넌트 삭제 |
+| `GET` | `/api/instances/{id}/cleanup-policies` | 정리 정책 목록 |
+| `POST` | `/api/instances/{id}/cleanup-policies` | 정리 정책 생성 |
+
+## 테스트
+
+```bash
+pytest
+```
+
+`respx`로 Nexus REST 응답을 모킹하여 클라이언트와 API 계층을 검증합니다
+(실제 Nexus 인스턴스 불필요).
+
+## 호환성 참고
+
+- 대상: Nexus Repository Manager **3.x** REST API (`/service/rest/v1`).
+- 정리 정책 엔드포인트는 버전에 따라 `v1` 또는 `beta` 네임스페이스를
+  사용하므로, 클라이언트가 `v1` → `beta` 순으로 자동 폴백합니다.

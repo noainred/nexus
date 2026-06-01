@@ -1,0 +1,25 @@
+# List of Sonatype Nexus Repository Manager 3 instances to manage.
+#
+# Copy this file to `instances.yaml` (gitignored) and fill in real values,
+# or point NEXUS_MANAGER_INSTANCES_FILE at another location.
+#
+# `id`       - unique, URL-safe identifier used in API routes.
+# `name`     - human friendly label shown in the dashboard.
+# `base_url` - root URL of the Nexus instance (no trailing /service path).
+# `username` - account used for management calls.
+# `password` - password / token for that account.
+# `verify_tls` - optional per-instance TLS override.
+
+instances:
+  - id: prod
+    name: "Production Nexus"
+    base_url: "https://nexus.example.com"
+    username: "admin"
+    password: "change-me"
+
+  - id: staging
+    name: "Staging Nexus"
+    base_url: "https://nexus-staging.example.com"
+    username: "admin"
+    password: "change-me"
+    verify_tls: false

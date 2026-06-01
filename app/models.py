@@ -1,0 +1,105 @@
+"""Pydantic models for API requests and responses."""
+from __future__ import annotations
+
+from typing import Any, List, Optional
+
+from pydantic import BaseModel, Field
+
+
+class InstanceSummary(BaseModel):
+    """Public view of a managed instance (never exposes credentials)."""
+
+    id: str
+    name: str
+    base_url: str
+
+
+class InstanceStatus(BaseModel):
+    """Health/monitoring snapshot for one instance."""
+
+    id: str
+    name: str
+    base_url: str
+    reachable: bool
+    healthy: bool
+    response_ms: Optional[float] = None
+    error: Optional[str] = None
+    checks: dict[str, bool] = Field(default_factory=dict)
+    repository_count: Optional[int] = None
+
+
+class Repository(BaseModel):
+    """A Nexus repository as returned by the REST API."""
+
+    name: str
+    format: Optional[str] = None
+    type: Optional[str] = None
+    url: Optional[str] = None
+    online: Optional[bool] = None
+    # Raw attributes passed through for advanced views.
+    attributes: dict[str, Any] = Field(default_factory=dict)
+
+
+class Component(BaseModel):
+    """A component (a group of assets) inside a repository."""
+
+    id: str
+    repository: Optional[str] = None
+    group: Optional[str] = None
+    name: Optional[str] = None
+    version: Optional[str] = None
+    format: Optional[str] = None
+
+
+class ComponentPage(BaseModel):
+    """A page of components plus the token for the next page."""
+
+    items: List[Component] = Field(default_factory=list)
+    continuation_token: Optional[str] = None
+
+
+class BlobStore(BaseModel):
+    """Blob store usage information used by the monitoring view."""
+
+    name: str
+    type: Optional[str] = None
+    total_size_bytes: Optional[int] = None
+    available_space_bytes: Optional[int] = None
+    blob_count: Optional[int] = None
+
+
+class CleanupPolicy(BaseModel):
+    """A cleanup policy definition."""
+
+    name: str
+    format: str = "*"
+    notes: Optional[str] = None
+    mode: str = "delete"
+    criteria: dict[str, Any] = Field(default_factory=dict)
+
+
+class CleanupPolicyCreate(BaseModel):
+    """Payload for creating or updating a cleanup policy."""
+
+    name: str = Field(..., min_length=1)
+    format: str = "*"
+    notes: Optional[str] = None
+    criteria_last_blob_updated: Optional[int] = Field(
+        default=None,
+        description="Delete components not updated for N days.",
+    )
+    criteria_last_downloaded: Optional[int] = Field(
+        default=None,
+        description="Delete components not downloaded for N days.",
+    )
+    criteria_release_type: Optional[str] = Field(
+        default=None,
+        description="RELEASES or PRERELEASES (maven/format dependent).",
+    )
+    criteria_asset_regex: Optional[str] = None
+
+
+class ApiError(BaseModel):
+    """Uniform error envelope returned to the frontend."""
+
+    detail: str
