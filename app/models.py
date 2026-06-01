@@ -103,3 +103,46 @@ class ApiError(BaseModel):
     """Uniform error envelope returned to the frontend."""
 
     detail: str
+
+
+# -- Repository comparison matrix -----------------------------------------
+
+
+class MatrixColumn(BaseModel):
+    """One instance column in the comparison matrix."""
+
+    id: str
+    name: str
+    reachable: bool = True
+    error: Optional[str] = None
+
+
+class MatrixCell(BaseModel):
+    """A single repository's state within one instance."""
+
+    present: bool = False
+    # ``unknown`` is True when the owning instance could not be queried.
+    unknown: bool = False
+    format: Optional[str] = None
+    type: Optional[str] = None
+    remote_url: Optional[str] = None
+    online: Optional[bool] = None
+    # None when not present; otherwise True if this cell matches the row's
+    # reference configuration, False when it drifts from it.
+    matches_reference: Optional[bool] = None
+
+
+class MatrixRow(BaseModel):
+    """One repository name compared across every instance."""
+
+    repository: str
+    # consistent | drift | partial | unknown
+    status: str
+    cells: dict[str, MatrixCell] = Field(default_factory=dict)
+
+
+class RepositoryMatrix(BaseModel):
+    """Full comparison grid: repositories (rows) x instances (columns)."""
+
+    columns: List[MatrixColumn] = Field(default_factory=list)
+    rows: List[MatrixRow] = Field(default_factory=list)

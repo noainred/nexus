@@ -128,3 +128,62 @@ tr:hover td { background: var(--panel); }
 .toast.ok { border-color: var(--green); }
 
 .empty { color: var(--muted); font-style: italic; padding: 12px 0; }
+
+/* -- comparison matrix -- */
+.matrix-header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.drift-only { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.drift-only input { width: auto; }
+
+.legend { display: flex; gap: 18px; margin: 6px 0 14px; color: var(--muted); font-size: 12px; }
+.legend span { display: flex; align-items: center; gap: 6px; }
+.legend .sw { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+.sw.consistent { background: rgba(63,185,80,.25); border: 1px solid var(--green); }
+.sw.drift { background: rgba(248,81,73,.25); border: 1px solid var(--red); }
+.sw.missing { background: rgba(139,155,171,.12); border: 1px dashed var(--muted); }
+.sw.unknown { background: repeating-linear-gradient(45deg, #2a3640, #2a3640 4px, #222e3a 4px, #222e3a 8px); border: 1px solid var(--border); }
+
+.matrix-wrap { overflow-x: auto; }
+table.matrix { border-collapse: separate; border-spacing: 0; min-width: 100%; }
+table.matrix th, table.matrix td {
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 0;
+  text-align: center;
+}
+table.matrix thead th {
+  background: var(--panel);
+  position: sticky;
+  top: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+table.matrix th.rowhead, table.matrix td.rowhead {
+  text-align: left;
+  padding: 8px 12px;
+  position: sticky;
+  left: 0;
+  background: var(--panel);
+  z-index: 1;
+  white-space: nowrap;
+}
+table.matrix td.rowhead { font-weight: 500; }
+table.matrix td.rowhead .row-status { margin-left: 8px; }
+
+.mcell {
+  display: block;
+  padding: 10px 8px;
+  min-width: 86px;
+  font-size: 11px;
+  line-height: 1.4;
+  cursor: default;
+}
+.mcell .mark { font-size: 14px; font-weight: 700; }
+.mcell .meta { color: var(--muted); display: block; }
+.mcell.consistent { background: rgba(63,185,80,.12); }
+.mcell.consistent .mark { color: var(--green); }
+.mcell.drift { background: rgba(248,81,73,.16); }
+.mcell.drift .mark { color: var(--red); }
+.mcell.drift .meta { color: #f0a8a4; }
+.mcell.missing { color: var(--muted); }
+.mcell.unknown { background: repeating-linear-gradient(45deg, rgba(42,54,64,.5), rgba(42,54,64,.5) 5px, transparent 5px, transparent 10px); color: var(--muted); }

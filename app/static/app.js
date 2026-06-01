@@ -5,6 +5,7 @@ const state = {
   current: null,
   componentToken: null,
   componentRepo: null,
+  matrix: null,
 };
 
 // ---- helpers -------------------------------------------------------------
@@ -138,6 +139,95 @@ async function loadBlobstores() {
   );
   container.append(buildTable(["이름", "유형", "사용량", "가용 공간", "Blob 수"], rows));
 }
+
+// ---- comparison matrix ---------------------------------------------------
+
+function cellDetail(c) {
+  if (c.unknown) return "조회 불가 (인스턴스 응답 없음)";
+  if (!c.present) return "이 인스턴스에 없음";
+  const parts = [`포맷: ${c.format || "—"}`, `타입: ${c.type || "—"}`];
+  if (c.remote_url) parts.push(`원격: ${c.remote_url}`);
+  if (c.online === false) parts.push("상태: offline");
+  return parts.join("\n");
+}
+
+function rowStatusBadge(status) {
+  const map = {
+    consistent: ["up", "일치"],
+    drift: ["down", "설정 상이"],
+    partial: ["warn", "일부 누락"],
+    unknown: ["warn", "조회 불가"],
+  };
+  const [cls, label] = map[status] || ["warn", status];
+  return el("span", { class: `badge ${cls} row-status` }, label);
+}
+
+function renderMatrix() {
+  const container = document.getElementById("matrix-table");
+  container.innerHTML = "";
+  const matrix = state.matrix;
+  if (!matrix) return;
+  if (!matrix.columns.length) {
+    container.append(el("div", { class: "empty" }, "구성된 인스턴스가 없습니다."));
+    return;
+  }
+
+  const driftOnly = document.getElementById("drift-only").checked;
+  let rows = matrix.rows;
+  if (driftOnly) rows = rows.filter((r) => r.status !== "consistent");
+
+  if (!rows.length) {
+    container.append(el("div", { class: "empty" },
+      driftOnly ? "차이가 있는 저장소가 없습니다. 모두 일치합니다 ✓" : "저장소가 없습니다."));
+    return;
+  }
+
+  // Header: blank corner + one column per instance (with unreachable mark).
+  const headCells = [el("th", { class: "rowhead" }, "저장소 \\ 인스턴스")];
+  matrix.columns.forEach((col) => {
+    const label = col.reachable ? col.name : `${col.name} ⚠`;
+    headCells.push(el("th", { title: col.error || col.name }, label));
+  });
+  const thead = el("thead", {}, el("tr", {}, headCells));
+
+  const body = rows.map((row) => {
+    const tds = [
+      el("td", { class: "rowhead" }, [row.repository, rowStatusBadge(row.status)]),
+    ];
+    matrix.columns.forEach((col) => {
+      const c = row.cells[col.id] || { present: false };
+      let cls, mark, meta;
+      if (c.unknown) { cls = "unknown"; mark = "?"; meta = ""; }
+      else if (!c.present) { cls = "missing"; mark = "—"; meta = ""; }
+      else if (c.matches_reference) { cls = "consistent"; mark = "✓"; meta = c.format || ""; }
+      else { cls = "drift"; mark = "≠"; meta = [c.type, c.remote_url].filter(Boolean).join(" · ") || c.format || ""; }
+
+      const inner = el("span", { class: `mcell ${cls}`, title: cellDetail(c) }, [
+        el("span", { class: "mark" }, mark),
+        meta ? el("span", { class: "meta" }, meta) : null,
+      ]);
+      tds.push(el("td", {}, inner));
+    });
+    return el("tr", {}, tds);
+  });
+
+  const table = el("table", { class: "matrix" }, [thead, el("tbody", {}, body)]);
+  container.append(table);
+}
+
+async function loadMatrix() {
+  const container = document.getElementById("matrix-table");
+  try {
+    state.matrix = await api("/api/matrix");
+  } catch (e) {
+    container.innerHTML = "";
+    container.append(el("div", { class: "empty" }, `매트릭스 로드 실패: ${e.message}`));
+    return;
+  }
+  renderMatrix();
+}
+
+document.getElementById("drift-only").addEventListener("change", renderMatrix);
 
 // ---- repositories --------------------------------------------------------
 
@@ -318,6 +408,7 @@ document.getElementById("cleanup-form").addEventListener("submit", async (ev) =>
 
 function refreshActiveTab() {
   loadOverview();
+  loadMatrix();
   loadRepositories();
   loadCleanup();
 }

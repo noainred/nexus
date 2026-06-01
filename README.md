@@ -9,8 +9,24 @@ REST API를 호출하고, 가벼운 단일 페이지(SPA) 프런트엔드가 이
 | 영역 | 설명 |
 | --- | --- |
 | **상태/모니터링** | 모든 인스턴스의 도달 가능성·응답 시간·서브시스템 health를 동시 점검하고, Blob Store 사용량을 표시 |
+| **비교 매트릭스** | 저장소(행) × 인스턴스(열) 격자에서 각 저장소의 **존재 여부와 설정 일치 여부**를 색으로 한눈에 비교. Core(타 리전)와 DMZ/사이트 간 구성 드리프트를 즉시 식별 |
 | **저장소 관리** | 저장소 목록 조회, 삭제, 컴포넌트(아티팩트) 탐색 및 삭제 (페이지네이션 지원) |
 | **정리(Cleanup) 정책** | 정책 목록 조회 및 신규 정책 생성 (마지막 업데이트/다운로드 경과일 기준) |
+
+### 비교 매트릭스 동작 방식
+
+각 저장소를 인스턴스별로 비교하여 행 단위 상태를 산출합니다.
+
+- **설정 지문(signature)** = `포맷 + 타입 + (프록시인 경우) 원격 URL`. 같은 이름이라도 이 셋이 다르면 "설정 상이"로 판단합니다.
+- **기준(reference)** = 해당 행에서 가장 많이 나타난 설정. 기준과 다른 셀이 드리프트로 표시됩니다(예: Core만 다른 원격 URL).
+- 행 상태:
+  - `일치(consistent)` — 모든(조회 가능한) 인스턴스에 존재하고 설정이 동일
+  - `설정 상이(drift)` — 같은 저장소가 인스턴스마다 다른 설정 (빨강)
+  - `일부 누락(partial)` — 일부 인스턴스에만 존재
+  - 조회 불가 인스턴스는 컬럼에 ⚠ 로 표시되고 드리프트 판정에서 제외
+- "차이가 있는 항목만 보기" 체크 시 `일치` 행을 숨겨 문제만 빠르게 확인할 수 있습니다.
+
+> 인스턴스 열 순서는 `instances.yaml`에 정의한 순서(예: DMZ → Core → Site1…N)를 그대로 따르므로 네트워크 토폴로지와 동일하게 보입니다.
 
 ## 아키텍처
 
@@ -22,7 +38,8 @@ FastAPI (app/main.py)
   ├─ routers/instances.py     인스턴스 목록
   ├─ routers/repositories.py  저장소 · 컴포넌트
   ├─ routers/cleanup.py       정리 정책
-  └─ routers/monitoring.py    상태 · Blob Store
+  ├─ routers/monitoring.py    상태 · Blob Store
+  └─ routers/matrix.py        구성 비교 매트릭스 (app/matrix.py 로직)
         │
         ▼
 NexusClient (app/nexus_client.py)  ── httpx ──▶  Nexus REST API
@@ -89,6 +106,7 @@ instances:
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | `GET` | `/api/instances` | 관리 인스턴스 목록 (자격 증명 제외) |
+| `GET` | `/api/matrix` | 저장소 × 인스턴스 구성 비교 매트릭스 |
 | `GET` | `/api/status` | 전체 인스턴스 상태 동시 점검 |
 | `GET` | `/api/instances/{id}/status` | 단일 인스턴스 상태 |
 | `GET` | `/api/instances/{id}/blobstores` | Blob Store 사용량 |

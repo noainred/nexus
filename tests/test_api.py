@@ -99,6 +99,63 @@ def test_cleanup_create(http_client):
 
 
 @respx.mock
+def test_matrix_endpoint_flags_drift(http_client):
+    # Two instances, same repo name, different upstream URL -> drift.
+    deps.registry._instances["core"] = InstanceConfig(
+        id="core",
+        name="Core",
+        base_url="https://core.test",
+        username="admin",
+        password="secret",
+        verify_tls=True,
+    )
+    respx.get(f"{API}/repositories").mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {
+                    "name": "pypi",
+                    "format": "pypi",
+                    "type": "proxy",
+                    "attributes": {"proxy": {"remoteUrl": "https://pypi.org/simple"}},
+                }
+            ],
+        )
+    )
+    respx.get("https://core.test/service/rest/v1/repositories").mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {
+                    "name": "pypi",
+                    "format": "pypi",
+                    "type": "proxy",
+                    "attributes": {"proxy": {"remoteUrl": "https://mirror.local/simple"}},
+                }
+            ],
+        )
+    )
+    resp = http_client.get("/api/matrix")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert [c["id"] for c in body["columns"]] == ["test", "core"]
+    row = body["rows"][0]
+    assert row["repository"] == "pypi"
+    assert row["status"] == "drift"
+
+
+@respx.mock
+def test_matrix_endpoint_marks_unreachable_column(http_client):
+    respx.get(f"{API}/repositories").mock(side_effect=httpx.ConnectError("down"))
+    resp = http_client.get("/api/matrix")
+    assert resp.status_code == 200
+    body = resp.json()
+    col = body["columns"][0]
+    assert col["reachable"] is False
+    assert col["error"]
+
+
+@respx.mock
 def test_status_endpoint_handles_unreachable(http_client):
     respx.get(f"{API}/status").mock(side_effect=httpx.ConnectError("down"))
     resp = http_client.get("/api/status")
