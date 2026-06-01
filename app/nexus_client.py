@@ -55,6 +55,10 @@ class NexusClient:
         try:
             async with self._client() as client:
                 response = await client.request(method, path, **kwargs)
+        except httpx.InvalidURL as exc:  # malformed base_url in instances.yaml
+            raise NexusError(
+                f"Invalid base_url '{self.instance.base_url}': {exc}"
+            ) from exc
         except httpx.HTTPError as exc:  # connection refused, DNS, timeout, TLS...
             raise NexusError(f"Connection error: {exc}") from exc
 
@@ -215,6 +219,10 @@ class NexusClient:
                 headers={"Accept": "application/json"},
             ) as client:
                 response = await client.request(method, path, **kwargs)
+        except httpx.InvalidURL as exc:
+            raise NexusError(
+                f"Invalid base_url '{self.instance.base_url}': {exc}"
+            ) from exc
         except httpx.HTTPError as exc:
             raise NexusError(f"Connection error: {exc}") from exc
         if response.status_code >= 400:

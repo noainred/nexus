@@ -63,6 +63,17 @@ async def test_connection_error_has_no_status(client):
     assert exc.value.status_code is None
 
 
+async def test_malformed_base_url_becomes_nexus_error(instance):
+    # A stray quote in base_url (a common instances.yaml typo) must not crash
+    # the whole dashboard; it should surface as a handled NexusError.
+    instance.base_url = 'https://nexus.test:8081"'
+    bad_client = NexusClient(instance, timeout=5.0)
+    with pytest.raises(NexusError) as exc:
+        await bad_client.list_repositories()
+    assert exc.value.status_code is None
+    assert "Invalid base_url" in exc.value.message
+
+
 @respx.mock
 async def test_list_components_pagination(client):
     respx.get(f"{API}/components").mock(
