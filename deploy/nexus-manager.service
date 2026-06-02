@@ -1,0 +1,28 @@
+[Unit]
+Description=Nexus Integrated Manager (dashboard)
+After=network.target
+
+[Service]
+Type=simple
+# Account that runs the service. Create it once with:
+#   useradd --system --home /opt/nexus-manager --shell /sbin/nologin nexusmgr
+User=nexusmgr
+Group=nexusmgr
+
+# Directory that contains app/, .venv/, instances.yaml
+WorkingDirectory=/opt/nexus-manager
+
+# Where the manager reads its instance list from (absolute path is safest).
+Environment=NEXUS_MANAGER_INSTANCES_FILE=/opt/nexus-manager/instances.yaml
+
+ExecStart=/opt/nexus-manager/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+Restart=on-failure
+RestartSec=5
+
+# Basic hardening (optional, safe defaults).
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -16,6 +16,10 @@ env/
 instances.local.yaml
 instances.yaml
 
+# Offline deployment artifacts
+wheelhouse/
+*.tar.gz
+
 # Editor / OS
 .idea/
 .vscode/

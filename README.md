@@ -91,6 +91,13 @@ uvicorn app.main:app --reload --port 8000
 브라우저에서 <http://localhost:8000> 에 접속하면 대시보드가, 
 <http://localhost:8000/docs> 에서 OpenAPI 문서가 열립니다.
 
+### 폐쇄망(오프라인) 서버 배포
+
+인터넷이 안 되는 폐쇄망 서버 배포는 [`deploy/README.md`](deploy/README.md)를
+참고하세요. 사내 **Nexus PyPI 프록시로 설치**하는 방법과, 완전 격리망을 위한
+**오프라인 wheel 번들** 방법, **systemd 서비스 등록**까지 스크립트와 함께
+정리되어 있습니다.
+
 ## 설정
 
 ### `instances.yaml`
