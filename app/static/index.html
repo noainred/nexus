@@ -22,6 +22,7 @@
       <button class="tab" data-tab="compare">저장소 1:1 비교</button>
       <button class="tab" data-tab="repositories">저장소 관리</button>
       <button class="tab" data-tab="downloads">다운로드 현황</button>
+      <button class="tab" data-tab="tasks">작업</button>
       <button class="tab" data-tab="cleanup">정리 정책</button>
     </nav>
 
@@ -100,6 +101,16 @@
         <div id="dl-summary" class="cards"></div>
         <div id="dl-note" class="hint"></div>
         <div id="dl-table"></div>
+      </section>
+
+      <section id="tasks" class="panel">
+        <h2>스케줄 작업 (Tasks)</h2>
+        <p class="hint">인스턴스의 스케줄 작업 상태·마지막 실행 결과를 확인하고, 직접 실행/중지할 수 있습니다. (예: Compact blob store, Cleanup)</p>
+        <div class="dl-controls">
+          <label>서버 <select id="task-inst"></select></label>
+          <button id="task-refresh">새로고침</button>
+        </div>
+        <div id="task-table"></div>
       </section>
 
       <section id="cleanup" class="panel">

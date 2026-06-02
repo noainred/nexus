@@ -10,6 +10,7 @@ const state = {
   repoDiff: null,
   compareDiff: null,
   downloadsLoaded: false,
+  tasksLoaded: false,
 };
 
 // ---- helpers -------------------------------------------------------------
@@ -79,6 +80,10 @@ document.querySelectorAll(".tab").forEach((tab) => {
     if (tab.dataset.tab === "downloads" && !state.downloadsLoaded) {
       state.downloadsLoaded = true;
       runDownloadsView();
+    }
+    if (tab.dataset.tab === "tasks" && !state.tasksLoaded) {
+      state.tasksLoaded = true;
+      loadTasks();
     }
   });
 });
@@ -832,6 +837,71 @@ async function loadRepoDownloadDetail(instId, repo) {
 
 document.getElementById("dl-run").addEventListener("click", runDownloadsView);
 
+// ---- scheduled tasks -----------------------------------------------------
+
+function setupTasks() {
+  const inst = document.getElementById("task-inst");
+  fillInstanceSelect(inst);
+  inst.addEventListener("change", loadTasks);
+  document.getElementById("task-refresh").addEventListener("click", loadTasks);
+}
+
+function taskResultBadge(result, state) {
+  if (state && state !== "WAITING") {
+    return el("span", { class: "badge warn" }, state);     // RUNNING 등
+  }
+  if (!result) return el("span", { class: "badge" }, "—");
+  const ok = result === "OK" || result === "SUCCESS";
+  return el("span", { class: `badge ${ok ? "up" : "down"}` }, result);
+}
+
+async function loadTasks() {
+  const instId = document.getElementById("task-inst").value;
+  const container = document.getElementById("task-table");
+  container.innerHTML = "";
+  if (!instId) return;
+  container.append(el("div", { class: "empty" }, "불러오는 중…"));
+  let list;
+  try {
+    list = await api(`/api/instances/${instId}/tasks`);
+  } catch (e) {
+    container.innerHTML = "";
+    container.append(el("div", { class: "empty" }, `작업 조회 실패: ${e.message}`));
+    return;
+  }
+  container.innerHTML = "";
+  if (!list.length) {
+    container.append(el("div", { class: "empty" }, "등록된 작업이 없습니다."));
+    return;
+  }
+  const rows = list.map((t) => {
+    const actions = [];
+    if (t.runnable) actions.push(el("button", { onclick: () => taskAction(instId, t.id, "run", t.name) }, "실행"));
+    if (t.stoppable) actions.push(el("button", { class: "danger", onclick: () => taskAction(instId, t.id, "stop", t.name) }, "중지"));
+    return el("tr", {}, [
+      el("td", {}, t.name || t.id),
+      el("td", {}, t.type || "—"),
+      el("td", {}, taskResultBadge(t.last_run_result, t.current_state)),
+      el("td", {}, fmtDate(t.last_run)),
+      el("td", {}, fmtDate(t.next_run)),
+      el("td", {}, actions.length ? actions : "—"),
+    ]);
+  });
+  container.append(buildTable(["작업", "유형", "마지막 결과", "마지막 실행", "다음 실행", ""], rows));
+}
+
+async function taskAction(instId, taskId, action, name) {
+  const verb = action === "run" ? "실행" : "중지";
+  if (!confirm(`작업 '${name}'을(를) ${verb}하시겠습니까?`)) return;
+  try {
+    await api(`/api/instances/${instId}/tasks/${encodeURIComponent(taskId)}/${action}`, { method: "POST" });
+    toast(`작업 ${verb} 요청됨`);
+    setTimeout(loadTasks, 800);
+  } catch (e) {
+    toast(e.message, "err");
+  }
+}
+
 // ---- cleanup -------------------------------------------------------------
 
 async function loadCleanup() {
@@ -921,6 +991,7 @@ async function init() {
   document.getElementById("refresh-btn").addEventListener("click", refreshActiveTab);
   setupCompare();
   setupDownloads();
+  setupTasks();
   refreshActiveTab();
 }
 

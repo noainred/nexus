@@ -20,6 +20,7 @@ from .models import (
     Component,
     ComponentPage,
     Repository,
+    Task,
 )
 
 
@@ -198,6 +199,36 @@ class NexusClient:
             for item in data.get("items", [])
         ]
         return AssetPage(items=items, continuation_token=data.get("continuationToken"))
+
+    # -- Scheduled tasks ----------------------------------------------------
+
+    async def list_tasks(self) -> list[Task]:
+        resp = await self._request("GET", "/tasks")
+        data = resp.json()
+        tasks: list[Task] = []
+        for item in data.get("items", []):
+            state = item.get("currentState")
+            tasks.append(
+                Task(
+                    id=item["id"],
+                    name=item.get("name"),
+                    type=item.get("type"),
+                    message=item.get("message"),
+                    current_state=state,
+                    last_run_result=item.get("lastRunResult"),
+                    last_run=item.get("lastRun"),
+                    next_run=item.get("nextRun"),
+                    runnable=state in (None, "WAITING"),
+                    stoppable=state == "RUNNING",
+                )
+            )
+        return tasks
+
+    async def run_task(self, task_id: str) -> None:
+        await self._request("POST", f"/tasks/{task_id}/run")
+
+    async def stop_task(self, task_id: str) -> None:
+        await self._request("POST", f"/tasks/{task_id}/stop")
 
     # -- Cleanup policies ---------------------------------------------------
     #

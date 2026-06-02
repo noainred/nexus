@@ -124,6 +124,21 @@ class ServerDownloadSummary(BaseModel):
     repositories: List[RepoDownloadSummary] = Field(default_factory=list)
 
 
+class Task(BaseModel):
+    """A scheduled task as returned by the Nexus tasks API."""
+
+    id: str
+    name: Optional[str] = None
+    type: Optional[str] = None
+    message: Optional[str] = None
+    current_state: Optional[str] = None
+    last_run_result: Optional[str] = None
+    last_run: Optional[str] = None
+    next_run: Optional[str] = None
+    runnable: bool = False
+    stoppable: bool = False
+
+
 class BlobStore(BaseModel):
     """Blob store usage information used by the monitoring view."""
 

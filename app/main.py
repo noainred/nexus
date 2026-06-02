@@ -15,6 +15,7 @@ from .routers import (
     matrix,
     monitoring,
     repositories,
+    tasks,
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -35,6 +36,7 @@ app.include_router(cleanup.router)
 app.include_router(monitoring.router)
 app.include_router(matrix.router)
 app.include_router(downloads.router)
+app.include_router(tasks.router)
 
 
 @app.middleware("http")

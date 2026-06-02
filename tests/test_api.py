@@ -372,6 +372,44 @@ def test_downloads_summary_scans_all_non_group_repos(http_client):
     assert body["downloaded_size_bytes"] == 100
 
 
+@respx.mock
+def test_tasks_list_and_run(http_client):
+    respx.get(f"{API}/tasks").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "id": "t1",
+                        "name": "Compact blob store",
+                        "type": "blobstore.compact",
+                        "currentState": "WAITING",
+                        "lastRunResult": "OK",
+                        "lastRun": "2026-05-01T00:00:00.000+00:00",
+                    },
+                    {
+                        "id": "t2",
+                        "name": "Cleanup",
+                        "type": "repository.cleanup",
+                        "currentState": "RUNNING",
+                        "lastRunResult": None,
+                    },
+                ]
+            },
+        )
+    )
+    resp = http_client.get("/api/instances/test/tasks")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body[0]["runnable"] is True and body[0]["stoppable"] is False
+    assert body[1]["stoppable"] is True and body[1]["runnable"] is False
+
+    run = respx.post(f"{API}/tasks/t1/run").mock(return_value=httpx.Response(204))
+    r = http_client.post("/api/instances/test/tasks/t1/run")
+    assert r.status_code == 204
+    assert run.called
+
+
 def test_compare_unknown_instance_404(http_client):
     resp = http_client.get(
         "/api/compare?left_instance=nope&left_repo=a&right_instance=test&right_repo=b"
