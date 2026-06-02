@@ -12,7 +12,12 @@ REST API를 호출하고, 가벼운 단일 페이지(SPA) 프런트엔드가 이
 | **비교 매트릭스** | 저장소(행) × 인스턴스(열) 격자에서 각 저장소의 **존재 여부와 설정 일치 여부**를 색으로 한눈에 비교. Core(타 리전)와 DMZ/사이트 간 구성 드리프트를 즉시 식별 |
 | **저장소 관리** | 저장소 목록 조회, 삭제, 컴포넌트(아티팩트) 탐색 및 삭제 (페이지네이션 지원) |
 | **다운로드 현황** | 서버 선택 시 모든 저장소의 다운로드 요약(저장소별 자산·용량)을 자동 표시, 저장소 선택 시 실제 다운로드된 패키지 상세 목록 표시 |
+| **작업(Tasks)** | 인스턴스의 스케줄 작업 상태·마지막 실행 결과 확인 및 실행/중지(Compact blob store, Cleanup 등) |
+| **보안 점검** | 사이트별 익명 접근 허용·기본 admin 계정·관리자 권한 계정 점검 |
+| **콘텐츠 동기화** | 사이트 간 실제 컴포넌트(아티팩트) 존재 비교로 콘텐츠 드리프트 탐지 |
 | **정리(Cleanup) 정책** | 정책 목록 조회 및 신규 정책 생성 (마지막 업데이트/다운로드 경과일 기준) |
+
+> 개요의 Blob Store 사용량에는 **사용률(%) 임계치 경고**(80% 주황 / 90% 빨강)가 표시됩니다.
 
 ### 비교 매트릭스 동작 방식
 
@@ -136,6 +141,10 @@ instances:
 | `GET` | `/api/matrix` | 저장소 × 인스턴스 구성 비교 매트릭스 |
 | `GET` | `/api/repository-detail?repository=` | 한 저장소의 설정 항목별 인스턴스 비교(diff) |
 | `GET` | `/api/compare?left_instance=&left_repo=&right_instance=&right_repo=` | 임의의 두 저장소(다른 서버·다른 이름) 1:1 설정 비교 |
+| `GET` | `/api/content-compare?repository=` | 사이트 간 실제 컴포넌트 존재 비교(콘텐츠 드리프트) |
+| `GET` | `/api/security` | 사이트별 보안 점검(익명 접근·admin 계정) |
+| `GET` | `/api/instances/{id}/tasks` | 스케줄 작업 목록·상태 |
+| `POST` | `/api/instances/{id}/tasks/{taskId}/run` · `/stop` | 작업 실행 / 중지 |
 | `GET` | `/api/status` | 전체 인스턴스 상태 동시 점검 |
 | `GET` | `/api/instances/{id}/status` | 단일 인스턴스 상태 |
 | `GET` | `/api/blobstores` | 전체 인스턴스 Blob Store 사용량 (사이트별) |

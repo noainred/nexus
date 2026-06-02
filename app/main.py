@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__
 from .routers import (
     cleanup,
+    content,
     downloads,
     instances,
     matrix,
@@ -39,6 +40,7 @@ app.include_router(matrix.router)
 app.include_router(downloads.router)
 app.include_router(tasks.router)
 app.include_router(security.router)
+app.include_router(content.router)
 
 
 @app.middleware("http")

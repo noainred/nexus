@@ -12,6 +12,8 @@ const state = {
   downloadsLoaded: false,
   tasksLoaded: false,
   securityLoaded: false,
+  contentSetup: false,
+  contentMatrix: null,
 };
 
 // ---- helpers -------------------------------------------------------------
@@ -89,6 +91,10 @@ document.querySelectorAll(".tab").forEach((tab) => {
     if (tab.dataset.tab === "security" && !state.securityLoaded) {
       state.securityLoaded = true;
       loadSecurity();
+    }
+    if (tab.dataset.tab === "content" && !state.contentSetup) {
+      state.contentSetup = true;
+      setupContent();
     }
   });
 });
@@ -958,6 +964,96 @@ async function loadSecurity() {
   container.append(buildTable(
     ["서버", "익명 접근", "기본 admin 계정", "관리자 권한 계정", "사용자 수"], rows
   ));
+}
+
+// ---- content sync compare ------------------------------------------------
+
+async function setupContent() {
+  const sel = document.getElementById("content-repo");
+  sel.innerHTML = "";
+  sel.append(el("option", { value: "" }, "저장소 목록 불러오는 중…"));
+  // Repository names = union across instances, taken from the matrix.
+  try {
+    const matrix = state.matrix || (await api("/api/matrix"));
+    state.matrix = matrix;
+    sel.innerHTML = "";
+    const names = matrix.rows.map((r) => r.repository);
+    if (!names.length) sel.append(el("option", { value: "" }, "저장소 없음"));
+    names.forEach((n) => sel.append(el("option", { value: n }, n)));
+  } catch (e) {
+    sel.innerHTML = "";
+    sel.append(el("option", { value: "" }, "목록 조회 실패"));
+  }
+  document.getElementById("content-run").addEventListener("click", loadContent);
+  document.getElementById("content-diff-only").addEventListener("change", renderContent);
+}
+
+function renderContent() {
+  const container = document.getElementById("content-table");
+  const note = document.getElementById("content-note");
+  container.innerHTML = "";
+  const data = state.contentMatrix;
+  if (!data) return;
+
+  note.textContent = data.truncated
+    ? "※ 컴포넌트가 매우 많아 일부만 스캔했습니다(하한). 결과가 불완전할 수 있어요."
+    : "";
+
+  const applicable = data.columns.filter((c) => c.reachable && !c.error);
+  const diffOnly = document.getElementById("content-diff-only").checked;
+  let rows = data.rows;
+  if (diffOnly) rows = rows.filter((r) => !r.consistent);
+
+  if (!data.columns.length) {
+    container.append(el("div", { class: "empty" }, "인스턴스가 없습니다."));
+    return;
+  }
+  if (!rows.length) {
+    container.append(el("div", { class: "empty" },
+      diffOnly ? "사이트 간 차이가 없습니다. 모두 동일합니다 ✓" : "컴포넌트가 없습니다."));
+    return;
+  }
+
+  const headCells = [el("th", { class: "rowhead" }, "컴포넌트 \\ 사이트")];
+  data.columns.forEach((col) => {
+    let label = col.name;
+    if (!col.reachable) label += " ⚠";
+    else if (col.error) label += " (없음)";
+    headCells.push(el("th", { title: col.error || col.name }, label));
+  });
+  const thead = el("thead", {}, el("tr", {}, headCells));
+
+  const body = rows.map((r) => {
+    const tds = [el("td", { class: "rowhead" }, r.key)];
+    data.columns.forEach((col) => {
+      const applies = col.reachable && !col.error;
+      let cls, mark;
+      if (!applies) { cls = "unknown"; mark = "·"; }
+      else if (r.present[col.id]) { cls = "consistent"; mark = "✓"; }
+      else { cls = "drift"; mark = "✗"; }
+      tds.push(el("td", {}, el("span", { class: `mcell ${cls}` }, el("span", { class: "mark" }, mark))));
+    });
+    return el("tr", {}, tds);
+  });
+
+  container.append(el("table", { class: "matrix" }, [thead, el("tbody", {}, body)]));
+}
+
+async function loadContent() {
+  const repo = document.getElementById("content-repo").value;
+  const container = document.getElementById("content-table");
+  document.getElementById("content-note").textContent = "";
+  container.innerHTML = "";
+  if (!repo) { toast("저장소를 선택하세요.", "err"); return; }
+  container.append(el("div", { class: "empty" }, "사이트별 컴포넌트를 스캔하는 중…"));
+  try {
+    state.contentMatrix = await api(`/api/content-compare?repository=${encodeURIComponent(repo)}`);
+  } catch (e) {
+    container.innerHTML = "";
+    container.append(el("div", { class: "empty" }, `비교 실패: ${e.message}`));
+    return;
+  }
+  renderContent();
 }
 
 // ---- cleanup -------------------------------------------------------------

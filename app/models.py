@@ -254,6 +254,26 @@ class RepositoryMatrix(BaseModel):
     rows: List[MatrixRow] = Field(default_factory=list)
 
 
+class ContentRow(BaseModel):
+    """One component compared across instances (presence only)."""
+
+    key: str
+    group: Optional[str] = None
+    name: Optional[str] = None
+    version: Optional[str] = None
+    present: dict[str, bool] = Field(default_factory=dict)
+    consistent: bool = True
+
+
+class ContentMatrix(BaseModel):
+    """Actual component presence for one repository across instances."""
+
+    repository: str
+    columns: List[MatrixColumn] = Field(default_factory=list)
+    rows: List[ContentRow] = Field(default_factory=list)
+    truncated: bool = False
+
+
 class RepoDiffField(BaseModel):
     """One configuration field compared across instances."""
 

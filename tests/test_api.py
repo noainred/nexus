@@ -411,6 +411,43 @@ def test_tasks_list_and_run(http_client):
 
 
 @respx.mock
+def test_content_compare_detects_missing_component(http_client):
+    deps.registry._instances["core"] = InstanceConfig(
+        id="core", name="Core", base_url="https://core.test",
+        username="admin", password="secret", verify_tls=True,
+    )
+    # test has 2 components; core is missing one of them.
+    respx.get(f"{API}/components").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "items": [
+                    {"id": "1", "group": "g", "name": "a", "version": "1.0"},
+                    {"id": "2", "group": "g", "name": "b", "version": "1.0"},
+                ],
+                "continuationToken": None,
+            },
+        )
+    )
+    respx.get("https://core.test/service/rest/v1/components").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "items": [{"id": "9", "group": "g", "name": "a", "version": "1.0"}],
+                "continuationToken": None,
+            },
+        )
+    )
+    resp = http_client.get("/api/content-compare?repository=raw-hosted")
+    assert resp.status_code == 200
+    body = resp.json()
+    by_key = {r["key"]: r for r in body["rows"]}
+    assert by_key["g:a:1.0"]["consistent"] is True
+    assert by_key["g:b:1.0"]["consistent"] is False
+    assert by_key["g:b:1.0"]["present"]["core"] is False
+
+
+@respx.mock
 def test_security_check(http_client):
     respx.get(f"{API}/security/anonymous").mock(
         return_value=httpx.Response(200, json={"enabled": True, "userId": "anonymous"})
