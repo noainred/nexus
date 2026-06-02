@@ -139,7 +139,11 @@ tr:hover td { background: var(--panel); }
 .dl-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
 .dl-controls select { min-width: 220px; }
 #dl-run { background: var(--accent); border-color: var(--accent); color: #fff; padding: 8px 18px; }
-#dl-summary { margin: 8px 0; }
+/* Compact summary cards so all four fit on one row. */
+#dl-summary { margin: 8px 0; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+#dl-summary .card { padding: 10px 14px; }
+#dl-summary .metric .label { font-size: 11px; }
+#dl-summary .metric .value { font-size: 16px; }
 #dl-note { margin-bottom: 8px; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
