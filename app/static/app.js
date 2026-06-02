@@ -116,28 +116,56 @@ async function loadOverview() {
 async function loadBlobstores() {
   const container = document.getElementById("blobstore-table");
   container.innerHTML = "";
-  if (!state.current) return;
-  let stores = [];
+  let sites = [];
   try {
-    stores = await api(`/api/instances/${state.current}/blobstores`);
+    sites = await api("/api/blobstores");
   } catch (e) {
     container.append(el("div", { class: "empty" }, `Blob store 조회 실패: ${e.message}`));
     return;
   }
-  if (!stores.length) {
-    container.append(el("div", { class: "empty" }, "Blob store가 없습니다."));
+  if (!sites.length) {
+    container.append(el("div", { class: "empty" }, "구성된 인스턴스가 없습니다."));
     return;
   }
-  const rows = stores.map((b) =>
-    el("tr", {}, [
-      el("td", {}, b.name),
-      el("td", {}, b.type || "—"),
-      el("td", {}, fmtBytes(b.total_size_bytes)),
-      el("td", {}, fmtBytes(b.available_space_bytes)),
-      el("td", {}, b.blob_count != null ? b.blob_count.toLocaleString() : "—"),
-    ])
+
+  const rows = [];
+  sites.forEach((site) => {
+    if (!site.reachable) {
+      rows.push(
+        el("tr", {}, [
+          el("td", { class: "site-cell" }, site.name),
+          el("td", { colspan: "5", class: "site-error" }, `조회 불가: ${site.error || ""}`),
+        ])
+      );
+      return;
+    }
+    if (!site.blobstores.length) {
+      rows.push(
+        el("tr", {}, [
+          el("td", { class: "site-cell" }, site.name),
+          el("td", { colspan: "5", class: "empty" }, "Blob store 없음"),
+        ])
+      );
+      return;
+    }
+    // First row of a site carries the site name (row-spanned visually).
+    site.blobstores.forEach((b, idx) =>
+      rows.push(
+        el("tr", { class: idx === 0 ? "site-start" : "" }, [
+          el("td", { class: "site-cell" }, idx === 0 ? site.name : ""),
+          el("td", {}, b.name),
+          el("td", {}, b.type || "—"),
+          el("td", {}, fmtBytes(b.total_size_bytes)),
+          el("td", {}, fmtBytes(b.available_space_bytes)),
+          el("td", {}, b.blob_count != null ? b.blob_count.toLocaleString() : "—"),
+        ])
+      )
+    );
+  });
+
+  container.append(
+    buildTable(["사이트", "Blob Store", "유형", "사용량", "가용 공간", "Blob 수"], rows)
   );
-  container.append(buildTable(["이름", "유형", "사용량", "가용 공간", "Blob 수"], rows));
 }
 
 // ---- comparison matrix ---------------------------------------------------

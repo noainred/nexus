@@ -129,6 +129,11 @@ tr:hover td { background: var(--panel); }
 
 .empty { color: var(--muted); font-style: italic; padding: 12px 0; }
 
+/* blob store by site */
+td.site-cell { font-weight: 600; color: var(--accent); white-space: nowrap; }
+tr.site-start td { border-top: 2px solid var(--border); }
+td.site-error { color: var(--red); }
+
 /* -- comparison matrix -- */
 .matrix-header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .drift-only { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }

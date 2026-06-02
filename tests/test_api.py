@@ -156,6 +156,50 @@ def test_matrix_endpoint_marks_unreachable_column(http_client):
 
 
 @respx.mock
+def test_blobstores_all_aggregates_per_instance(http_client):
+    respx.get(f"{API}/blobstores").mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {
+                    "name": "default",
+                    "type": "File",
+                    "totalSizeInBytes": 100,
+                    "availableSpaceInBytes": 900,
+                    "blobCount": 5,
+                },
+                {
+                    "name": "extra",
+                    "type": "File",
+                    "totalSizeInBytes": 50,
+                    "blobCount": 2,
+                },
+            ],
+        )
+    )
+    resp = http_client.get("/api/blobstores")
+    assert resp.status_code == 200
+    body = resp.json()
+    site = body[0]
+    assert site["id"] == "test"
+    assert site["reachable"] is True
+    assert len(site["blobstores"]) == 2
+    assert site["total_size_bytes"] == 150  # summed across blob stores
+    assert site["blob_count"] == 7
+
+
+@respx.mock
+def test_blobstores_all_marks_unreachable(http_client):
+    respx.get(f"{API}/blobstores").mock(side_effect=httpx.ConnectError("down"))
+    resp = http_client.get("/api/blobstores")
+    assert resp.status_code == 200
+    site = resp.json()[0]
+    assert site["reachable"] is False
+    assert site["error"]
+    assert site["blobstores"] == []
+
+
+@respx.mock
 def test_status_endpoint_handles_unreachable(http_client):
     respx.get(f"{API}/status").mock(side_effect=httpx.ConnectError("down"))
     resp = http_client.get("/api/status")

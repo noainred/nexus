@@ -109,7 +109,8 @@ instances:
 | `GET` | `/api/matrix` | 저장소 × 인스턴스 구성 비교 매트릭스 |
 | `GET` | `/api/status` | 전체 인스턴스 상태 동시 점검 |
 | `GET` | `/api/instances/{id}/status` | 단일 인스턴스 상태 |
-| `GET` | `/api/instances/{id}/blobstores` | Blob Store 사용량 |
+| `GET` | `/api/blobstores` | 전체 인스턴스 Blob Store 사용량 (사이트별) |
+| `GET` | `/api/instances/{id}/blobstores` | 단일 인스턴스 Blob Store 사용량 |
 | `GET` | `/api/instances/{id}/repositories` | 저장소 목록 |
 | `DELETE` | `/api/instances/{id}/repositories/{name}` | 저장소 삭제 |
 | `GET` | `/api/instances/{id}/components?repository=` | 컴포넌트 목록(페이지네이션) |

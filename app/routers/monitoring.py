@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..config import get_settings
 from ..deps import InstanceRegistry, get_client, get_registry
-from ..models import BlobStore, InstanceStatus
+from ..models import BlobStore, InstanceBlobStores, InstanceStatus
 from ..nexus_client import NexusClient, NexusError
 
 router = APIRouter(prefix="/api", tags=["monitoring"])
@@ -71,3 +71,33 @@ async def list_blobstores(instance_id: str) -> List[BlobStore]:
         return await client.list_blobstores()
     except NexusError as exc:
         raise HTTPException(status_code=exc.status_code or 502, detail=exc.message)
+
+
+async def _blobstores_for(instance) -> InstanceBlobStores:
+    """Fetch one instance's blob stores, never raising (errors -> fields)."""
+    client = NexusClient(instance, timeout=get_settings().request_timeout)
+    result = InstanceBlobStores(id=instance.id, name=instance.name)
+    try:
+        stores = await client.list_blobstores()
+    except NexusError as exc:
+        result.reachable = False
+        result.error = exc.message
+        return result
+
+    result.blobstores = stores
+    sizes = [s.total_size_bytes for s in stores if s.total_size_bytes is not None]
+    counts = [s.blob_count for s in stores if s.blob_count is not None]
+    result.total_size_bytes = sum(sizes) if sizes else None
+    result.blob_count = sum(counts) if counts else None
+    return result
+
+
+@router.get("/blobstores", response_model=List[InstanceBlobStores])
+async def blobstores_all(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> List[InstanceBlobStores]:
+    """Blob store usage for every instance, for the site-by-site overview."""
+    results = await asyncio.gather(
+        *(_blobstores_for(instance) for instance in registry.all())
+    )
+    return list(results)

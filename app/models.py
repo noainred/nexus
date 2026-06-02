@@ -68,6 +68,18 @@ class BlobStore(BaseModel):
     blob_count: Optional[int] = None
 
 
+class InstanceBlobStores(BaseModel):
+    """Per-instance blob store usage for the site-by-site overview."""
+
+    id: str
+    name: str
+    reachable: bool = True
+    error: Optional[str] = None
+    blobstores: List[BlobStore] = Field(default_factory=list)
+    total_size_bytes: Optional[int] = None
+    blob_count: Optional[int] = None
+
+
 class CleanupPolicy(BaseModel):
     """A cleanup policy definition."""
 
