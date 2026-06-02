@@ -44,6 +44,12 @@ function fmtBytes(n) {
   return `${v.toFixed(1)} ${units[i]}`;
 }
 
+function fmtDate(s) {
+  if (!s) return "—";
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? s : d.toLocaleString();
+}
+
 function el(tag, props = {}, children = []) {
   const node = document.createElement(tag);
   Object.entries(props).forEach(([k, v]) => {
@@ -560,6 +566,85 @@ document.getElementById("component-more").addEventListener("click", () => {
   browseComponents(state.componentRepo, true);
 });
 
+// ---- download usage ------------------------------------------------------
+
+function loadDownloadsRepoOptions() {
+  // Refresh the repo dropdown for the active instance; clear stale results.
+  document.getElementById("dl-summary").innerHTML = "";
+  document.getElementById("dl-table").innerHTML = "";
+  document.getElementById("dl-note").textContent = "";
+  const sel = document.getElementById("dl-repo");
+  if (!state.current) {
+    sel.innerHTML = "";
+    return;
+  }
+  fillRepoSelect(state.current, sel);
+}
+
+function summaryCard(label, value) {
+  return el("div", { class: "card" }, [
+    el("div", { class: "metric" }, [
+      el("div", { class: "label" }, label),
+      el("div", { class: "value" }, value),
+    ]),
+  ]);
+}
+
+async function runDownloads() {
+  const repo = document.getElementById("dl-repo").value;
+  const summary = document.getElementById("dl-summary");
+  const note = document.getElementById("dl-note");
+  const table = document.getElementById("dl-table");
+  summary.innerHTML = "";
+  note.textContent = "";
+  table.innerHTML = "";
+  if (!state.current || !repo) {
+    toast("저장소를 선택하세요.", "err");
+    return;
+  }
+  table.append(el("div", { class: "empty" }, "자산을 스캔하는 중… (저장소 크기에 따라 시간이 걸릴 수 있어요)"));
+
+  let report;
+  try {
+    report = await api(
+      `/api/instances/${state.current}/downloads?repository=${encodeURIComponent(repo)}`
+    );
+  } catch (e) {
+    table.innerHTML = "";
+    table.append(el("div", { class: "empty" }, `조회 실패: ${e.message}`));
+    return;
+  }
+
+  summary.append(
+    summaryCard("전체 자산", report.total_assets.toLocaleString()),
+    summaryCard("다운로드된 자산", report.downloaded_assets.toLocaleString()),
+    summaryCard("전체 용량", fmtBytes(report.total_size_bytes)),
+    summaryCard("다운로드된 용량", fmtBytes(report.downloaded_size_bytes))
+  );
+
+  if (report.truncated) {
+    note.textContent =
+      "※ 자산이 매우 많아 일부만 스캔했습니다. 위 수치는 최소값(하한)입니다.";
+  }
+
+  table.innerHTML = "";
+  if (!report.items.length) {
+    table.append(el("div", { class: "empty" }, "다운로드된 자산이 없습니다."));
+    return;
+  }
+  const rows = report.items.map((a) =>
+    el("tr", {}, [
+      el("td", {}, a.path),
+      el("td", {}, a.content_type || "—"),
+      el("td", { class: "num" }, fmtBytes(a.size_bytes)),
+      el("td", {}, fmtDate(a.last_downloaded)),
+    ])
+  );
+  table.append(buildTable(["경로", "유형", "용량", "마지막 다운로드"], rows));
+}
+
+document.getElementById("dl-run").addEventListener("click", runDownloads);
+
 // ---- cleanup -------------------------------------------------------------
 
 async function loadCleanup() {
@@ -624,6 +709,7 @@ function refreshActiveTab() {
   loadOverview();
   loadMatrix();
   loadRepositories();
+  loadDownloadsRepoOptions();
   loadCleanup();
 }
 

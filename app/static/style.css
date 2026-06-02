@@ -129,6 +129,20 @@ tr:hover td { background: var(--panel); }
 
 .empty { color: var(--muted); font-style: italic; padding: 12px 0; }
 
+/* download usage */
+.dl-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 12px 0;
+}
+.dl-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.dl-controls select { min-width: 220px; }
+#dl-run { background: var(--accent); border-color: var(--accent); color: #fff; padding: 8px 18px; }
+#dl-summary { margin: 8px 0; }
+#dl-note { margin-bottom: 8px; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
 /* repository 1:1 compare */
 .compare-pickers {
   display: flex;

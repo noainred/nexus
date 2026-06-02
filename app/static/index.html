@@ -21,6 +21,7 @@
       <button class="tab" data-tab="matrix">비교 매트릭스</button>
       <button class="tab" data-tab="compare">저장소 1:1 비교</button>
       <button class="tab" data-tab="repositories">저장소</button>
+      <button class="tab" data-tab="downloads">다운로드 현황</button>
       <button class="tab" data-tab="cleanup">정리 정책</button>
     </nav>
 
@@ -81,6 +82,18 @@
         <div id="component-pager" class="pager hidden">
           <button id="component-more">더 보기</button>
         </div>
+      </section>
+
+      <section id="downloads" class="panel">
+        <h2>다운로드 현황 (실제 사용 패키지·용량)</h2>
+        <p class="hint">선택한 저장소의 자산을 스캔하여, 실제로 다운로드된 패키지와 용량을 집계합니다.</p>
+        <div class="dl-controls">
+          <label>저장소 <select id="dl-repo"></select></label>
+          <button id="dl-run">조회</button>
+        </div>
+        <div id="dl-summary" class="cards"></div>
+        <div id="dl-note" class="hint"></div>
+        <div id="dl-table"></div>
       </section>
 
       <section id="cleanup" class="panel">

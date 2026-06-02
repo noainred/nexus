@@ -13,6 +13,8 @@ import httpx
 
 from .config import InstanceConfig
 from .models import (
+    Asset,
+    AssetPage,
     BlobStore,
     CleanupPolicy,
     Component,
@@ -171,6 +173,31 @@ class NexusClient:
 
     async def delete_component(self, component_id: str) -> None:
         await self._request("DELETE", f"/components/{component_id}")
+
+    # -- Assets (used for download usage) -----------------------------------
+
+    async def list_assets(
+        self, repository: str, continuation_token: Optional[str] = None
+    ) -> AssetPage:
+        """One page of assets, each carrying fileSize and lastDownloaded."""
+        params: dict[str, str] = {"repository": repository}
+        if continuation_token:
+            params["continuationToken"] = continuation_token
+        resp = await self._request("GET", "/assets", params=params)
+        data = resp.json()
+        items = [
+            Asset(
+                id=item["id"],
+                path=item.get("path"),
+                repository=item.get("repository"),
+                format=item.get("format"),
+                content_type=item.get("contentType"),
+                file_size=item.get("fileSize"),
+                last_downloaded=item.get("lastDownloaded"),
+            )
+            for item in data.get("items", [])
+        ]
+        return AssetPage(items=items, continuation_token=data.get("continuationToken"))
 
     # -- Cleanup policies ---------------------------------------------------
     #

@@ -8,7 +8,14 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
-from .routers import cleanup, instances, matrix, monitoring, repositories
+from .routers import (
+    cleanup,
+    downloads,
+    instances,
+    matrix,
+    monitoring,
+    repositories,
+)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -27,6 +34,7 @@ app.include_router(repositories.router)
 app.include_router(cleanup.router)
 app.include_router(monitoring.router)
 app.include_router(matrix.router)
+app.include_router(downloads.router)
 
 
 @app.middleware("http")

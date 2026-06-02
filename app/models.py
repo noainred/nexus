@@ -58,6 +58,47 @@ class ComponentPage(BaseModel):
     continuation_token: Optional[str] = None
 
 
+class Asset(BaseModel):
+    """A single asset (file) inside a repository."""
+
+    id: str
+    path: Optional[str] = None
+    repository: Optional[str] = None
+    format: Optional[str] = None
+    content_type: Optional[str] = None
+    file_size: Optional[int] = None
+    last_downloaded: Optional[str] = None
+
+
+class AssetPage(BaseModel):
+    """A page of assets plus the token for the next page."""
+
+    items: List[Asset] = Field(default_factory=list)
+    continuation_token: Optional[str] = None
+
+
+class AssetDownload(BaseModel):
+    """A downloaded asset shown in the usage report."""
+
+    path: str
+    size_bytes: Optional[int] = None
+    last_downloaded: Optional[str] = None
+    content_type: Optional[str] = None
+
+
+class DownloadReport(BaseModel):
+    """Aggregated download usage for one repository."""
+
+    repository: str
+    total_assets: int = 0
+    downloaded_assets: int = 0
+    total_size_bytes: int = 0
+    downloaded_size_bytes: int = 0
+    # True when the scan hit the page cap and numbers are a lower bound.
+    truncated: bool = False
+    items: List[AssetDownload] = Field(default_factory=list)
+
+
 class BlobStore(BaseModel):
     """Blob store usage information used by the monitoring view."""
 

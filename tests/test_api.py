@@ -264,6 +264,78 @@ def test_compare_two_repositories_across_instances(http_client):
     assert by_key["online"]["differs"] is False
 
 
+@respx.mock
+def test_download_report_aggregates_assets(http_client):
+    # Two assets: one downloaded, one never downloaded; single page.
+    respx.get(f"{API}/assets").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "id": "a1",
+                        "path": "pkg/foo-1.0.tar.gz",
+                        "contentType": "application/gzip",
+                        "fileSize": 100,
+                        "lastDownloaded": "2026-05-01T10:00:00.000+00:00",
+                    },
+                    {
+                        "id": "a2",
+                        "path": "pkg/bar-2.0.tar.gz",
+                        "fileSize": 50,
+                        "lastDownloaded": None,
+                    },
+                ],
+                "continuationToken": None,
+            },
+        )
+    )
+    resp = http_client.get("/api/instances/test/downloads?repository=raw-hosted")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total_assets"] == 2
+    assert body["downloaded_assets"] == 1
+    assert body["total_size_bytes"] == 150
+    assert body["downloaded_size_bytes"] == 100
+    assert body["truncated"] is False
+    assert len(body["items"]) == 1
+    assert body["items"][0]["path"] == "pkg/foo-1.0.tar.gz"
+
+
+@respx.mock
+def test_download_report_follows_pagination(http_client):
+    route = respx.get(f"{API}/assets")
+    route.side_effect = [
+        httpx.Response(
+            200,
+            json={
+                "items": [
+                    {"id": "a1", "path": "p1", "fileSize": 10,
+                     "lastDownloaded": "2026-05-02T00:00:00.000+00:00"},
+                ],
+                "continuationToken": "next",
+            },
+        ),
+        httpx.Response(
+            200,
+            json={
+                "items": [
+                    {"id": "a2", "path": "p2", "fileSize": 20,
+                     "lastDownloaded": "2026-05-03T00:00:00.000+00:00"},
+                ],
+                "continuationToken": None,
+            },
+        ),
+    ]
+    resp = http_client.get("/api/instances/test/downloads?repository=raw-hosted")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total_assets"] == 2
+    assert body["downloaded_size_bytes"] == 30
+    # Most-recent first.
+    assert [i["path"] for i in body["items"]] == ["p2", "p1"]
+
+
 def test_compare_unknown_instance_404(http_client):
     resp = http_client.get(
         "/api/compare?left_instance=nope&left_repo=a&right_instance=test&right_repo=b"
