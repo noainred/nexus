@@ -146,6 +146,8 @@ tr:hover td { background: var(--panel); }
 #dl-summary .metric .value { font-size: 16px; }
 #dl-note { margin-bottom: 8px; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.usage-warn { color: var(--amber); font-weight: 600; }
+td.usage-crit { color: var(--red); font-weight: 700; background: rgba(248,81,73,.12); }
 
 /* repository 1:1 compare */
 .compare-pickers {

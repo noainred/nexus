@@ -128,6 +128,22 @@ async function loadOverview() {
   loadBlobstores();
 }
 
+function usagePct(b) {
+  const used = b.total_size_bytes;
+  const avail = b.available_space_bytes;
+  if (used == null || avail == null) return null;
+  const total = used + avail;
+  if (total <= 0) return null;
+  return (used / total) * 100;
+}
+
+function usageCell(b) {
+  const pct = usagePct(b);
+  if (pct == null) return el("td", { class: "num" }, "—");
+  const cls = pct >= 90 ? "usage-crit" : pct >= 80 ? "usage-warn" : "";
+  return el("td", { class: `num ${cls}`, title: `사용 ${fmtBytes(b.total_size_bytes)} / 전체 ${fmtBytes(b.total_size_bytes + b.available_space_bytes)}` }, `${pct.toFixed(0)}%`);
+}
+
 async function loadBlobstores() {
   const container = document.getElementById("blobstore-table");
   container.innerHTML = "";
@@ -153,7 +169,7 @@ async function loadBlobstores() {
       rows.push(
         el("tr", { class: "site-start" }, [
           el("td", { class: "site-cell" }, site.name),
-          el("td", { colspan: "5", class: "site-error" }, `조회 불가: ${site.error || ""}`),
+          el("td", { colspan: "6", class: "site-error" }, `조회 불가: ${site.error || ""}`),
         ])
       );
       return;
@@ -166,7 +182,7 @@ async function loadBlobstores() {
       rows.push(
         el("tr", { class: "site-start" }, [
           el("td", { class: "site-cell" }, site.name),
-          el("td", { colspan: "5", class: "empty" }, "Blob store 없음"),
+          el("td", { colspan: "6", class: "empty" }, "Blob store 없음"),
         ])
       );
       return;
@@ -178,9 +194,10 @@ async function loadBlobstores() {
           el("td", { class: "site-cell" }, idx === 0 ? site.name : ""),
           el("td", {}, b.name),
           el("td", {}, b.type || "—"),
-          el("td", {}, fmtBytes(b.total_size_bytes)),
-          el("td", {}, fmtBytes(b.available_space_bytes)),
-          el("td", {}, b.blob_count != null ? b.blob_count.toLocaleString() : "—"),
+          el("td", { class: "num" }, fmtBytes(b.total_size_bytes)),
+          el("td", { class: "num" }, fmtBytes(b.available_space_bytes)),
+          usageCell(b),
+          el("td", { class: "num" }, b.blob_count != null ? b.blob_count.toLocaleString() : "—"),
         ])
       )
     );
@@ -191,9 +208,10 @@ async function loadBlobstores() {
           el("td", { class: "site-cell" }, ""),
           el("td", { class: "subtotal-label" }, "사이트 합계"),
           el("td", {}, ""),
-          el("td", {}, fmtBytes(site.total_size_bytes)),
+          el("td", { class: "num" }, fmtBytes(site.total_size_bytes)),
           el("td", {}, ""),
-          el("td", {}, site.blob_count != null ? site.blob_count.toLocaleString() : "—"),
+          el("td", {}, ""),
+          el("td", { class: "num" }, site.blob_count != null ? site.blob_count.toLocaleString() : "—"),
         ])
       );
     }
@@ -205,14 +223,15 @@ async function loadBlobstores() {
       el("td", { class: "site-cell" }, "전체 합계"),
       el("td", {}, `${reachableSites}개 사이트`),
       el("td", {}, ""),
-      el("td", {}, fmtBytes(grandUsed)),
+      el("td", { class: "num" }, fmtBytes(grandUsed)),
       el("td", {}, ""),
-      el("td", {}, grandBlobs.toLocaleString()),
+      el("td", {}, ""),
+      el("td", { class: "num" }, grandBlobs.toLocaleString()),
     ])
   );
 
   container.append(
-    buildTable(["사이트", "Blob Store", "유형", "사용량", "가용 공간", "Blob 수"], rows)
+    buildTable(["사이트", "Blob Store", "유형", "사용량", "가용 공간", "사용률", "Blob 수"], rows)
   );
 }
 
