@@ -132,6 +132,18 @@ class NexusClient:
     async def delete_repository(self, name: str) -> None:
         await self._request("DELETE", f"/repositories/{name}")
 
+    async def get_repository_config(
+        self, fmt: str, type_: str, name: str
+    ) -> dict[str, Any]:
+        """Return the full configuration for a single repository.
+
+        Uses the admin endpoint ``/repositories/{format}/{type}/{name}`` which
+        exposes storage, cleanup, proxy, negativeCache and httpClient settings
+        used by the detailed cross-instance comparison.
+        """
+        resp = await self._request("GET", f"/repositories/{fmt}/{type_}/{name}")
+        return resp.json()
+
     # -- Components ---------------------------------------------------------
 
     async def list_components(

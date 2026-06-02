@@ -1,7 +1,7 @@
 """Tests for the repository comparison matrix builder."""
 from __future__ import annotations
 
-from app.matrix import build_matrix
+from app.matrix import build_matrix, build_repo_diff
 from app.models import MatrixColumn, Repository
 
 
@@ -99,3 +99,63 @@ def test_format_or_type_difference_is_drift():
         },
     )
     assert matrix.rows[0].status == "drift"
+
+
+# -- field-level repository diff ------------------------------------------
+
+DIFF_COLS = [
+    MatrixColumn(id="front1", name="Frontend 1"),
+    MatrixColumn(id="back1", name="Backend 1"),
+]
+
+
+def test_repo_diff_flags_only_differing_fields():
+    front = {
+        "name": "fedora-epel",
+        "online": True,
+        "storage": {"blobStoreName": "default"},
+        "proxy": {"remoteUrl": "https://dl.fedoraproject.org/epel/"},
+    }
+    back = {
+        "name": "fedora-epel",
+        "online": True,
+        "storage": {"blobStoreName": "default"},
+        "proxy": {"remoteUrl": "http://192.168.139.96:8081/repository/fedora-epel/"},
+    }
+    diff = build_repo_diff("fedora-epel", DIFF_COLS, {"front1": front, "back1": back})
+
+    by_key = {f.key: f for f in diff.fields}
+    # The proxy URL differs; everything else matches.
+    assert by_key["proxy.remoteUrl"].differs is True
+    assert by_key["storage.blobStoreName"].differs is False
+    assert by_key["online"].differs is False
+    # name/url are excluded from the comparison as pure noise.
+    assert "name" not in by_key
+
+
+def test_repo_diff_missing_on_one_instance_counts_as_difference():
+    front = {"online": True, "proxy": {"remoteUrl": "https://x"}}
+    back = {"online": True}  # no proxy section
+    diff = build_repo_diff("pkg", DIFF_COLS, {"front1": front, "back1": back})
+    by_key = {f.key: f for f in diff.fields}
+    assert by_key["proxy.remoteUrl"].differs is True
+    assert by_key["proxy.remoteUrl"].values["back1"] is None
+
+
+def test_repo_diff_all_identical_has_no_differences():
+    cfg = {"online": True, "storage": {"blobStoreName": "default"}}
+    diff = build_repo_diff("repo", DIFF_COLS, {"front1": dict(cfg), "back1": dict(cfg)})
+    assert all(not f.differs for f in diff.fields)
+
+
+def test_repo_diff_unreachable_instance_excluded_from_diff():
+    cols = [
+        MatrixColumn(id="front1", name="Frontend 1"),
+        MatrixColumn(id="back1", name="Backend 1", reachable=False, error="down"),
+    ]
+    front = {"online": True}
+    diff = build_repo_diff("repo", cols, {"front1": front, "back1": None})
+    by_key = {f.key: f for f in diff.fields}
+    # Only one reachable+present instance -> nothing differs.
+    assert by_key["online"].differs is False
+    assert by_key["online"].values["back1"] is None

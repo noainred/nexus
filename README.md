@@ -28,6 +28,14 @@ REST API를 호출하고, 가벼운 단일 페이지(SPA) 프런트엔드가 이
 
 > 인스턴스 열 순서는 `instances.yaml`에 정의한 순서(예: DMZ → Core → Site1…N)를 그대로 따르므로 네트워크 토폴로지와 동일하게 보입니다.
 
+#### 항목별 상세 비교 (drill-down)
+
+매트릭스 또는 저장소 목록에서 **저장소 이름을 클릭**하면, 그 저장소의 전체
+설정(storage, cleanup, proxy.remoteUrl, negativeCache, httpClient 등)을
+인스턴스별로 **항목 단위로 비교**하는 표가 팝업으로 열립니다. 값이 서로 다른
+항목은 빨갛게 강조되어, 어떤 설정이 어디서 어긋났는지 정확히 짚어줍니다.
+("차이나는 항목만" 기본 켜짐 — 끄면 전체 설정을 볼 수 있음)
+
 ## 아키텍처
 
 ```
@@ -107,6 +115,7 @@ instances:
 | --- | --- | --- |
 | `GET` | `/api/instances` | 관리 인스턴스 목록 (자격 증명 제외) |
 | `GET` | `/api/matrix` | 저장소 × 인스턴스 구성 비교 매트릭스 |
+| `GET` | `/api/repository-detail?repository=` | 한 저장소의 설정 항목별 인스턴스 비교(diff) |
 | `GET` | `/api/status` | 전체 인스턴스 상태 동시 점검 |
 | `GET` | `/api/instances/{id}/status` | 단일 인스턴스 상태 |
 | `GET` | `/api/blobstores` | 전체 인스턴스 Blob Store 사용량 (사이트별) |

@@ -129,6 +129,63 @@ tr:hover td { background: var(--panel); }
 
 .empty { color: var(--muted); font-style: italic; padding: 12px 0; }
 
+/* repository config diff modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.6);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  z-index: 50;
+}
+.modal-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: min(1000px, 100%);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 48px rgba(0,0,0,.5);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h3 { margin: 0; flex: 1; font-size: 15px; }
+.modal-head #repo-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: var(--muted);
+}
+.modal-body { overflow: auto; padding: 0 18px 18px; }
+
+table.diff { border-collapse: collapse; width: 100%; }
+table.diff th, table.diff td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  text-align: left;
+  vertical-align: top;
+}
+table.diff thead th {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  white-space: nowrap;
+}
+table.diff td.key { font-family: ui-monospace, monospace; color: var(--muted); white-space: nowrap; }
+table.diff tr.differs td { background: rgba(248,81,73,.12); }
+table.diff tr.differs td.key { color: #f0a8a4; }
+table.diff td.missing { color: var(--muted); font-style: italic; }
+table.diff td.unreach { color: var(--amber); font-style: italic; }
+
 /* blob store by site */
 td.site-cell { font-weight: 600; color: var(--accent); white-space: nowrap; }
 tr.site-start td { border-top: 2px solid var(--border); }

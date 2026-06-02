@@ -158,3 +158,20 @@ class RepositoryMatrix(BaseModel):
 
     columns: List[MatrixColumn] = Field(default_factory=list)
     rows: List[MatrixRow] = Field(default_factory=list)
+
+
+class RepoDiffField(BaseModel):
+    """One configuration field compared across instances."""
+
+    key: str
+    # instance id -> stringified value (None when absent / unreachable).
+    values: dict[str, Optional[str]] = Field(default_factory=dict)
+    differs: bool = False
+
+
+class RepositoryDiff(BaseModel):
+    """Field-by-field configuration comparison for one repository."""
+
+    repository: str
+    columns: List[MatrixColumn] = Field(default_factory=list)
+    fields: List[RepoDiffField] = Field(default_factory=list)

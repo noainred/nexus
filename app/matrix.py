@@ -8,13 +8,15 @@ Core and the DMZ/site instances is exactly what we want to surface.
 from __future__ import annotations
 
 from collections import Counter
-from typing import Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 from .models import (
     MatrixCell,
     MatrixColumn,
     MatrixRow,
+    RepoDiffField,
     Repository,
+    RepositoryDiff,
     RepositoryMatrix,
 )
 
@@ -118,3 +120,68 @@ def build_matrix(
         rows.append(MatrixRow(repository=name, status=status, cells=cells))
 
     return RepositoryMatrix(columns=list(columns), rows=rows)
+
+
+# -- Field-level configuration diff ---------------------------------------
+
+# Keys that are identical by definition or pure noise in a cross-instance
+# comparison, so they are hidden from the diff.
+_DIFF_EXCLUDED_KEYS = {"name", "url"}
+
+
+def _flatten_config(obj: Any, prefix: str = "") -> dict[str, str]:
+    """Flatten a nested repository config into dotted-path -> string values."""
+    flat: dict[str, str] = {}
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            path = f"{prefix}.{key}" if prefix else key
+            flat.update(_flatten_config(value, path))
+    elif isinstance(obj, list):
+        flat[prefix] = ", ".join(str(x) for x in obj) if obj else "(none)"
+    elif isinstance(obj, bool):
+        flat[prefix] = "true" if obj else "false"
+    elif obj is None:
+        flat[prefix] = ""
+    else:
+        flat[prefix] = str(obj)
+    return flat
+
+
+def build_repo_diff(
+    repository: str,
+    columns: Sequence[MatrixColumn],
+    configs: Mapping[str, Optional[Mapping[str, Any]]],
+) -> RepositoryDiff:
+    """Compare one repository's full configuration across instances.
+
+    ``configs`` maps instance id -> raw config dict, or ``None`` when the repo
+    is absent on that instance or the instance was unreachable (the column's
+    ``reachable`` flag distinguishes the two for the UI).
+    """
+    flat_by_instance: dict[str, dict[str, str]] = {}
+    for column in columns:
+        cfg = configs.get(column.id)
+        flat_by_instance[column.id] = (
+            _flatten_config(dict(cfg)) if isinstance(cfg, Mapping) else {}
+        )
+
+    present_ids = [c.id for c in columns if isinstance(configs.get(c.id), Mapping)]
+
+    keys: set[str] = set()
+    for column in columns:
+        keys.update(flat_by_instance[column.id].keys())
+    keys -= _DIFF_EXCLUDED_KEYS
+
+    fields: list[RepoDiffField] = []
+    for key in sorted(keys):
+        values: dict[str, Optional[str]] = {}
+        for column in columns:
+            if column.id in present_ids:
+                values[column.id] = flat_by_instance[column.id].get(key)
+            else:
+                values[column.id] = None
+        present_values = [values[i] for i in present_ids]
+        differs = len(set(present_values)) > 1
+        fields.append(RepoDiffField(key=key, values=values, differs=differs))
+
+    return RepositoryDiff(repository=repository, columns=list(columns), fields=fields)

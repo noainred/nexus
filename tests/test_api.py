@@ -200,6 +200,38 @@ def test_blobstores_all_marks_unreachable(http_client):
 
 
 @respx.mock
+def test_repository_detail_diff(http_client):
+    deps.registry._instances["core"] = InstanceConfig(
+        id="core", name="Core", base_url="https://core.test",
+        username="admin", password="secret", verify_tls=True,
+    )
+    # Both instances list the repo so format/type can be resolved.
+    repo_list = [{"name": "epel", "format": "yum", "type": "proxy"}]
+    respx.get(f"{API}/repositories").mock(return_value=httpx.Response(200, json=repo_list))
+    respx.get("https://core.test/service/rest/v1/repositories").mock(
+        return_value=httpx.Response(200, json=repo_list)
+    )
+    # Full configs differ on proxy.remoteUrl only.
+    respx.get(f"{API}/repositories/yum/proxy/epel").mock(
+        return_value=httpx.Response(
+            200, json={"name": "epel", "online": True, "proxy": {"remoteUrl": "https://a"}}
+        )
+    )
+    respx.get("https://core.test/service/rest/v1/repositories/yum/proxy/epel").mock(
+        return_value=httpx.Response(
+            200, json={"name": "epel", "online": True, "proxy": {"remoteUrl": "https://b"}}
+        )
+    )
+    resp = http_client.get("/api/repository-detail?repository=epel")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["repository"] == "epel"
+    by_key = {f["key"]: f for f in body["fields"]}
+    assert by_key["proxy.remoteUrl"]["differs"] is True
+    assert by_key["online"]["differs"] is False
+
+
+@respx.mock
 def test_status_endpoint_handles_unreachable(http_client):
     respx.get(f"{API}/status").mock(side_effect=httpx.ConnectError("down"))
     resp = http_client.get("/api/status")

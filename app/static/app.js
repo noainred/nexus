@@ -6,6 +6,7 @@ const state = {
   componentToken: null,
   componentRepo: null,
   matrix: null,
+  repoDiff: null,
 };
 
 // ---- helpers -------------------------------------------------------------
@@ -253,7 +254,10 @@ function renderMatrix() {
 
   const body = rows.map((row) => {
     const tds = [
-      el("td", { class: "rowhead" }, [row.repository, rowStatusBadge(row.status)]),
+      el("td", { class: "rowhead" }, [
+        el("span", { class: "link", title: "설정 자세히 비교", onclick: () => openRepoDiff(row.repository) }, row.repository),
+        rowStatusBadge(row.status),
+      ]),
     ];
     matrix.columns.forEach((col) => {
       const c = row.cells[col.id] || { present: false };
@@ -290,6 +294,77 @@ async function loadMatrix() {
 
 document.getElementById("drift-only").addEventListener("change", renderMatrix);
 
+// ---- repository config diff (deep comparison) ----------------------------
+
+function renderRepoDiff() {
+  const body = document.getElementById("repo-modal-body");
+  body.innerHTML = "";
+  const diff = state.repoDiff;
+  if (!diff) return;
+
+  const diffOnly = document.getElementById("repo-diff-only").checked;
+  let fields = diff.fields;
+  if (diffOnly) fields = fields.filter((f) => f.differs);
+
+  if (!fields.length) {
+    body.append(
+      el("div", { class: "empty" },
+        diffOnly
+          ? "모든 인스턴스의 설정이 동일합니다 ✓"
+          : "비교할 설정 항목이 없습니다.")
+    );
+    return;
+  }
+
+  const headCells = [el("th", {}, "설정 항목")];
+  diff.columns.forEach((col) => {
+    const label = col.reachable ? col.name : `${col.name} ⚠`;
+    headCells.push(el("th", { title: col.error || col.name }, label));
+  });
+  const thead = el("thead", {}, el("tr", {}, headCells));
+
+  const rows = fields.map((f) => {
+    const tds = [el("td", { class: "key" }, f.key)];
+    diff.columns.forEach((col) => {
+      const v = f.values[col.id];
+      if (!col.reachable) tds.push(el("td", { class: "unreach" }, "조회 불가"));
+      else if (v === null || v === undefined) tds.push(el("td", { class: "missing" }, "(없음)"));
+      else tds.push(el("td", {}, v === "" ? "(빈 값)" : v));
+    });
+    return el("tr", { class: f.differs ? "differs" : "" }, tds);
+  });
+
+  body.append(el("table", { class: "diff" }, [thead, el("tbody", {}, rows)]));
+}
+
+async function openRepoDiff(name) {
+  document.getElementById("repo-modal-title").textContent = `저장소 설정 비교 — ${name}`;
+  const modal = document.getElementById("repo-modal");
+  const body = document.getElementById("repo-modal-body");
+  modal.classList.remove("hidden");
+  body.innerHTML = "";
+  body.append(el("div", { class: "empty" }, "불러오는 중…"));
+  try {
+    state.repoDiff = await api(`/api/repository-detail?repository=${encodeURIComponent(name)}`);
+  } catch (e) {
+    body.innerHTML = "";
+    body.append(el("div", { class: "empty" }, `비교 정보를 불러오지 못했습니다: ${e.message}`));
+    return;
+  }
+  renderRepoDiff();
+}
+
+function closeRepoDiff() {
+  document.getElementById("repo-modal").classList.add("hidden");
+  state.repoDiff = null;
+}
+
+document.getElementById("repo-modal-close").addEventListener("click", closeRepoDiff);
+document.getElementById("repo-diff-only").addEventListener("change", renderRepoDiff);
+document.getElementById("repo-modal").addEventListener("click", (ev) => {
+  if (ev.target.id === "repo-modal") closeRepoDiff();
+});
+
 // ---- repositories --------------------------------------------------------
 
 function buildTable(headers, rows) {
@@ -323,7 +398,11 @@ async function loadRepositories() {
       el("td", {}, r.format || "—"),
       el("td", {}, r.type || "—"),
       el("td", {}, r.online === false ? el("span", { class: "badge down" }, "offline") : el("span", { class: "badge up" }, "online")),
-      el("td", {}, el("button", { class: "danger", onclick: () => deleteRepo(r.name) }, "삭제")),
+      el("td", {}, [
+        el("button", { onclick: () => openRepoDiff(r.name) }, "비교"),
+        " ",
+        el("button", { class: "danger", onclick: () => deleteRepo(r.name) }, "삭제"),
+      ]),
     ])
   );
   container.append(buildTable(["이름", "포맷", "유형", "상태", ""], rows));
