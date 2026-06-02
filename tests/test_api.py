@@ -336,6 +336,42 @@ def test_download_report_follows_pagination(http_client):
     assert [i["path"] for i in body["items"]] == ["p2", "p1"]
 
 
+@respx.mock
+def test_downloads_summary_scans_all_non_group_repos(http_client):
+    respx.get(f"{API}/repositories").mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {"name": "raw-hosted", "format": "raw", "type": "hosted"},
+                {"name": "maven-public", "format": "maven2", "type": "group"},
+            ],
+        )
+    )
+    # Only the hosted repo should be scanned (group is skipped).
+    respx.get(f"{API}/assets", params={"repository": "raw-hosted"}).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "items": [
+                    {"id": "a1", "path": "p1", "fileSize": 100,
+                     "lastDownloaded": "2026-05-01T00:00:00.000+00:00"},
+                    {"id": "a2", "path": "p2", "fileSize": 50, "lastDownloaded": None},
+                ],
+                "continuationToken": None,
+            },
+        )
+    )
+    resp = http_client.get("/api/instances/test/downloads-summary")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["repositories"]) == 1
+    assert body["repositories"][0]["repository"] == "raw-hosted"
+    assert body["total_assets"] == 2
+    assert body["downloaded_assets"] == 1
+    assert body["total_size_bytes"] == 150
+    assert body["downloaded_size_bytes"] == 100
+
+
 def test_compare_unknown_instance_404(http_client):
     resp = http_client.get(
         "/api/compare?left_instance=nope&left_repo=a&right_instance=test&right_repo=b"

@@ -99,6 +99,31 @@ class DownloadReport(BaseModel):
     items: List[AssetDownload] = Field(default_factory=list)
 
 
+class RepoDownloadSummary(BaseModel):
+    """Per-repository usage totals (no asset list) for the server overview."""
+
+    repository: str
+    format: Optional[str] = None
+    type: Optional[str] = None
+    total_assets: int = 0
+    downloaded_assets: int = 0
+    total_size_bytes: int = 0
+    downloaded_size_bytes: int = 0
+    truncated: bool = False
+    error: Optional[str] = None
+
+
+class ServerDownloadSummary(BaseModel):
+    """Download usage for every repository on one server."""
+
+    instance_id: str
+    total_assets: int = 0
+    downloaded_assets: int = 0
+    total_size_bytes: int = 0
+    downloaded_size_bytes: int = 0
+    repositories: List[RepoDownloadSummary] = Field(default_factory=list)
+
+
 class BlobStore(BaseModel):
     """Blob store usage information used by the monitoring view."""
 

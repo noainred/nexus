@@ -8,6 +8,7 @@ const state = {
   matrix: null,
   repoDiff: null,
   compareDiff: null,
+  downloadsLoaded: false,
 };
 
 // ---- helpers -------------------------------------------------------------
@@ -73,6 +74,11 @@ document.querySelectorAll(".tab").forEach((tab) => {
     document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
     tab.classList.add("active");
     document.getElementById(tab.dataset.tab).classList.add("active");
+    // Lazy-load the (potentially heavy) download scan when first opened.
+    if (tab.dataset.tab === "downloads" && !state.downloadsLoaded) {
+      state.downloadsLoaded = true;
+      runDownloadsView();
+    }
   });
 });
 
@@ -568,21 +574,30 @@ document.getElementById("component-more").addEventListener("click", () => {
 
 // ---- download usage ------------------------------------------------------
 
-function clearDownloadsResult() {
-  document.getElementById("dl-summary").innerHTML = "";
-  document.getElementById("dl-table").innerHTML = "";
-  document.getElementById("dl-note").textContent = "";
+// Fill the repo dropdown for the downloads tab, with an "all repos" option.
+async function fillDownloadRepoSelect(instanceId, repoSel) {
+  repoSel.innerHTML = "";
+  repoSel.append(el("option", { value: "" }, "— 전체 (모든 저장소) —"));
+  try {
+    const repos = await api(`/api/instances/${instanceId}/repositories`);
+    repos.forEach((r) =>
+      repoSel.append(el("option", { value: r.name }, `${r.name} (${r.format || "?"}/${r.type || "?"})`))
+    );
+  } catch (e) {
+    /* repo list failure is non-fatal; the "전체" view will still try. */
+  }
 }
 
-function setupDownloads() {
+async function setupDownloads() {
   const inst = document.getElementById("dl-inst");
   const repo = document.getElementById("dl-repo");
   fillInstanceSelect(inst);
-  inst.addEventListener("change", () => {
-    clearDownloadsResult();
-    fillRepoSelect(inst.value, repo);
+  inst.addEventListener("change", async () => {
+    await fillDownloadRepoSelect(inst.value, repo); // resets to "전체"
+    runDownloadsView();
   });
-  if (inst.value) fillRepoSelect(inst.value, repo);
+  repo.addEventListener("change", runDownloadsView);
+  if (inst.value) await fillDownloadRepoSelect(inst.value, repo);
 }
 
 function summaryCard(label, value) {
@@ -594,19 +609,87 @@ function summaryCard(label, value) {
   ]);
 }
 
-async function runDownloads() {
+// Dispatch: no repository chosen -> whole-server summary; otherwise detail.
+function runDownloadsView() {
   const instId = document.getElementById("dl-inst").value;
   const repo = document.getElementById("dl-repo").value;
+  if (!instId) return;
+  if (repo) {
+    loadRepoDownloadDetail(instId, repo);
+  } else {
+    loadServerDownloadSummary(instId);
+  }
+}
+
+async function loadServerDownloadSummary(instId) {
   const summary = document.getElementById("dl-summary");
   const note = document.getElementById("dl-note");
   const table = document.getElementById("dl-table");
   summary.innerHTML = "";
   note.textContent = "";
   table.innerHTML = "";
-  if (!instId || !repo) {
-    toast("서버와 저장소를 선택하세요.", "err");
+  table.append(el("div", { class: "empty" }, "모든 저장소를 스캔하는 중… (저장소가 많으면 시간이 걸릴 수 있어요)"));
+
+  let data;
+  try {
+    data = await api(`/api/instances/${instId}/downloads-summary`);
+  } catch (e) {
+    table.innerHTML = "";
+    table.append(el("div", { class: "empty" }, `조회 실패: ${e.message}`));
     return;
   }
+
+  summary.append(
+    summaryCard("저장소 수", data.repositories.length.toLocaleString()),
+    summaryCard("전체 자산", data.total_assets.toLocaleString()),
+    summaryCard("전체 용량", fmtBytes(data.total_size_bytes)),
+    summaryCard("다운로드된 용량", fmtBytes(data.downloaded_size_bytes))
+  );
+
+  table.innerHTML = "";
+  if (!data.repositories.length) {
+    table.append(el("div", { class: "empty" }, "스캔할 저장소가 없습니다."));
+    return;
+  }
+  const rows = data.repositories.map((r) => {
+    const name = el("span", { class: "link", title: "상세 보기", onclick: () => openRepoDownloadDetail(r.repository) }, r.repository);
+    if (r.error) {
+      return el("tr", {}, [
+        el("td", {}, name),
+        el("td", {}, `${r.format || "?"}/${r.type || "?"}`),
+        el("td", { colspan: "4", class: "site-error" }, `조회 불가: ${r.error}`),
+      ]);
+    }
+    return el("tr", {}, [
+      el("td", {}, name),
+      el("td", {}, `${r.format || "?"}/${r.type || "?"}`),
+      el("td", { class: "num" }, r.total_assets.toLocaleString()),
+      el("td", { class: "num" }, r.downloaded_assets.toLocaleString()),
+      el("td", { class: "num" }, fmtBytes(r.total_size_bytes)),
+      el("td", { class: "num" }, fmtBytes(r.downloaded_size_bytes) + (r.truncated ? " *" : "")),
+    ]);
+  });
+  table.append(buildTable(
+    ["저장소", "포맷/유형", "전체 자산", "다운로드 자산", "전체 용량", "다운로드 용량"], rows
+  ));
+  if (data.repositories.some((r) => r.truncated)) {
+    note.textContent = "※ '*' 표시 저장소는 자산이 매우 많아 일부만 스캔했습니다(하한값).";
+  }
+}
+
+// Select a repo in the dropdown and show its detail (used by summary links).
+function openRepoDownloadDetail(repoName) {
+  document.getElementById("dl-repo").value = repoName;
+  runDownloadsView();
+}
+
+async function loadRepoDownloadDetail(instId, repo) {
+  const summary = document.getElementById("dl-summary");
+  const note = document.getElementById("dl-note");
+  const table = document.getElementById("dl-table");
+  summary.innerHTML = "";
+  note.textContent = "";
+  table.innerHTML = "";
   table.append(el("div", { class: "empty" }, "자산을 스캔하는 중… (저장소 크기에 따라 시간이 걸릴 수 있어요)"));
 
   let report;
@@ -648,7 +731,7 @@ async function runDownloads() {
   table.append(buildTable(["경로", "유형", "용량", "마지막 다운로드"], rows));
 }
 
-document.getElementById("dl-run").addEventListener("click", runDownloads);
+document.getElementById("dl-run").addEventListener("click", runDownloadsView);
 
 // ---- cleanup -------------------------------------------------------------
 

@@ -1,14 +1,23 @@
-"""Download-usage report endpoint.
+"""Download-usage report endpoints.
 
 Aggregates per-asset ``lastDownloaded`` / ``fileSize`` to show which packages
-users actually downloaded and how much storage they account for.
+users actually downloaded and how much storage they account for — for a single
+repository (detail) or for every repository on a server (overview).
 """
 from __future__ import annotations
+
+import asyncio
+from typing import List, Tuple
 
 from fastapi import APIRouter, HTTPException, Query
 
 from ..deps import get_client
-from ..models import AssetDownload, DownloadReport
+from ..models import (
+    AssetDownload,
+    DownloadReport,
+    RepoDownloadSummary,
+    ServerDownloadSummary,
+)
 from ..nexus_client import NexusClient, NexusError
 
 router = APIRouter(prefix="/api/instances/{instance_id}", tags=["downloads"])
@@ -17,40 +26,31 @@ router = APIRouter(prefix="/api/instances/{instance_id}", tags=["downloads"])
 _MAX_PAGES = 50
 
 
-@router.get("/downloads", response_model=DownloadReport)
-async def download_report(
-    instance_id: str,
-    repository: str = Query(..., description="Repository to scan."),
-    limit: int = Query(200, ge=1, le=1000, description="Max rows to return."),
-) -> DownloadReport:
-    """Scan a repository's assets and summarise actual download usage.
+async def _scan_repo(
+    client: NexusClient, repository: str, collect_items: bool
+) -> Tuple[int, int, int, int, bool, List[AssetDownload]]:
+    """Page a repository's assets, aggregating download usage.
 
-    Counts every asset, flags those ever downloaded (``lastDownloaded`` set),
-    and sums their sizes. The returned ``items`` are the downloaded assets,
-    most-recent first, capped at ``limit``.
+    Returns ``(total, downloaded, total_size, downloaded_size, truncated,
+    items)``. ``items`` is only populated when ``collect_items`` is True.
     """
-    client: NexusClient = get_client(instance_id)
-
-    total_assets = 0
-    downloaded_assets = 0
-    total_size = 0
-    downloaded_size = 0
-    downloaded: list[AssetDownload] = []
+    total = downloaded = total_size = downloaded_size = 0
+    items: List[AssetDownload] = []
     token = None
     pages = 0
     truncated = False
 
-    try:
-        while True:
-            page = await client.list_assets(repository, token)
-            for asset in page.items:
-                total_assets += 1
-                size = asset.file_size or 0
-                total_size += size
-                if asset.last_downloaded:
-                    downloaded_assets += 1
-                    downloaded_size += size
-                    downloaded.append(
+    while True:
+        page = await client.list_assets(repository, token)
+        for asset in page.items:
+            total += 1
+            size = asset.file_size or 0
+            total_size += size
+            if asset.last_downloaded:
+                downloaded += 1
+                downloaded_size += size
+                if collect_items:
+                    items.append(
                         AssetDownload(
                             path=asset.path or asset.id,
                             size_bytes=asset.file_size,
@@ -58,24 +58,90 @@ async def download_report(
                             content_type=asset.content_type,
                         )
                     )
-            token = page.continuation_token
-            pages += 1
-            if not token:
-                break
-            if pages >= _MAX_PAGES:
-                truncated = True
-                break
+        token = page.continuation_token
+        pages += 1
+        if not token:
+            break
+        if pages >= _MAX_PAGES:
+            truncated = True
+            break
+
+    return total, downloaded, total_size, downloaded_size, truncated, items
+
+
+@router.get("/downloads", response_model=DownloadReport)
+async def download_report(
+    instance_id: str,
+    repository: str = Query(..., description="Repository to scan."),
+    limit: int = Query(200, ge=1, le=1000, description="Max rows to return."),
+) -> DownloadReport:
+    """Scan one repository's assets and summarise actual download usage."""
+    client: NexusClient = get_client(instance_id)
+    try:
+        total, downloaded, total_size, dl_size, truncated, items = await _scan_repo(
+            client, repository, collect_items=True
+        )
     except NexusError as exc:
         raise HTTPException(status_code=exc.status_code or 502, detail=exc.message)
 
-    downloaded.sort(key=lambda a: a.last_downloaded or "", reverse=True)
-
+    items.sort(key=lambda a: a.last_downloaded or "", reverse=True)
     return DownloadReport(
         repository=repository,
-        total_assets=total_assets,
-        downloaded_assets=downloaded_assets,
+        total_assets=total,
+        downloaded_assets=downloaded,
         total_size_bytes=total_size,
-        downloaded_size_bytes=downloaded_size,
+        downloaded_size_bytes=dl_size,
         truncated=truncated,
-        items=downloaded[:limit],
+        items=items[:limit],
+    )
+
+
+@router.get("/downloads-summary", response_model=ServerDownloadSummary)
+async def downloads_summary(instance_id: str) -> ServerDownloadSummary:
+    """Download usage for every repository on the server.
+
+    Group repositories are skipped: their /assets view aggregates member repo
+    assets and would double-count against the hosted/proxy repos.
+    """
+    client: NexusClient = get_client(instance_id)
+    try:
+        repos = await client.list_repositories()
+    except NexusError as exc:
+        raise HTTPException(status_code=exc.status_code or 502, detail=exc.message)
+
+    scannable = [r for r in repos if (r.type or "").lower() != "group"]
+
+    async def summarise(repo) -> RepoDownloadSummary:
+        try:
+            total, downloaded, total_size, dl_size, truncated, _ = await _scan_repo(
+                client, repo.name, collect_items=False
+            )
+        except NexusError as exc:
+            return RepoDownloadSummary(
+                repository=repo.name,
+                format=repo.format,
+                type=repo.type,
+                error=exc.message,
+            )
+        return RepoDownloadSummary(
+            repository=repo.name,
+            format=repo.format,
+            type=repo.type,
+            total_assets=total,
+            downloaded_assets=downloaded,
+            total_size_bytes=total_size,
+            downloaded_size_bytes=dl_size,
+            truncated=truncated,
+        )
+
+    summaries = await asyncio.gather(*(summarise(r) for r in scannable))
+    summaries = sorted(summaries, key=lambda s: s.repository)
+
+    return ServerDownloadSummary(
+        instance_id=instance_id,
+        total_assets=sum(s.total_assets for s in summaries),
+        downloaded_assets=sum(s.downloaded_assets for s in summaries),
+        total_size_bytes=sum(s.total_size_bytes for s in summaries),
+        downloaded_size_bytes=sum(s.downloaded_size_bytes for s in summaries),
+        repositories=list(summaries),
     )

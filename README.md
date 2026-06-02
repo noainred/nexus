@@ -11,7 +11,7 @@ REST API를 호출하고, 가벼운 단일 페이지(SPA) 프런트엔드가 이
 | **상태/모니터링** | 모든 인스턴스의 도달 가능성·응답 시간·서브시스템 health를 동시 점검하고, Blob Store 사용량을 표시 |
 | **비교 매트릭스** | 저장소(행) × 인스턴스(열) 격자에서 각 저장소의 **존재 여부와 설정 일치 여부**를 색으로 한눈에 비교. Core(타 리전)와 DMZ/사이트 간 구성 드리프트를 즉시 식별 |
 | **저장소 관리** | 저장소 목록 조회, 삭제, 컴포넌트(아티팩트) 탐색 및 삭제 (페이지네이션 지원) |
-| **다운로드 현황** | 저장소 자산을 스캔하여 실제로 다운로드된 패키지와 용량을 집계 (전체/다운로드 자산 수·용량, 최근 다운로드 목록) |
+| **다운로드 현황** | 서버 선택 시 모든 저장소의 다운로드 요약(저장소별 자산·용량)을 자동 표시, 저장소 선택 시 실제 다운로드된 패키지 상세 목록 표시 |
 | **정리(Cleanup) 정책** | 정책 목록 조회 및 신규 정책 생성 (마지막 업데이트/다운로드 경과일 기준) |
 
 ### 비교 매트릭스 동작 방식
@@ -134,7 +134,8 @@ instances:
 | `DELETE` | `/api/instances/{id}/repositories/{name}` | 저장소 삭제 |
 | `GET` | `/api/instances/{id}/components?repository=` | 컴포넌트 목록(페이지네이션) |
 | `DELETE` | `/api/instances/{id}/components/{component_id}` | 컴포넌트 삭제 |
-| `GET` | `/api/instances/{id}/downloads?repository=` | 다운로드 현황(실사용 패키지·용량) 집계 |
+| `GET` | `/api/instances/{id}/downloads-summary` | 서버 내 모든 저장소의 다운로드 요약(저장소별 자산·용량) |
+| `GET` | `/api/instances/{id}/downloads?repository=` | 한 저장소의 다운로드 상세(실사용 패키지·용량) |
 | `GET` | `/api/instances/{id}/cleanup-policies` | 정리 정책 목록 |
 | `POST` | `/api/instances/{id}/cleanup-policies` | 정리 정책 생성 |
 
