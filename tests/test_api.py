@@ -410,6 +410,29 @@ def test_tasks_list_and_run(http_client):
     assert run.called
 
 
+@respx.mock
+def test_security_check(http_client):
+    respx.get(f"{API}/security/anonymous").mock(
+        return_value=httpx.Response(200, json={"enabled": True, "userId": "anonymous"})
+    )
+    respx.get(f"{API}/security/users").mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {"userId": "admin", "status": "active", "roles": ["nx-admin"]},
+                {"userId": "dev", "status": "active", "roles": ["nx-anonymous"]},
+            ],
+        )
+    )
+    resp = http_client.get("/api/security")
+    assert resp.status_code == 200
+    s = resp.json()[0]
+    assert s["anonymous_enabled"] is True
+    assert s["admin_active"] is True
+    assert s["admin_users"] == ["admin"]
+    assert s["user_count"] == 2
+
+
 def test_compare_unknown_instance_404(http_client):
     resp = http_client.get(
         "/api/compare?left_instance=nope&left_repo=a&right_instance=test&right_repo=b"

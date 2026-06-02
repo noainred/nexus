@@ -15,6 +15,7 @@ from .routers import (
     matrix,
     monitoring,
     repositories,
+    security,
     tasks,
 )
 
@@ -37,6 +38,7 @@ app.include_router(monitoring.router)
 app.include_router(matrix.router)
 app.include_router(downloads.router)
 app.include_router(tasks.router)
+app.include_router(security.router)
 
 
 @app.middleware("http")

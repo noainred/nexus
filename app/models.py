@@ -28,6 +28,19 @@ class InstanceStatus(BaseModel):
     repository_count: Optional[int] = None
 
 
+class InstanceSecurity(BaseModel):
+    """Security posture snapshot for one instance."""
+
+    id: str
+    name: str
+    reachable: bool = True
+    error: Optional[str] = None
+    anonymous_enabled: Optional[bool] = None
+    admin_active: Optional[bool] = None
+    admin_users: List[str] = Field(default_factory=list)
+    user_count: Optional[int] = None
+
+
 class Repository(BaseModel):
     """A Nexus repository as returned by the REST API."""
 

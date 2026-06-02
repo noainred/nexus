@@ -11,6 +11,7 @@ const state = {
   compareDiff: null,
   downloadsLoaded: false,
   tasksLoaded: false,
+  securityLoaded: false,
 };
 
 // ---- helpers -------------------------------------------------------------
@@ -84,6 +85,10 @@ document.querySelectorAll(".tab").forEach((tab) => {
     if (tab.dataset.tab === "tasks" && !state.tasksLoaded) {
       state.tasksLoaded = true;
       loadTasks();
+    }
+    if (tab.dataset.tab === "security" && !state.securityLoaded) {
+      state.securityLoaded = true;
+      loadSecurity();
     }
   });
 });
@@ -902,6 +907,59 @@ async function taskAction(instId, taskId, action, name) {
   }
 }
 
+// ---- security check ------------------------------------------------------
+
+function setupSecurity() {
+  document.getElementById("security-refresh").addEventListener("click", loadSecurity);
+}
+
+function yesNoBadge(value, riskWhenTrue, labels) {
+  // value: boolean|null ; labels: [trueLabel, falseLabel]
+  if (value === null || value === undefined) return el("span", { class: "badge" }, "—");
+  const risky = value === riskWhenTrue;
+  return el("span", { class: `badge ${risky ? "down" : "up"}` }, value ? labels[0] : labels[1]);
+}
+
+async function loadSecurity() {
+  const container = document.getElementById("security-table");
+  container.innerHTML = "";
+  container.append(el("div", { class: "empty" }, "점검 중…"));
+  let list;
+  try {
+    list = await api("/api/security");
+  } catch (e) {
+    container.innerHTML = "";
+    container.append(el("div", { class: "empty" }, `보안 점검 실패: ${e.message}`));
+    return;
+  }
+  container.innerHTML = "";
+  if (!list.length) {
+    container.append(el("div", { class: "empty" }, "구성된 인스턴스가 없습니다."));
+    return;
+  }
+  const rows = list.map((s) => {
+    if (!s.reachable) {
+      return el("tr", {}, [
+        el("td", {}, s.name),
+        el("td", { colspan: "4", class: "site-error" }, `조회 불가: ${s.error || ""}`),
+      ]);
+    }
+    const adminList = s.admin_users && s.admin_users.length
+      ? s.admin_users.join(", ")
+      : "—";
+    return el("tr", {}, [
+      el("td", {}, s.name),
+      el("td", {}, yesNoBadge(s.anonymous_enabled, true, ["허용", "차단"])),
+      el("td", {}, yesNoBadge(s.admin_active, true, ["활성", "비활성"])),
+      el("td", { title: adminList }, `${s.admin_users ? s.admin_users.length : "—"}${adminList !== "—" ? " (" + adminList + ")" : ""}`),
+      el("td", { class: "num" }, s.user_count != null ? s.user_count.toLocaleString() : "—"),
+    ]);
+  });
+  container.append(buildTable(
+    ["서버", "익명 접근", "기본 admin 계정", "관리자 권한 계정", "사용자 수"], rows
+  ));
+}
+
 // ---- cleanup -------------------------------------------------------------
 
 async function loadCleanup() {
@@ -992,6 +1050,7 @@ async function init() {
   setupCompare();
   setupDownloads();
   setupTasks();
+  setupSecurity();
   refreshActiveTab();
 }
 

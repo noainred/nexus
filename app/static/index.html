@@ -23,6 +23,7 @@
       <button class="tab" data-tab="repositories">저장소 관리</button>
       <button class="tab" data-tab="downloads">다운로드 현황</button>
       <button class="tab" data-tab="tasks">작업</button>
+      <button class="tab" data-tab="security">보안 점검</button>
       <button class="tab" data-tab="cleanup">정리 정책</button>
     </nav>
 
@@ -111,6 +112,15 @@
           <button id="task-refresh">새로고침</button>
         </div>
         <div id="task-table"></div>
+      </section>
+
+      <section id="security" class="panel">
+        <div class="matrix-header">
+          <h2>보안 점검 (사이트별)</h2>
+          <button id="security-refresh">새로고침</button>
+        </div>
+        <p class="hint">익명 접근 허용·기본 admin 계정·관리자 권한 계정을 점검합니다. 빨간 항목은 보안 위험입니다.</p>
+        <div id="security-table"></div>
       </section>
 
       <section id="cleanup" class="panel">

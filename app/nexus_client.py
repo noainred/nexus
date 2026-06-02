@@ -200,6 +200,16 @@ class NexusClient:
         ]
         return AssetPage(items=items, continuation_token=data.get("continuationToken"))
 
+    # -- Security -----------------------------------------------------------
+
+    async def get_anonymous(self) -> dict[str, Any]:
+        resp = await self._request("GET", "/security/anonymous")
+        return resp.json()
+
+    async def list_users(self) -> list[dict[str, Any]]:
+        resp = await self._request("GET", "/security/users")
+        return resp.json()
+
     # -- Scheduled tasks ----------------------------------------------------
 
     async def list_tasks(self) -> list[Task]:
