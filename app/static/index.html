@@ -19,6 +19,7 @@
     <nav class="tabs">
       <button class="tab active" data-tab="overview">개요</button>
       <button class="tab" data-tab="matrix">비교 매트릭스</button>
+      <button class="tab" data-tab="compare">저장소 1:1 비교</button>
       <button class="tab" data-tab="repositories">저장소</button>
       <button class="tab" data-tab="cleanup">정리 정책</button>
     </nav>
@@ -46,6 +47,30 @@
           <span><i class="sw unknown"></i> 조회 불가</span>
         </div>
         <div id="matrix-table" class="matrix-wrap"></div>
+      </section>
+
+      <section id="compare" class="panel">
+        <h2>저장소 1:1 비교 (서버·저장소 자유 선택)</h2>
+        <p class="hint">서로 다른 서버의, 이름이 다른 저장소끼리도 설정을 항목별로 비교할 수 있습니다.</p>
+        <div class="compare-pickers">
+          <div class="compare-side">
+            <span class="side-label">A</span>
+            <label>서버 <select id="cmp-left-inst"></select></label>
+            <label>저장소 <select id="cmp-left-repo"></select></label>
+          </div>
+          <div class="compare-vs">↔</div>
+          <div class="compare-side">
+            <span class="side-label">B</span>
+            <label>서버 <select id="cmp-right-inst"></select></label>
+            <label>저장소 <select id="cmp-right-repo"></select></label>
+          </div>
+          <button id="cmp-run">비교하기</button>
+        </div>
+        <label class="drift-only">
+          <input type="checkbox" id="cmp-diff-only" checked />
+          차이나는 항목만
+        </label>
+        <div id="cmp-result"></div>
       </section>
 
       <section id="repositories" class="panel">

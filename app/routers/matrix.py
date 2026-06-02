@@ -91,3 +91,39 @@ async def repository_detail(
     columns = [column for column, _ in results]
     configs = {column.id: config for column, config in results}
     return build_repo_diff(repository, columns, configs)
+
+
+@router.get("/compare", response_model=RepositoryDiff)
+async def compare_repositories(
+    left_instance: str = Query(..., description="Left side instance id."),
+    left_repo: str = Query(..., description="Left side repository name."),
+    right_instance: str = Query(..., description="Right side instance id."),
+    right_repo: str = Query(..., description="Right side repository name."),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> RepositoryDiff:
+    """Compare any two repositories across (possibly different) instances.
+
+    Unlike the matrix/detail views which match by repository name, this lets
+    an operator pick an arbitrary repository on server A and compare it,
+    field by field, against an arbitrarily named one on server B.
+    """
+    left = registry.get(left_instance)
+    right = registry.get(right_instance)
+    (lcol, lcfg), (rcol, rcfg) = await asyncio.gather(
+        _fetch_repo_config(left, left_repo),
+        _fetch_repo_config(right, right_repo),
+    )
+    left_column = MatrixColumn(
+        id="left",
+        name=f"{left.name} / {left_repo}",
+        reachable=lcol.reachable,
+        error=lcol.error,
+    )
+    right_column = MatrixColumn(
+        id="right",
+        name=f"{right.name} / {right_repo}",
+        reachable=rcol.reachable,
+        error=rcol.error,
+    )
+    configs = {"left": lcfg, "right": rcfg}
+    return build_repo_diff(f"{left_repo} ↔ {right_repo}", [left_column, right_column], configs)

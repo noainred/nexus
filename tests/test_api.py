@@ -232,6 +232,46 @@ def test_repository_detail_diff(http_client):
 
 
 @respx.mock
+def test_compare_two_repositories_across_instances(http_client):
+    deps.registry._instances["core"] = InstanceConfig(
+        id="core", name="Core", base_url="https://core.test",
+        username="admin", password="secret", verify_tls=True,
+    )
+    # Left side: instance "test", repo "epel".
+    respx.get(f"{API}/repositories").mock(
+        return_value=httpx.Response(200, json=[{"name": "epel", "format": "yum", "type": "proxy"}])
+    )
+    respx.get(f"{API}/repositories/yum/proxy/epel").mock(
+        return_value=httpx.Response(200, json={"online": True, "proxy": {"remoteUrl": "https://a"}})
+    )
+    # Right side: instance "core", a differently-named repo "epel-mirror".
+    respx.get("https://core.test/service/rest/v1/repositories").mock(
+        return_value=httpx.Response(200, json=[{"name": "epel-mirror", "format": "yum", "type": "proxy"}])
+    )
+    respx.get("https://core.test/service/rest/v1/repositories/yum/proxy/epel-mirror").mock(
+        return_value=httpx.Response(200, json={"online": True, "proxy": {"remoteUrl": "https://b"}})
+    )
+    resp = http_client.get(
+        "/api/compare?left_instance=test&left_repo=epel"
+        "&right_instance=core&right_repo=epel-mirror"
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert [c["id"] for c in body["columns"]] == ["left", "right"]
+    assert body["columns"][0]["name"] == "Test Nexus / epel"
+    by_key = {f["key"]: f for f in body["fields"]}
+    assert by_key["proxy.remoteUrl"]["differs"] is True
+    assert by_key["online"]["differs"] is False
+
+
+def test_compare_unknown_instance_404(http_client):
+    resp = http_client.get(
+        "/api/compare?left_instance=nope&left_repo=a&right_instance=test&right_repo=b"
+    )
+    assert resp.status_code == 404
+
+
+@respx.mock
 def test_status_endpoint_handles_unreachable(http_client):
     respx.get(f"{API}/status").mock(side_effect=httpx.ConnectError("down"))
     resp = http_client.get("/api/status")

@@ -36,6 +36,14 @@ REST API를 호출하고, 가벼운 단일 페이지(SPA) 프런트엔드가 이
 항목은 빨갛게 강조되어, 어떤 설정이 어디서 어긋났는지 정확히 짚어줍니다.
 ("차이나는 항목만" 기본 켜짐 — 끄면 전체 설정을 볼 수 있음)
 
+#### 저장소 1:1 비교 (임의 선택)
+
+매트릭스/상세 비교는 **같은 이름**의 저장소를 맞춰 비교합니다. 이름이 서로
+다른 저장소를 비교하고 싶을 때는 **저장소 1:1 비교** 탭을 사용하세요. 양쪽에서
+서버와 저장소를 각각 자유롭게 골라(예: `Frontend 1 / epel` ↔ `Backend 1 /
+epel-mirror`) 설정을 항목별로 diff 합니다. 동일한 diff 엔진을 재사용하므로 다른
+항목은 똑같이 빨갛게 강조됩니다.
+
 ## 아키텍처
 
 ```
@@ -116,6 +124,7 @@ instances:
 | `GET` | `/api/instances` | 관리 인스턴스 목록 (자격 증명 제외) |
 | `GET` | `/api/matrix` | 저장소 × 인스턴스 구성 비교 매트릭스 |
 | `GET` | `/api/repository-detail?repository=` | 한 저장소의 설정 항목별 인스턴스 비교(diff) |
+| `GET` | `/api/compare?left_instance=&left_repo=&right_instance=&right_repo=` | 임의의 두 저장소(다른 서버·다른 이름) 1:1 설정 비교 |
 | `GET` | `/api/status` | 전체 인스턴스 상태 동시 점검 |
 | `GET` | `/api/instances/{id}/status` | 단일 인스턴스 상태 |
 | `GET` | `/api/blobstores` | 전체 인스턴스 Blob Store 사용량 (사이트별) |

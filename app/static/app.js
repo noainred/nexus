@@ -7,6 +7,7 @@ const state = {
   componentRepo: null,
   matrix: null,
   repoDiff: null,
+  compareDiff: null,
 };
 
 // ---- helpers -------------------------------------------------------------
@@ -296,24 +297,14 @@ document.getElementById("drift-only").addEventListener("change", renderMatrix);
 
 // ---- repository config diff (deep comparison) ----------------------------
 
-function renderRepoDiff() {
-  const body = document.getElementById("repo-modal-body");
-  body.innerHTML = "";
-  const diff = state.repoDiff;
-  if (!diff) return;
-
-  const diffOnly = document.getElementById("repo-diff-only").checked;
+// Build a field-by-field diff table element (shared by modal and compare tab).
+function diffTable(diff, diffOnly) {
   let fields = diff.fields;
   if (diffOnly) fields = fields.filter((f) => f.differs);
 
   if (!fields.length) {
-    body.append(
-      el("div", { class: "empty" },
-        diffOnly
-          ? "모든 인스턴스의 설정이 동일합니다 ✓"
-          : "비교할 설정 항목이 없습니다.")
-    );
-    return;
+    return el("div", { class: "empty" },
+      diffOnly ? "모든 설정이 동일합니다 ✓" : "비교할 설정 항목이 없습니다.");
   }
 
   const headCells = [el("th", {}, "설정 항목")];
@@ -334,7 +325,14 @@ function renderRepoDiff() {
     return el("tr", { class: f.differs ? "differs" : "" }, tds);
   });
 
-  body.append(el("table", { class: "diff" }, [thead, el("tbody", {}, rows)]));
+  return el("table", { class: "diff" }, [thead, el("tbody", {}, rows)]);
+}
+
+function renderRepoDiff() {
+  const body = document.getElementById("repo-modal-body");
+  body.innerHTML = "";
+  if (!state.repoDiff) return;
+  body.append(diffTable(state.repoDiff, document.getElementById("repo-diff-only").checked));
 }
 
 async function openRepoDiff(name) {
@@ -364,6 +362,82 @@ document.getElementById("repo-diff-only").addEventListener("change", renderRepoD
 document.getElementById("repo-modal").addEventListener("click", (ev) => {
   if (ev.target.id === "repo-modal") closeRepoDiff();
 });
+
+// ---- repository 1:1 compare ----------------------------------------------
+
+function fillInstanceSelect(sel) {
+  sel.innerHTML = "";
+  state.instances.forEach((i) => sel.append(el("option", { value: i.id }, i.name)));
+}
+
+async function fillRepoSelect(instanceId, repoSel) {
+  repoSel.innerHTML = "";
+  repoSel.append(el("option", { value: "" }, "불러오는 중…"));
+  try {
+    const repos = await api(`/api/instances/${instanceId}/repositories`);
+    repoSel.innerHTML = "";
+    if (!repos.length) {
+      repoSel.append(el("option", { value: "" }, "저장소 없음"));
+      return;
+    }
+    repos.forEach((r) =>
+      repoSel.append(el("option", { value: r.name }, `${r.name} (${r.format || "?"}/${r.type || "?"})`))
+    );
+  } catch (e) {
+    repoSel.innerHTML = "";
+    repoSel.append(el("option", { value: "" }, "조회 실패"));
+  }
+}
+
+function setupCompare() {
+  const li = document.getElementById("cmp-left-inst");
+  const ri = document.getElementById("cmp-right-inst");
+  const lr = document.getElementById("cmp-left-repo");
+  const rr = document.getElementById("cmp-right-repo");
+  fillInstanceSelect(li);
+  fillInstanceSelect(ri);
+  // Default the right side to a different server when possible.
+  if (state.instances.length > 1) ri.value = state.instances[1].id;
+  li.addEventListener("change", () => fillRepoSelect(li.value, lr));
+  ri.addEventListener("change", () => fillRepoSelect(ri.value, rr));
+  if (li.value) fillRepoSelect(li.value, lr);
+  if (ri.value) fillRepoSelect(ri.value, rr);
+}
+
+function renderCompare() {
+  const c = document.getElementById("cmp-result");
+  c.innerHTML = "";
+  if (!state.compareDiff) return;
+  c.append(diffTable(state.compareDiff, document.getElementById("cmp-diff-only").checked));
+}
+
+async function runCompare() {
+  const li = document.getElementById("cmp-left-inst").value;
+  const lr = document.getElementById("cmp-left-repo").value;
+  const ri = document.getElementById("cmp-right-inst").value;
+  const rr = document.getElementById("cmp-right-repo").value;
+  if (!li || !lr || !ri || !rr) {
+    toast("양쪽 서버와 저장소를 모두 선택하세요.", "err");
+    return;
+  }
+  const c = document.getElementById("cmp-result");
+  c.innerHTML = "";
+  c.append(el("div", { class: "empty" }, "비교 중…"));
+  const url =
+    `/api/compare?left_instance=${encodeURIComponent(li)}&left_repo=${encodeURIComponent(lr)}` +
+    `&right_instance=${encodeURIComponent(ri)}&right_repo=${encodeURIComponent(rr)}`;
+  try {
+    state.compareDiff = await api(url);
+  } catch (e) {
+    c.innerHTML = "";
+    c.append(el("div", { class: "empty" }, `비교 실패: ${e.message}`));
+    return;
+  }
+  renderCompare();
+}
+
+document.getElementById("cmp-run").addEventListener("click", runCompare);
+document.getElementById("cmp-diff-only").addEventListener("change", renderCompare);
 
 // ---- repositories --------------------------------------------------------
 
@@ -573,6 +647,7 @@ async function init() {
     refreshActiveTab();
   });
   document.getElementById("refresh-btn").addEventListener("click", refreshActiveTab);
+  setupCompare();
   refreshActiveTab();
 }
 

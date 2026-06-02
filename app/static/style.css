@@ -129,6 +129,31 @@ tr:hover td { background: var(--panel); }
 
 .empty { color: var(--muted); font-style: italic; padding: 12px 0; }
 
+/* repository 1:1 compare */
+.compare-pickers {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.compare-side { display: flex; align-items: flex-end; gap: 10px; }
+.compare-side .side-label {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 18px;
+  padding-bottom: 4px;
+}
+.compare-side label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.compare-side select { min-width: 160px; }
+.compare-vs { font-size: 20px; color: var(--muted); padding-bottom: 4px; }
+#cmp-run { background: var(--accent); border-color: var(--accent); color: #fff; padding: 8px 18px; }
+#cmp-result { margin-top: 12px; }
+
 /* repository config diff modal */
 .modal {
   position: fixed;
