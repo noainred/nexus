@@ -568,17 +568,21 @@ document.getElementById("component-more").addEventListener("click", () => {
 
 // ---- download usage ------------------------------------------------------
 
-function loadDownloadsRepoOptions() {
-  // Refresh the repo dropdown for the active instance; clear stale results.
+function clearDownloadsResult() {
   document.getElementById("dl-summary").innerHTML = "";
   document.getElementById("dl-table").innerHTML = "";
   document.getElementById("dl-note").textContent = "";
-  const sel = document.getElementById("dl-repo");
-  if (!state.current) {
-    sel.innerHTML = "";
-    return;
-  }
-  fillRepoSelect(state.current, sel);
+}
+
+function setupDownloads() {
+  const inst = document.getElementById("dl-inst");
+  const repo = document.getElementById("dl-repo");
+  fillInstanceSelect(inst);
+  inst.addEventListener("change", () => {
+    clearDownloadsResult();
+    fillRepoSelect(inst.value, repo);
+  });
+  if (inst.value) fillRepoSelect(inst.value, repo);
 }
 
 function summaryCard(label, value) {
@@ -591,6 +595,7 @@ function summaryCard(label, value) {
 }
 
 async function runDownloads() {
+  const instId = document.getElementById("dl-inst").value;
   const repo = document.getElementById("dl-repo").value;
   const summary = document.getElementById("dl-summary");
   const note = document.getElementById("dl-note");
@@ -598,8 +603,8 @@ async function runDownloads() {
   summary.innerHTML = "";
   note.textContent = "";
   table.innerHTML = "";
-  if (!state.current || !repo) {
-    toast("저장소를 선택하세요.", "err");
+  if (!instId || !repo) {
+    toast("서버와 저장소를 선택하세요.", "err");
     return;
   }
   table.append(el("div", { class: "empty" }, "자산을 스캔하는 중… (저장소 크기에 따라 시간이 걸릴 수 있어요)"));
@@ -607,7 +612,7 @@ async function runDownloads() {
   let report;
   try {
     report = await api(
-      `/api/instances/${state.current}/downloads?repository=${encodeURIComponent(repo)}`
+      `/api/instances/${instId}/downloads?repository=${encodeURIComponent(repo)}`
     );
   } catch (e) {
     table.innerHTML = "";
@@ -709,7 +714,6 @@ function refreshActiveTab() {
   loadOverview();
   loadMatrix();
   loadRepositories();
-  loadDownloadsRepoOptions();
   loadCleanup();
 }
 
@@ -734,6 +738,7 @@ async function init() {
   });
   document.getElementById("refresh-btn").addEventListener("click", refreshActiveTab);
   setupCompare();
+  setupDownloads();
   refreshActiveTab();
 }
 
