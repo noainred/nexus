@@ -129,26 +129,34 @@ async function loadBlobstores() {
   }
 
   const rows = [];
+  let grandUsed = 0;
+  let grandBlobs = 0;
+  let reachableSites = 0;
+
   sites.forEach((site) => {
     if (!site.reachable) {
       rows.push(
-        el("tr", {}, [
+        el("tr", { class: "site-start" }, [
           el("td", { class: "site-cell" }, site.name),
           el("td", { colspan: "5", class: "site-error" }, `조회 불가: ${site.error || ""}`),
         ])
       );
       return;
     }
+    reachableSites += 1;
+    if (site.total_size_bytes != null) grandUsed += site.total_size_bytes;
+    if (site.blob_count != null) grandBlobs += site.blob_count;
+
     if (!site.blobstores.length) {
       rows.push(
-        el("tr", {}, [
+        el("tr", { class: "site-start" }, [
           el("td", { class: "site-cell" }, site.name),
           el("td", { colspan: "5", class: "empty" }, "Blob store 없음"),
         ])
       );
       return;
     }
-    // First row of a site carries the site name (row-spanned visually).
+    // First row of a site carries the site name.
     site.blobstores.forEach((b, idx) =>
       rows.push(
         el("tr", { class: idx === 0 ? "site-start" : "" }, [
@@ -161,7 +169,32 @@ async function loadBlobstores() {
         ])
       )
     );
+    // Per-site subtotal when a site has more than one blob store.
+    if (site.blobstores.length > 1) {
+      rows.push(
+        el("tr", { class: "subtotal" }, [
+          el("td", { class: "site-cell" }, ""),
+          el("td", { class: "subtotal-label" }, "사이트 합계"),
+          el("td", {}, ""),
+          el("td", {}, fmtBytes(site.total_size_bytes)),
+          el("td", {}, ""),
+          el("td", {}, site.blob_count != null ? site.blob_count.toLocaleString() : "—"),
+        ])
+      );
+    }
   });
+
+  // Grand total across all reachable sites.
+  rows.push(
+    el("tr", { class: "grand-total" }, [
+      el("td", { class: "site-cell" }, "전체 합계"),
+      el("td", {}, `${reachableSites}개 사이트`),
+      el("td", {}, ""),
+      el("td", {}, fmtBytes(grandUsed)),
+      el("td", {}, ""),
+      el("td", {}, grandBlobs.toLocaleString()),
+    ])
+  );
 
   container.append(
     buildTable(["사이트", "Blob Store", "유형", "사용량", "가용 공간", "Blob 수"], rows)

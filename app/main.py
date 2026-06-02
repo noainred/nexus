@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -27,6 +27,20 @@ app.include_router(repositories.router)
 app.include_router(cleanup.router)
 app.include_router(monitoring.router)
 app.include_router(matrix.router)
+
+
+@app.middleware("http")
+async def no_cache_dashboard(request: Request, call_next):
+    """Tell browsers to always revalidate the SPA assets.
+
+    Without this, a cached app.js/style.css can keep showing an old UI after
+    the code is updated. ETags still allow 304s, so this is cheap.
+    """
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.startswith("/static"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 @app.get("/healthz", tags=["meta"])

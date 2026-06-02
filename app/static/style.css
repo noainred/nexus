@@ -133,6 +133,14 @@ tr:hover td { background: var(--panel); }
 td.site-cell { font-weight: 600; color: var(--accent); white-space: nowrap; }
 tr.site-start td { border-top: 2px solid var(--border); }
 td.site-error { color: var(--red); }
+tr.subtotal td { color: var(--muted); font-style: italic; }
+tr.subtotal .subtotal-label { font-style: normal; }
+tr.grand-total td {
+  border-top: 2px solid var(--accent);
+  font-weight: 700;
+  background: var(--panel);
+}
+tr.grand-total:hover td { background: var(--panel); }
 
 /* -- comparison matrix -- */
 .matrix-header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
