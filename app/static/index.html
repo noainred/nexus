@@ -36,10 +36,15 @@
       <section id="matrix" class="panel">
         <div class="matrix-header">
           <h2>저장소 구성 비교 (인스턴스 × 저장소)</h2>
-          <label class="drift-only">
-            <input type="checkbox" id="drift-only" />
-            차이가 있는 항목만 보기
-          </label>
+          <div class="matrix-controls">
+            <label class="ref-pick">기준 서버
+              <select id="matrix-ref"></select>
+            </label>
+            <label class="drift-only">
+              <input type="checkbox" id="drift-only" />
+              차이가 있는 항목만 보기
+            </label>
+          </div>
         </div>
         <div class="legend">
           <span><i class="sw consistent"></i> 일치</span>

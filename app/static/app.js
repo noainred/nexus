@@ -6,6 +6,7 @@ const state = {
   componentToken: null,
   componentRepo: null,
   matrix: null,
+  matrixReference: "",
   repoDiff: null,
   compareDiff: null,
   downloadsLoaded: false,
@@ -232,9 +233,62 @@ function rowStatusBadge(status) {
     drift: ["down", "설정 상이"],
     partial: ["warn", "일부 누락"],
     unknown: ["warn", "조회 불가"],
+    no_ref: ["warn", "기준 서버에 없음"],
   };
   const [cls, label] = map[status] || ["warn", status];
   return el("span", { class: `badge ${cls} row-status` }, label);
+}
+
+function cellSignature(c) {
+  return `${c.format || ""}|${c.type || ""}|${c.remote_url || ""}`;
+}
+
+// Evaluate one row's status and per-cell match, either against the majority
+// (server-computed, refId == "") or against a chosen reference server.
+function evaluateRow(row, columns, refId) {
+  const matches = {};
+  if (!refId) {
+    columns.forEach((col) => {
+      const c = row.cells[col.id];
+      matches[col.id] = c && c.present ? !!c.matches_reference : null;
+    });
+    return { status: row.status, matches, refMissing: false };
+  }
+
+  const reachable = columns.filter((col) => {
+    const c = row.cells[col.id];
+    return c && !c.unknown;
+  });
+  const presentCount = columns.filter((col) => {
+    const c = row.cells[col.id];
+    return c && c.present;
+  }).length;
+
+  const refCell = row.cells[refId];
+  if (!refCell || !refCell.present) {
+    columns.forEach((col) => { matches[col.id] = null; });
+    const status = refCell && refCell.unknown ? "unknown" : "no_ref";
+    return { status, matches, refMissing: true };
+  }
+
+  const refSig = cellSignature(refCell);
+  let anyDiff = false;
+  columns.forEach((col) => {
+    const c = row.cells[col.id];
+    if (c && c.present) {
+      const m = cellSignature(c) === refSig;
+      matches[col.id] = m;
+      if (!m) anyDiff = true;
+    } else {
+      matches[col.id] = null;
+    }
+  });
+
+  let status;
+  if (anyDiff) status = "drift";
+  else if (presentCount < reachable.length) status = "partial";
+  else status = "consistent";
+  return { status, matches, refMissing: false };
 }
 
 function renderMatrix() {
@@ -247,9 +301,13 @@ function renderMatrix() {
     return;
   }
 
+  const refId = state.matrixReference || "";
+  const evals = new Map();
+  matrix.rows.forEach((r) => evals.set(r, evaluateRow(r, matrix.columns, refId)));
+
   const driftOnly = document.getElementById("drift-only").checked;
   let rows = matrix.rows;
-  if (driftOnly) rows = rows.filter((r) => r.status !== "consistent");
+  if (driftOnly) rows = rows.filter((r) => evals.get(r).status !== "consistent");
 
   if (!rows.length) {
     container.append(el("div", { class: "empty" },
@@ -260,37 +318,54 @@ function renderMatrix() {
   // Header: blank corner + one column per instance (with unreachable mark).
   const headCells = [el("th", { class: "rowhead" }, "저장소 \\ 인스턴스")];
   matrix.columns.forEach((col) => {
-    const label = col.reachable ? col.name : `${col.name} ⚠`;
-    headCells.push(el("th", { title: col.error || col.name }, label));
+    let label = col.reachable ? col.name : `${col.name} ⚠`;
+    if (col.id === refId) label = `${label} (기준)`;
+    headCells.push(el("th", { class: col.id === refId ? "ref-col" : "", title: col.error || col.name }, label));
   });
   const thead = el("thead", {}, el("tr", {}, headCells));
 
   const body = rows.map((row) => {
+    const ev = evals.get(row);
     const tds = [
       el("td", { class: "rowhead" }, [
         el("span", { class: "link", title: "설정 자세히 비교", onclick: () => openRepoDiff(row.repository) }, row.repository),
-        rowStatusBadge(row.status),
+        rowStatusBadge(ev.status),
       ]),
     ];
     matrix.columns.forEach((col) => {
       const c = row.cells[col.id] || { present: false };
+      const match = ev.matches[col.id];
       let cls, mark, meta;
       if (c.unknown) { cls = "unknown"; mark = "?"; meta = ""; }
       else if (!c.present) { cls = "missing"; mark = "—"; meta = ""; }
-      else if (c.matches_reference) { cls = "consistent"; mark = "✓"; meta = c.format || ""; }
+      else if (match === null) { cls = "neutral"; mark = "•"; meta = c.format || ""; }
+      else if (match) { cls = "consistent"; mark = "✓"; meta = c.format || ""; }
       else { cls = "drift"; mark = "≠"; meta = [c.type, c.remote_url].filter(Boolean).join(" · ") || c.format || ""; }
 
+      const refMark = col.id === refId ? "ref-col" : "";
       const inner = el("span", { class: `mcell ${cls}`, title: cellDetail(c) }, [
         el("span", { class: "mark" }, mark),
         meta ? el("span", { class: "meta" }, meta) : null,
       ]);
-      tds.push(el("td", {}, inner));
+      tds.push(el("td", { class: refMark }, inner));
     });
     return el("tr", {}, tds);
   });
 
   const table = el("table", { class: "matrix" }, [thead, el("tbody", {}, body)]);
   container.append(table);
+}
+
+function populateMatrixRef() {
+  const sel = document.getElementById("matrix-ref");
+  const prev = state.matrixReference || "";
+  sel.innerHTML = "";
+  sel.append(el("option", { value: "" }, "(자동: 다수 기준)"));
+  (state.matrix ? state.matrix.columns : []).forEach((col) =>
+    sel.append(el("option", { value: col.id }, col.name))
+  );
+  sel.value = [...sel.options].some((o) => o.value === prev) ? prev : "";
+  state.matrixReference = sel.value;
 }
 
 async function loadMatrix() {
@@ -302,10 +377,15 @@ async function loadMatrix() {
     container.append(el("div", { class: "empty" }, `매트릭스 로드 실패: ${e.message}`));
     return;
   }
+  populateMatrixRef();
   renderMatrix();
 }
 
 document.getElementById("drift-only").addEventListener("change", renderMatrix);
+document.getElementById("matrix-ref").addEventListener("change", (e) => {
+  state.matrixReference = e.target.value;
+  renderMatrix();
+});
 
 // ---- repository config diff (deep comparison) ----------------------------
 
