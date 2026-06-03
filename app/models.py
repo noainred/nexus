@@ -7,11 +7,41 @@ from pydantic import BaseModel, Field
 
 
 class InstanceSummary(BaseModel):
-    """Public view of a managed instance (never exposes credentials)."""
+    """Public view of a managed instance (never exposes the password)."""
 
     id: str
     name: str
     base_url: str
+    username: Optional[str] = None
+    verify_tls: Optional[bool] = None
+    use_in_monitoring: bool = True
+    use_in_comparison: bool = True
+
+
+class InstanceCreate(BaseModel):
+    """Payload to add a managed instance."""
+
+    id: str = Field(..., min_length=1, pattern=r"^[A-Za-z0-9_.-]+$")
+    name: str = Field(..., min_length=1)
+    base_url: str = Field(..., min_length=1)
+    username: str = ""
+    password: str = ""
+    verify_tls: Optional[bool] = None
+    use_in_monitoring: bool = True
+    use_in_comparison: bool = True
+
+
+class InstanceUpdate(BaseModel):
+    """Payload to edit a managed instance (id is taken from the path)."""
+
+    name: str = Field(..., min_length=1)
+    base_url: str = Field(..., min_length=1)
+    username: str = ""
+    # Blank password means "keep the existing one".
+    password: Optional[str] = None
+    verify_tls: Optional[bool] = None
+    use_in_monitoring: bool = True
+    use_in_comparison: bool = True
 
 
 class InstanceStatus(BaseModel):

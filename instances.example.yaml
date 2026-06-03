@@ -9,6 +9,11 @@
 # `username` - account used for management calls.
 # `password` - password / token for that account.
 # `verify_tls` - optional per-instance TLS override.
+# `use_in_monitoring` - include in 개요/상태/Blob/보안 집계 (default true).
+# `use_in_comparison` - include in 비교 매트릭스/콘텐츠 동기화 (default true).
+#
+# You can also manage all of this from the dashboard's "서버 설정" tab,
+# which writes back to this file.
 
 instances:
   - id: prod
@@ -23,3 +28,5 @@ instances:
     username: "admin"
     password: "change-me"
     verify_tls: false
+    use_in_monitoring: true
+    use_in_comparison: false

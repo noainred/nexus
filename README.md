@@ -16,6 +16,7 @@ REST API를 호출하고, 가벼운 단일 페이지(SPA) 프런트엔드가 이
 | **보안 점검** | 사이트별 익명 접근 허용·기본 admin 계정·관리자 권한 계정 점검 |
 | **콘텐츠 동기화** | 사이트 간 실제 컴포넌트(아티팩트) 존재 비교로 콘텐츠 드리프트 탐지 |
 | **정리(Cleanup) 정책** | 정책 목록 조회 및 신규 정책 생성 (마지막 업데이트/다운로드 경과일 기준) |
+| **서버 설정** | 대시보드에서 Nexus 서버 추가·수정·삭제, 서버별 모니터링/비교 사용 여부 선택 (instances.yaml에 저장) |
 
 > 개요의 Blob Store 사용량에는 **사용률(%) 임계치 경고**(80% 주황 / 90% 빨강)가 표시됩니다.
 
@@ -137,7 +138,8 @@ instances:
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
-| `GET` | `/api/instances` | 관리 인스턴스 목록 (자격 증명 제외) |
+| `GET` | `/api/instances` | 관리 인스턴스 목록 (비밀번호 제외, 사용 플래그 포함) |
+| `POST`·`PUT`·`DELETE` | `/api/instances[/{id}]` | 인스턴스 추가·수정·삭제 (instances.yaml에 영속) |
 | `GET` | `/api/matrix` | 저장소 × 인스턴스 구성 비교 매트릭스 |
 | `GET` | `/api/repository-detail?repository=` | 한 저장소의 설정 항목별 인스턴스 비교(diff) |
 | `GET` | `/api/compare?left_instance=&left_repo=&right_instance=&right_repo=` | 임의의 두 저장소(다른 서버·다른 이름) 1:1 설정 비교 |

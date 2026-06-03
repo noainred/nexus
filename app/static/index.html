@@ -26,6 +26,7 @@
       <button class="tab" data-tab="security">보안 점검</button>
       <button class="tab" data-tab="content">콘텐츠 동기화</button>
       <button class="tab" data-tab="cleanup">정리 정책</button>
+      <button class="tab" data-tab="settings">서버 설정</button>
     </nav>
 
     <main>
@@ -167,6 +168,36 @@
         <p class="hint">
           ※ 최소 한 개 이상의 기준(N일)을 입력해야 합니다.
         </p>
+      </section>
+
+      <section id="settings" class="panel">
+        <h2>Nexus 서버 설정</h2>
+        <p class="hint">관리할 Nexus 서버를 추가·수정·삭제합니다. 각 서버를 모니터링/비교에 사용할지 선택할 수 있습니다.</p>
+        <div id="settings-table"></div>
+
+        <h3 id="settings-form-title">새 서버 추가</h3>
+        <form id="settings-form" class="form">
+          <input type="hidden" name="editing_id" value="" />
+          <label>식별자(id)
+            <input name="id" placeholder="영문/숫자, 예: oc2a" required />
+          </label>
+          <label>이름 <input name="name" placeholder="예: OC2A Nexus" required /></label>
+          <label>주소(base_url)
+            <input name="base_url" placeholder="http://192.168.0.10:8081" required />
+          </label>
+          <label>계정 <input name="username" placeholder="admin" /></label>
+          <label>비밀번호
+            <input name="password" type="password" placeholder="비밀번호" />
+          </label>
+          <label class="chk"><input type="checkbox" name="verify_tls" /> TLS 인증서 검증(https 자체 인증서면 해제)</label>
+          <label class="chk"><input type="checkbox" name="use_in_monitoring" checked /> 모니터링에 사용</label>
+          <label class="chk"><input type="checkbox" name="use_in_comparison" checked /> 비교에 사용</label>
+          <div class="form-actions">
+            <button type="submit" id="settings-submit">서버 추가</button>
+            <button type="button" id="settings-cancel" class="ghost hidden">취소</button>
+          </div>
+        </form>
+        <p class="hint">※ 수정 시 비밀번호를 비워두면 기존 비밀번호가 유지됩니다.</p>
       </section>
     </main>
 

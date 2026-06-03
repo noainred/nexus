@@ -54,6 +54,6 @@ async def security_all(
 ) -> List[InstanceSecurity]:
     """Security posture for every managed instance (concurrent)."""
     results = await asyncio.gather(
-        *(_security_for(instance) for instance in registry.all())
+        *(_security_for(instance) for instance in registry.monitoring())
     )
     return list(results)

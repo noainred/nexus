@@ -73,7 +73,7 @@ async def content_compare(
     Unlike the config matrix, this reads the real artifacts so silent content
     drift between sites (no Pro replication) is caught.
     """
-    instances = registry.all()
+    instances = registry.comparison()
     results = await asyncio.gather(
         *(_fetch_keys(i, repository) for i in instances)
     )

@@ -48,6 +48,58 @@ def test_list_instances_hides_credentials(http_client):
     data = resp.json()
     assert data[0]["id"] == "test"
     assert "password" not in data[0]
+    assert data[0]["use_in_monitoring"] is True
+    assert data[0]["use_in_comparison"] is True
+
+
+def test_instance_crud(http_client, monkeypatch, tmp_path):
+    # Avoid touching a real instances.yaml during the test.
+    monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
+
+    # Create
+    resp = http_client.post(
+        "/api/instances",
+        json={
+            "id": "new1",
+            "name": "New One",
+            "base_url": "http://new.test:8081",
+            "username": "admin",
+            "password": "pw",
+            "use_in_monitoring": False,
+            "use_in_comparison": True,
+        },
+    )
+    assert resp.status_code == 201
+    assert resp.json()["use_in_monitoring"] is False
+    assert "new1" in deps.registry._instances
+
+    # Duplicate id -> 409
+    dup = http_client.post(
+        "/api/instances",
+        json={"id": "new1", "name": "x", "base_url": "http://x", "password": "p"},
+    )
+    assert dup.status_code == 409
+
+    # Update keeps password when blank
+    upd = http_client.put(
+        "/api/instances/new1",
+        json={
+            "name": "Renamed",
+            "base_url": "http://new.test:8081",
+            "username": "admin",
+            "password": "",
+            "use_in_monitoring": True,
+            "use_in_comparison": True,
+        },
+    )
+    assert upd.status_code == 200
+    assert deps.registry._instances["new1"].name == "Renamed"
+    assert deps.registry._instances["new1"].password == "pw"  # preserved
+
+    # Delete
+    dele = http_client.delete("/api/instances/new1")
+    assert dele.status_code == 204
+    assert "new1" not in deps.registry._instances
 
 
 @respx.mock

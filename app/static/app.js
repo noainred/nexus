@@ -96,6 +96,9 @@ document.querySelectorAll(".tab").forEach((tab) => {
       state.contentSetup = true;
       setupContent();
     }
+    if (tab.dataset.tab === "settings") {
+      loadSettings();
+    }
   });
 });
 
@@ -1056,6 +1059,143 @@ async function loadContent() {
   renderContent();
 }
 
+// ---- server settings (instance management) -------------------------------
+
+const SETTINGS_SELECTORS = ["cmp-left-inst", "cmp-right-inst", "dl-inst", "task-inst"];
+
+async function refreshInstances() {
+  state.instances = await api("/api/instances");
+  // Refill the standalone instance dropdowns, keeping selection if possible.
+  SETTINGS_SELECTORS.forEach((id) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const prev = sel.value;
+    fillInstanceSelect(sel);
+    if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
+  });
+  // Invalidate cached comparison data so it rebuilds with the new set.
+  state.matrix = null;
+  state.contentSetup = false;
+}
+
+function settingsResetForm() {
+  const form = document.getElementById("settings-form");
+  form.reset();
+  form.editing_id.value = "";
+  form.id.disabled = false;
+  form.use_in_monitoring.checked = true;
+  form.use_in_comparison.checked = true;
+  document.getElementById("settings-form-title").textContent = "새 서버 추가";
+  document.getElementById("settings-submit").textContent = "서버 추가";
+  document.getElementById("settings-cancel").classList.add("hidden");
+}
+
+function settingsEdit(inst) {
+  const form = document.getElementById("settings-form");
+  form.editing_id.value = inst.id;
+  form.id.value = inst.id;
+  form.id.disabled = true;                 // id is the key; not editable
+  form.name.value = inst.name;
+  form.base_url.value = inst.base_url;
+  form.username.value = inst.username || "";
+  form.password.value = "";                // blank = keep existing
+  form.verify_tls.checked = inst.verify_tls === true;
+  form.use_in_monitoring.checked = inst.use_in_monitoring !== false;
+  form.use_in_comparison.checked = inst.use_in_comparison !== false;
+  document.getElementById("settings-form-title").textContent = `서버 수정 — ${inst.name}`;
+  document.getElementById("settings-submit").textContent = "변경 저장";
+  document.getElementById("settings-cancel").classList.remove("hidden");
+  document.getElementById("settings-form").scrollIntoView({ behavior: "smooth" });
+}
+
+function flagBadge(on) {
+  return el("span", { class: `badge ${on ? "up" : ""}` }, on ? "사용" : "제외");
+}
+
+async function loadSettings() {
+  const container = document.getElementById("settings-table");
+  container.innerHTML = "";
+  let list = state.instances;
+  try {
+    list = await api("/api/instances");
+    state.instances = list;
+  } catch (e) {
+    container.append(el("div", { class: "empty" }, `목록 조회 실패: ${e.message}`));
+    return;
+  }
+  if (!list.length) {
+    container.append(el("div", { class: "empty" }, "등록된 서버가 없습니다. 아래에서 추가하세요."));
+    return;
+  }
+  const rows = list.map((i) =>
+    el("tr", {}, [
+      el("td", {}, i.name),
+      el("td", {}, i.id),
+      el("td", {}, i.base_url),
+      el("td", {}, i.username || "—"),
+      el("td", {}, flagBadge(i.use_in_monitoring !== false)),
+      el("td", {}, flagBadge(i.use_in_comparison !== false)),
+      el("td", {}, [
+        el("button", { onclick: () => settingsEdit(i) }, "수정"),
+        " ",
+        el("button", { class: "danger", onclick: () => settingsDelete(i) }, "삭제"),
+      ]),
+    ])
+  );
+  container.append(buildTable(
+    ["이름", "식별자", "주소", "계정", "모니터링", "비교", ""], rows
+  ));
+}
+
+async function settingsDelete(inst) {
+  if (!confirm(`서버 '${inst.name}'을(를) 삭제하시겠습니까?`)) return;
+  try {
+    await api(`/api/instances/${encodeURIComponent(inst.id)}`, { method: "DELETE" });
+    toast(`'${inst.name}' 삭제됨`);
+    await refreshInstances();
+    loadSettings();
+  } catch (e) {
+    toast(e.message, "err");
+  }
+}
+
+function setupSettings() {
+  const form = document.getElementById("settings-form");
+  document.getElementById("settings-cancel").addEventListener("click", settingsResetForm);
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const fd = new FormData(form);
+    const editingId = fd.get("editing_id");
+    const body = {
+      name: fd.get("name"),
+      base_url: fd.get("base_url"),
+      username: fd.get("username") || "",
+      password: fd.get("password") || "",
+      verify_tls: form.verify_tls.checked,
+      use_in_monitoring: form.use_in_monitoring.checked,
+      use_in_comparison: form.use_in_comparison.checked,
+    };
+    try {
+      if (editingId) {
+        await api(`/api/instances/${encodeURIComponent(editingId)}`, {
+          method: "PUT",
+          body: JSON.stringify(body),
+        });
+        toast("변경 저장됨");
+      } else {
+        body.id = fd.get("id");
+        await api("/api/instances", { method: "POST", body: JSON.stringify(body) });
+        toast(`'${body.name}' 추가됨`);
+      }
+      settingsResetForm();
+      await refreshInstances();
+      loadSettings();
+    } catch (e) {
+      toast(e.message, "err");
+    }
+  });
+}
+
 // ---- cleanup -------------------------------------------------------------
 
 async function loadCleanup() {
@@ -1147,6 +1287,7 @@ async function init() {
   setupDownloads();
   setupTasks();
   setupSecurity();
+  setupSettings();
   refreshActiveTab();
 }
 

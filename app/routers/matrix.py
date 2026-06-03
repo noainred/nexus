@@ -39,7 +39,7 @@ async def repository_matrix(
     Columns preserve the order instances are configured (e.g. DMZ, Core,
     Site1..N) so the dashboard grid mirrors the network topology.
     """
-    instances = registry.all()
+    instances = registry.comparison()
     results = await asyncio.gather(*(_fetch_repos(i) for i in instances))
 
     columns = [column for column, _ in results]

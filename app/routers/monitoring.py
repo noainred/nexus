@@ -49,9 +49,9 @@ async def _status_for(instance) -> InstanceStatus:
 async def status_all(
     registry: InstanceRegistry = Depends(get_registry),
 ) -> List[InstanceStatus]:
-    """Probe every managed instance concurrently for the dashboard overview."""
+    """Probe every monitoring-enabled instance concurrently for the overview."""
     results = await asyncio.gather(
-        *(_status_for(instance) for instance in registry.all())
+        *(_status_for(instance) for instance in registry.monitoring())
     )
     return list(results)
 
@@ -98,6 +98,6 @@ async def blobstores_all(
 ) -> List[InstanceBlobStores]:
     """Blob store usage for every instance, for the site-by-site overview."""
     results = await asyncio.gather(
-        *(_blobstores_for(instance) for instance in registry.all())
+        *(_blobstores_for(instance) for instance in registry.monitoring())
     )
     return list(results)

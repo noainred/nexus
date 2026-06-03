@@ -23,6 +23,14 @@ class InstanceConfig(BaseModel):
         default=None,
         description="Per-instance TLS verification override.",
     )
+    use_in_monitoring: bool = Field(
+        default=True,
+        description="Include this instance in monitoring aggregates.",
+    )
+    use_in_comparison: bool = Field(
+        default=True,
+        description="Include this instance in comparison views.",
+    )
 
     @property
     def api_root(self) -> str:
@@ -88,3 +96,37 @@ def load_instances(settings: Optional[Settings] = None) -> List[InstanceConfig]:
             instance.verify_tls = settings.verify_tls
 
     return document.instances
+
+
+def _instance_path(settings: Settings) -> Path:
+    path = Path(settings.instances_file)
+    if not path.is_absolute():
+        path = Path(os.getcwd()) / path
+    return path
+
+
+def save_instances(
+    instances: List[InstanceConfig], settings: Optional[Settings] = None
+) -> None:
+    """Persist the managed instances back to the YAML file."""
+    settings = settings or get_settings()
+    path = _instance_path(settings)
+    data = {
+        "instances": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "base_url": c.base_url,
+                "username": c.username,
+                "password": c.password,
+                "verify_tls": c.verify_tls,
+                "use_in_monitoring": c.use_in_monitoring,
+                "use_in_comparison": c.use_in_comparison,
+            }
+            for c in instances
+        ]
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
