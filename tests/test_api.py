@@ -52,6 +52,41 @@ def test_list_instances_hides_credentials(http_client):
     assert data[0]["use_in_comparison"] is True
 
 
+@respx.mock
+def test_instance_test_connection_ok(http_client):
+    respx.get("https://probe.test/service/rest/v1/status").mock(
+        return_value=httpx.Response(200)
+    )
+    respx.get("https://probe.test/service/rest/v1/status/check").mock(
+        return_value=httpx.Response(200, json={})
+    )
+    respx.get("https://probe.test/service/rest/v1/repositories").mock(
+        return_value=httpx.Response(200, json=[{"name": "r", "format": "raw", "type": "hosted"}])
+    )
+    resp = http_client.post(
+        "/api/instances/test",
+        json={"base_url": "https://probe.test", "username": "admin", "password": "p"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["reachable"] is True
+    assert body["repository_count"] == 1
+
+
+@respx.mock
+def test_instance_test_connection_fails(http_client):
+    respx.get("https://down.test/service/rest/v1/status").mock(
+        side_effect=httpx.ConnectError("nope")
+    )
+    resp = http_client.post(
+        "/api/instances/test", json={"base_url": "https://down.test"}
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["reachable"] is False
+    assert body["error"]
+
+
 def test_instance_crud(http_client, monkeypatch, tmp_path):
     # Avoid touching a real instances.yaml during the test.
     monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)

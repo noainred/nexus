@@ -100,6 +100,8 @@ tr:hover td { background: var(--panel); }
 .form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .form button { grid-column: 1 / -1; background: var(--accent); border-color: var(--accent); color: #fff; }
 .form-actions button { grid-column: auto; }
+.flag-toggle { cursor: pointer; user-select: none; }
+.flag-toggle:hover { filter: brightness(1.25); }
 .form .chk { flex-direction: row; align-items: center; gap: 8px; }
 .form .chk input { width: auto; }
 .form-actions { grid-column: 1 / -1; display: flex; gap: 10px; }

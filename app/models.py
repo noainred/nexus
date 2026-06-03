@@ -44,6 +44,25 @@ class InstanceUpdate(BaseModel):
     use_in_comparison: bool = True
 
 
+class InstanceTestRequest(BaseModel):
+    """Connection-test payload (does not persist anything)."""
+
+    base_url: str = Field(..., min_length=1)
+    username: str = ""
+    password: str = ""
+    verify_tls: Optional[bool] = None
+
+
+class InstanceTestResult(BaseModel):
+    """Outcome of a connection test."""
+
+    reachable: bool = False
+    healthy: bool = False
+    response_ms: Optional[float] = None
+    repository_count: Optional[int] = None
+    error: Optional[str] = None
+
+
 class InstanceStatus(BaseModel):
     """Health/monitoring snapshot for one instance."""
 

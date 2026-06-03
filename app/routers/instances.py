@@ -5,9 +5,16 @@ from typing import List
 
 from fastapi import APIRouter, Depends, Response
 
-from ..config import InstanceConfig
+from ..config import InstanceConfig, get_settings
 from ..deps import InstanceRegistry, get_registry
-from ..models import InstanceCreate, InstanceSummary, InstanceUpdate
+from ..models import (
+    InstanceCreate,
+    InstanceSummary,
+    InstanceTestRequest,
+    InstanceTestResult,
+    InstanceUpdate,
+)
+from ..nexus_client import NexusClient, NexusError
 
 router = APIRouter(prefix="/api/instances", tags=["instances"])
 
@@ -30,6 +37,35 @@ async def list_instances(
 ) -> List[InstanceSummary]:
     """Return the managed instances (without passwords)."""
     return [_summary(i) for i in registry.all()]
+
+
+@router.post("/test", response_model=InstanceTestResult)
+async def test_instance(body: InstanceTestRequest) -> InstanceTestResult:
+    """Probe a Nexus server with the given credentials without saving it."""
+    cfg = InstanceConfig(
+        id="__test__",
+        name="__test__",
+        base_url=body.base_url,
+        username=body.username,
+        password=body.password,
+        verify_tls=body.verify_tls,
+    )
+    client = NexusClient(cfg, timeout=get_settings().request_timeout)
+    result = InstanceTestResult()
+    try:
+        ping = await client.ping()
+    except NexusError as exc:
+        result.error = exc.message
+        return result
+    result.reachable = True
+    result.response_ms = ping["response_ms"]
+    result.healthy = all(ping["checks"].values()) if ping["checks"] else True
+    try:
+        repos = await client.list_repositories()
+        result.repository_count = len(repos)
+    except NexusError:
+        pass  # reachable, but the account may lack browse permission
+    return result
 
 
 @router.post("", response_model=InstanceSummary, status_code=201)

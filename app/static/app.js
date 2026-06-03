@@ -1108,8 +1108,36 @@ function settingsEdit(inst) {
   document.getElementById("settings-form").scrollIntoView({ behavior: "smooth" });
 }
 
-function flagBadge(on) {
-  return el("span", { class: `badge ${on ? "up" : ""}` }, on ? "사용" : "제외");
+function flagToggle(inst, field) {
+  const on = inst[field] !== false;
+  return el("span", {
+    class: `badge ${on ? "up" : "down"} flag-toggle`,
+    title: "클릭하여 전환",
+    onclick: () => toggleFlag(inst, field),
+  }, on ? "✓ 사용" : "✗ 제외");
+}
+
+async function toggleFlag(inst, field) {
+  const body = {
+    name: inst.name,
+    base_url: inst.base_url,
+    username: inst.username || "",
+    password: "",                       // blank keeps the stored password
+    verify_tls: inst.verify_tls,
+    use_in_monitoring: inst.use_in_monitoring !== false,
+    use_in_comparison: inst.use_in_comparison !== false,
+  };
+  body[field] = !(inst[field] !== false);  // flip
+  try {
+    await api(`/api/instances/${encodeURIComponent(inst.id)}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+    await refreshInstances();
+    loadSettings();
+  } catch (e) {
+    toast(e.message, "err");
+  }
 }
 
 async function loadSettings() {
@@ -1133,8 +1161,8 @@ async function loadSettings() {
       el("td", {}, i.id),
       el("td", {}, i.base_url),
       el("td", {}, i.username || "—"),
-      el("td", {}, flagBadge(i.use_in_monitoring !== false)),
-      el("td", {}, flagBadge(i.use_in_comparison !== false)),
+      el("td", {}, flagToggle(i, "use_in_monitoring")),
+      el("td", {}, flagToggle(i, "use_in_comparison")),
       el("td", {}, [
         el("button", { onclick: () => settingsEdit(i) }, "수정"),
         " ",
@@ -1175,6 +1203,7 @@ function setupSettings() {
       use_in_monitoring: form.use_in_monitoring.checked,
       use_in_comparison: form.use_in_comparison.checked,
     };
+    const submit = document.getElementById("settings-submit");
     try {
       if (editingId) {
         await api(`/api/instances/${encodeURIComponent(editingId)}`, {
@@ -1184,13 +1213,43 @@ function setupSettings() {
         toast("변경 저장됨");
       } else {
         body.id = fd.get("id");
+        // Verify the server actually responds before adding it.
+        submit.disabled = true;
+        submit.textContent = "연결 확인 중…";
+        let test;
+        try {
+          test = await api("/api/instances/test", {
+            method: "POST",
+            body: JSON.stringify({
+              base_url: body.base_url,
+              username: body.username,
+              password: body.password,
+              verify_tls: body.verify_tls,
+            }),
+          });
+        } catch (e) {
+          test = { reachable: false, error: e.message };
+        }
+        submit.disabled = false;
+        submit.textContent = "서버 추가";
+        if (!test.reachable) {
+          if (!confirm(`서버에 연결할 수 없습니다:\n${test.error || "원인 불명"}\n\n그래도 추가하시겠습니까?`)) {
+            return;
+          }
+        }
         await api("/api/instances", { method: "POST", body: JSON.stringify(body) });
-        toast(`'${body.name}' 추가됨`);
+        toast(
+          test.reachable
+            ? `'${body.name}' 추가됨 — 연결 정상 (응답 ${test.response_ms}ms${test.repository_count != null ? ", 저장소 " + test.repository_count : ""})`
+            : `'${body.name}' 추가됨 (연결 미확인)`
+        );
       }
       settingsResetForm();
       await refreshInstances();
       loadSettings();
     } catch (e) {
+      submit.disabled = false;
+      submit.textContent = editingId ? "변경 저장" : "서버 추가";
       toast(e.message, "err");
     }
   });
