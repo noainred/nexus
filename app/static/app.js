@@ -14,6 +14,7 @@ const state = {
   securityLoaded: false,
   contentSetup: false,
   contentMatrix: null,
+  topologyLoaded: false,
 };
 
 // ---- helpers -------------------------------------------------------------
@@ -98,6 +99,10 @@ document.querySelectorAll(".tab").forEach((tab) => {
     }
     if (tab.dataset.tab === "settings") {
       loadSettings();
+    }
+    if (tab.dataset.tab === "topology" && !state.topologyLoaded) {
+      state.topologyLoaded = true;
+      loadTopology();
     }
   });
 });
@@ -252,6 +257,83 @@ async function loadBlobstores() {
   container.append(
     buildTable(["사이트", "Blob Store", "유형", "사용량", "가용 공간", "사용률", "Blob 수"], rows)
   );
+}
+
+// ---- topology ------------------------------------------------------------
+
+function setupTopology() {
+  document.getElementById("topo-refresh").addEventListener("click", loadTopology);
+  document.getElementById("topo-probe").addEventListener("change", loadTopology);
+}
+
+async function loadTopology() {
+  const summary = document.getElementById("topo-summary");
+  const body = document.getElementById("topo-body");
+  summary.innerHTML = "";
+  body.innerHTML = "";
+  body.append(el("div", { class: "empty" }, "토폴로지를 분석하는 중…"));
+  const probe = document.getElementById("topo-probe").checked;
+  let data;
+  try {
+    data = await api(`/api/topology${probe ? "?probe=true" : ""}`);
+  } catch (e) {
+    body.innerHTML = "";
+    body.append(el("div", { class: "empty" }, `토폴로지 조회 실패: ${e.message}`));
+    return;
+  }
+  body.innerHTML = "";
+
+  const down = data.nodes.filter((n) => !n.reachable).length;
+  summary.append(
+    summaryCard("노드", data.nodes.length.toLocaleString()),
+    summaryCard("다운 노드", String(down)),
+    summaryCard("끊긴 링크", String(data.broken_links))
+  );
+
+  if (!data.nodes.length) {
+    body.append(el("div", { class: "empty" }, "노드가 없습니다."));
+    return;
+  }
+
+  data.nodes.forEach((node) => {
+    const statusBadge = node.reachable
+      ? el("span", { class: "badge up" }, "정상")
+      : el("span", { class: "badge down" }, "다운");
+    const head = el("div", { class: "topo-node-head" }, [
+      el("span", { class: "topo-node-name" }, node.name),
+      statusBadge,
+      el("span", { class: "url" }, node.base_url),
+    ]);
+
+    let detail;
+    if (!node.reachable) {
+      detail = el("div", { class: "site-error", style: "padding:6px 0" }, node.error || "연결 불가");
+    } else if (!node.proxies.length) {
+      detail = el("div", { class: "empty" }, "프록시 저장소 없음 (말단/호스트 노드)");
+    } else {
+      const rows = node.proxies.map((p) => {
+        let targetCell;
+        if (p.internal) {
+          targetCell = el("td", {}, [
+            el("span", { class: `badge ${p.broken ? "down" : "up"}` }, p.broken ? "끊김" : "연결"),
+            " ",
+            p.target_id || p.target_host,
+          ]);
+        } else {
+          const mark = p.remote_reachable === false ? " ✗" : p.remote_reachable === true ? " ✓" : "";
+          targetCell = el("td", {}, `외부: ${p.target_host}${mark}`);
+        }
+        return el("tr", { class: p.broken ? "differs" : "" }, [
+          el("td", {}, p.repository),
+          targetCell,
+          el("td", { class: "url" }, p.remote_url),
+        ]);
+      });
+      detail = buildTable(["프록시 저장소", "상위(부모)", "원격 주소"], rows);
+    }
+
+    body.append(el("div", { class: "topo-node" }, [head, detail]));
+  });
 }
 
 // ---- comparison matrix ---------------------------------------------------
@@ -1347,6 +1429,7 @@ async function init() {
   setupTasks();
   setupSecurity();
   setupSettings();
+  setupTopology();
   refreshActiveTab();
 }
 

@@ -18,6 +18,7 @@ from .routers import (
     repositories,
     security,
     tasks,
+    topology,
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -41,6 +42,7 @@ app.include_router(downloads.router)
 app.include_router(tasks.router)
 app.include_router(security.router)
 app.include_router(content.router)
+app.include_router(topology.router)
 
 
 @app.middleware("http")

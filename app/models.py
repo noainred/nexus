@@ -303,6 +303,36 @@ class RepositoryMatrix(BaseModel):
     rows: List[MatrixRow] = Field(default_factory=list)
 
 
+class ProxyLink(BaseModel):
+    """A proxy repository's upstream link (an edge in the topology)."""
+
+    repository: str
+    remote_url: str
+    target_host: str
+    target_id: Optional[str] = None   # matched managed node id, else external
+    internal: bool = False
+    remote_reachable: Optional[bool] = None
+    broken: bool = False
+
+
+class TopologyNode(BaseModel):
+    """One node (instance) plus its outgoing proxy links."""
+
+    id: str
+    name: str
+    base_url: str
+    reachable: bool = True
+    error: Optional[str] = None
+    proxies: List[ProxyLink] = Field(default_factory=list)
+
+
+class Topology(BaseModel):
+    """Proxy-derived topology across all managed nodes."""
+
+    nodes: List[TopologyNode] = Field(default_factory=list)
+    broken_links: int = 0
+
+
 class ContentRow(BaseModel):
     """One component compared across instances (presence only)."""
 

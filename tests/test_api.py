@@ -535,6 +535,47 @@ def test_content_compare_detects_missing_component(http_client):
 
 
 @respx.mock
+def test_topology_internal_link_and_broken(http_client):
+    # core is a managed node; test proxies it. core is unreachable -> broken.
+    deps.registry._instances["core"] = InstanceConfig(
+        id="core", name="Core", base_url="http://core.test:8081",
+        username="admin", password="secret", verify_tls=True,
+    )
+    respx.get(f"{API}/repositories").mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {
+                    "name": "maven-proxy",
+                    "format": "maven2",
+                    "type": "proxy",
+                    "attributes": {"proxy": {"remoteUrl": "http://core.test:8081/repository/maven/"}},
+                },
+                {
+                    "name": "pypi",
+                    "format": "pypi",
+                    "type": "proxy",
+                    "attributes": {"proxy": {"remoteUrl": "https://pypi.org/simple"}},
+                },
+            ],
+        )
+    )
+    respx.get("http://core.test:8081/service/rest/v1/repositories").mock(
+        side_effect=httpx.ConnectError("down")
+    )
+    resp = http_client.get("/api/topology")
+    assert resp.status_code == 200
+    body = resp.json()
+    by_id = {n["id"]: n for n in body["nodes"]}
+    links = {p["repository"]: p for p in by_id["test"]["proxies"]}
+    assert links["maven-proxy"]["internal"] is True
+    assert links["maven-proxy"]["target_id"] == "core"
+    assert links["maven-proxy"]["broken"] is True       # core is down
+    assert links["pypi"]["internal"] is False            # external upstream
+    assert body["broken_links"] >= 1
+
+
+@respx.mock
 def test_security_check(http_client):
     respx.get(f"{API}/security/anonymous").mock(
         return_value=httpx.Response(200, json={"enabled": True, "userId": "anonymous"})

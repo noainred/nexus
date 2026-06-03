@@ -18,6 +18,7 @@
 
     <nav class="tabs">
       <button class="tab active" data-tab="overview">개요</button>
+      <button class="tab" data-tab="topology">토폴로지</button>
       <button class="tab" data-tab="matrix">비교 매트릭스</button>
       <button class="tab" data-tab="compare">저장소 1:1 비교</button>
       <button class="tab" data-tab="repositories">저장소 관리</button>
@@ -30,6 +31,22 @@
     </nav>
 
     <main>
+      <section id="topology" class="panel">
+        <div class="matrix-header">
+          <h2>토폴로지 (프록시 연결 구조)</h2>
+          <div class="matrix-controls">
+            <label class="drift-only">
+              <input type="checkbox" id="topo-probe" />
+              원격 실제 점검(느림)
+            </label>
+            <button id="topo-refresh">새로고침</button>
+          </div>
+        </div>
+        <p class="hint">각 프록시 저장소의 원격 주소로 노드 간 부모↔자식 관계를 도출합니다. 상위 노드가 다운된 끊긴 링크는 빨갛게 표시되며, 해당 프록시는 Auto-block 위험이 있습니다.</p>
+        <div id="topo-summary" class="cards"></div>
+        <div id="topo-body"></div>
+      </section>
+
       <section id="overview" class="panel active">
         <h2>인스턴스 상태</h2>
         <div id="status-cards" class="cards"></div>
