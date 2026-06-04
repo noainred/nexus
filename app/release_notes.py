@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.5.1",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "added", "text": "서버 설정 상단에 '변경 이력 보기' 버튼(메뉴) 추가 — 클릭 시 이력 팝업"},
+        ],
+    },
+    {
         "version": "0.5.0",
         "date": "2026-06-04",
         "changes": [

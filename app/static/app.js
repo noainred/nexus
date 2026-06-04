@@ -1580,6 +1580,7 @@ function setupSettings() {
   });
   const fileInput = document.getElementById("import-file");
   document.getElementById("import-btn").addEventListener("click", () => fileInput.click());
+  document.getElementById("history-btn").addEventListener("click", openReleaseNotes);
   fileInput.addEventListener("change", () => {
     if (fileInput.files && fileInput.files[0]) importSettings(fileInput.files[0]);
     fileInput.value = "";  // allow re-selecting the same file
