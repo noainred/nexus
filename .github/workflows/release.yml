@@ -33,10 +33,10 @@ jobs:
           echo "version=$V" >> "$GITHUB_OUTPUT"
 
       - name: Build offline bundle (source + wheels)
-        run: bash deploy/build-offline-bundle.sh nexus-manager-offline.tar.gz
+        run: bash deploy/build-offline-bundle.sh "nexus-manager-offline-v${{ steps.ver.outputs.version }}.tar.gz"
 
       - name: Build source-only archive
-        run: git archive --format=tar.gz -o nexus-manager-src.tar.gz HEAD
+        run: git archive --format=tar.gz -o "nexus-manager-src-v${{ steps.ver.outputs.version }}.tar.gz" HEAD
 
       - name: Publish per-version and latest releases
         env:
@@ -44,29 +44,32 @@ jobs:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -e
-          # The build step created ver_${VERSION}.md as a version marker.
-          FILES="nexus-manager-offline.tar.gz nexus-manager-src.tar.gz ver_${VERSION}.md"
+          VER_OFFLINE="nexus-manager-offline-v${VERSION}.tar.gz"
+          VER_SRC="nexus-manager-src-v${VERSION}.tar.gz"
+          VER_MD="ver_${VERSION}.md"     # created by the build script
           NOTES="Auto-built from ${GITHUB_SHA} (app v${VERSION})"
-          for TAG in "v${VERSION}" latest; do
-            TITLE="$TAG"
-            [ "$TAG" = "latest" ] && TITLE="latest (v${VERSION})"
-            if gh release view "$TAG" >/dev/null 2>&1; then
-              # On the rolling "latest", drop stale version-marker assets.
-              if [ "$TAG" = "latest" ]; then
-                for OLD in $(gh release view latest --json assets -q '.assets[].name' | grep '^ver_' || true); do
-                  [ "$OLD" = "ver_${VERSION}.md" ] || gh release delete-asset latest "$OLD" -y || true
-                done
-              fi
-              gh release upload "$TAG" $FILES --clobber
-              # Refresh title/notes so they reflect the current version.
-              gh release edit "$TAG" --title "$TITLE" --notes "$NOTES"
-            else
-              PRE=""
-              [ "$TAG" = "latest" ] && PRE="--prerelease"
-              gh release create "$TAG" $FILES \
-                --target "$GITHUB_SHA" \
-                --title "$TITLE" \
-                --notes "$NOTES" \
-                $PRE
-            fi
-          done
+
+          # Stable-named copies so the rolling latest URLs never change.
+          cp "$VER_OFFLINE" nexus-manager-offline.tar.gz
+          cp "$VER_SRC" nexus-manager-src.tar.gz
+
+          # Per-version release: version-stamped filenames, kept forever.
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            gh release upload "v${VERSION}" "$VER_OFFLINE" "$VER_SRC" "$VER_MD" --clobber
+            gh release edit "v${VERSION}" --title "v${VERSION}" --notes "$NOTES"
+          else
+            gh release create "v${VERSION}" "$VER_OFFLINE" "$VER_SRC" "$VER_MD" \
+              --target "$GITHUB_SHA" --title "v${VERSION}" --notes "$NOTES"
+          fi
+
+          # Rolling latest: stable filenames + version marker.
+          if gh release view latest >/dev/null 2>&1; then
+            for OLD in $(gh release view latest --json assets -q '.assets[].name' | grep '^ver_' || true); do
+              [ "$OLD" = "$VER_MD" ] || gh release delete-asset latest "$OLD" -y || true
+            done
+            gh release upload latest nexus-manager-offline.tar.gz nexus-manager-src.tar.gz "$VER_MD" --clobber
+            gh release edit latest --title "latest (v${VERSION})" --notes "$NOTES"
+          else
+            gh release create latest nexus-manager-offline.tar.gz nexus-manager-src.tar.gz "$VER_MD" \
+              --target "$GITHUB_SHA" --title "latest (v${VERSION})" --notes "$NOTES" --prerelease
+          fi

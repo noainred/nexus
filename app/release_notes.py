@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.6.3",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "changed", "text": "버전별 릴리스 압축본 파일명에 버전 포함(nexus-manager-offline-vX.Y.Z.tar.gz); latest는 안정 URL 유지"},
+            {"type": "added", "text": "변경(푸시)마다 버전별 압축본을 새로 생성·보존"},
+        ],
+    },
+    {
         "version": "0.6.2",
         "date": "2026-06-04",
         "changes": [
