@@ -517,6 +517,31 @@ def test_download_report_follows_pagination(http_client):
 
 
 @respx.mock
+def test_downloads_batch_scans_only_given_repos(http_client):
+    respx.get(f"{API}/assets", params={"repository": "r1"}).mock(
+        return_value=httpx.Response(
+            200,
+            json={"items": [{"id": "a", "path": "p", "fileSize": 10,
+                              "lastDownloaded": "2026-05-01T00:00:00.000+00:00"}],
+                  "continuationToken": None},
+        )
+    )
+    respx.get(f"{API}/assets", params={"repository": "r2"}).mock(
+        return_value=httpx.Response(
+            200, json={"items": [], "continuationToken": None}
+        )
+    )
+    resp = http_client.get(
+        "/api/instances/test/downloads-batch?repository=r1&repository=r2"
+    )
+    assert resp.status_code == 200
+    body = {r["repository"]: r for r in resp.json()}
+    assert body["r1"]["total_assets"] == 1
+    assert body["r1"]["downloaded_assets"] == 1
+    assert body["r2"]["total_assets"] == 0
+
+
+@respx.mock
 def test_downloads_summary_scans_all_non_group_repos(http_client):
     respx.get(f"{API}/repositories").mock(
         return_value=httpx.Response(

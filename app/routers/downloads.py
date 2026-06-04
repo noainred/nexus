@@ -98,6 +98,35 @@ async def download_report(
     )
 
 
+@router.get("/downloads-batch", response_model=List[RepoDownloadSummary])
+async def downloads_batch(
+    instance_id: str,
+    repository: List[str] = Query(default=[], description="Repositories to scan."),
+) -> List[RepoDownloadSummary]:
+    """Scan usage for a specific set of repositories (for progressive UI loads)."""
+    client: NexusClient = get_client(instance_id)
+    sem = asyncio.Semaphore(_SUMMARY_CONCURRENCY)
+
+    async def one(name: str) -> RepoDownloadSummary:
+        async with sem:
+            try:
+                total, downloaded, total_size, dl_size, truncated, _ = await _scan_repo(
+                    client, name, collect_items=False
+                )
+            except NexusError as exc:
+                return RepoDownloadSummary(repository=name, error=exc.message)
+        return RepoDownloadSummary(
+            repository=name,
+            total_assets=total,
+            downloaded_assets=downloaded,
+            total_size_bytes=total_size,
+            downloaded_size_bytes=dl_size,
+            truncated=truncated,
+        )
+
+    return list(await asyncio.gather(*(one(n) for n in repository)))
+
+
 @router.get("/downloads-summary", response_model=ServerDownloadSummary)
 async def downloads_summary(instance_id: str) -> ServerDownloadSummary:
     """Download usage for every repository on the server.

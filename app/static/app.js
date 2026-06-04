@@ -16,6 +16,7 @@ const state = {
   contentMatrix: null,
   topologyLoaded: false,
   downloadSummary: null,
+  dlRunId: 0,
 };
 
 // ---- helpers -------------------------------------------------------------
@@ -905,6 +906,7 @@ function summaryCard(label, value) {
 function runDownloadsView() {
   const instId = document.getElementById("dl-inst").value;
   const repo = document.getElementById("dl-repo").value;
+  state.dlRunId = (state.dlRunId || 0) + 1;  // invalidates any in-flight load
   if (!instId) return;
   if (repo) {
     loadRepoDownloadDetail(instId, repo);
@@ -914,20 +916,62 @@ function runDownloadsView() {
 }
 
 async function loadServerDownloadSummary(instId) {
+  const token = state.dlRunId;
   const table = document.getElementById("dl-table");
   document.getElementById("dl-summary").innerHTML = "";
   document.getElementById("dl-note").textContent = "";
   table.innerHTML = "";
-  table.append(el("div", { class: "empty" }, "모든 저장소를 스캔하는 중… (저장소가 많으면 시간이 걸릴 수 있어요)"));
+  table.append(el("div", { class: "empty" }, "저장소 목록을 불러오는 중…"));
 
+  // 1) Get the full repository list up front and show every row immediately.
+  let repos;
   try {
-    state.downloadSummary = await api(`/api/instances/${instId}/downloads-summary`);
+    repos = await api(`/api/instances/${instId}/repositories`);
   } catch (e) {
+    if (state.dlRunId !== token) return;
     table.innerHTML = "";
     table.append(el("div", { class: "empty" }, `조회 실패: ${e.message}`));
     return;
   }
+  if (state.dlRunId !== token) return;
+
+  // Group repos aggregate member assets -> excluded; sort case-insensitive.
+  repos = repos
+    .filter((r) => (r.type || "").toLowerCase() !== "group")
+    .sort((a, b) => (a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1));
+
+  state.downloadSummary = {
+    instance_id: instId,
+    repositories: repos.map((r) => ({
+      repository: r.name, format: r.format, type: r.type, pending: true,
+    })),
+  };
   renderServerSummary();
+
+  // 2) Scan 5 at a time, updating those rows as each batch finishes.
+  const byName = {};
+  state.downloadSummary.repositories.forEach((r) => (byName[r.repository] = r));
+  const names = repos.map((r) => r.name);
+  const CHUNK = 5;
+  for (let i = 0; i < names.length; i += CHUNK) {
+    if (state.dlRunId !== token) return;  // a newer load/started; stop quietly
+    const chunk = names.slice(i, i + CHUNK);
+    const qs = chunk.map((n) => `repository=${encodeURIComponent(n)}`).join("&");
+    let results;
+    try {
+      results = await api(`/api/instances/${instId}/downloads-batch?${qs}`);
+    } catch (e) {
+      results = chunk.map((n) => ({ repository: n, error: e.message }));
+    }
+    if (state.dlRunId !== token) return;
+    results.forEach((res) => {
+      const row = byName[res.repository];
+      if (!row) return;
+      row.pending = false;
+      Object.assign(row, res);
+    });
+    renderServerSummary();
+  }
 }
 
 // Sort state for the summary table.
@@ -952,20 +996,32 @@ function renderServerSummary() {
   table.innerHTML = "";
   if (!data) return;
 
+  const reps = data.repositories;
   const hideErrors = document.getElementById("dl-hide-errors").checked;
-  const errorCount = data.repositories.filter((r) => r.error).length;
+  const errorCount = reps.filter((r) => r.error).length;
+  const pendingCount = reps.filter((r) => r.pending).length;
+
+  // Running totals from completed, non-error rows.
+  const totals = reps.reduce((acc, r) => {
+    if (!r.pending && !r.error) {
+      acc.ta += r.total_assets || 0;
+      acc.ts += r.total_size_bytes || 0;
+      acc.ds += r.downloaded_size_bytes || 0;
+    }
+    return acc;
+  }, { ta: 0, ts: 0, ds: 0 });
 
   summary.append(
-    summaryCard("저장소 수", data.repositories.length.toLocaleString()),
-    summaryCard("전체 자산", data.total_assets.toLocaleString()),
-    summaryCard("전체 용량", fmtBytes(data.total_size_bytes)),
-    summaryCard("다운로드된 용량", fmtBytes(data.downloaded_size_bytes))
+    summaryCard("저장소 수", reps.length.toLocaleString()),
+    summaryCard("전체 자산", totals.ta.toLocaleString()),
+    summaryCard("전체 용량", fmtBytes(totals.ts)),
+    summaryCard("다운로드된 용량", fmtBytes(totals.ds))
   );
 
-  let rows = data.repositories.slice();
+  let rows = reps.slice();
   if (hideErrors) rows = rows.filter((r) => !r.error);
 
-  // Sort: error rows always sink to the bottom; the rest by the chosen column.
+  // Sort: pending rows stay in place by name; error rows sink to the bottom.
   const { col, dir } = state.dlSort;
   const colDef = DL_COLUMNS.find((c) => c.key === col) || DL_COLUMNS[0];
   const val = (r) => {
@@ -987,7 +1043,6 @@ function renderServerSummary() {
     return;
   }
 
-  // Sortable header.
   const headCells = DL_COLUMNS.map((c) => {
     const arrow = state.dlSort.col === c.key ? (state.dlSort.dir === "asc" ? " ▲" : " ▼") : "";
     return el("th", {
@@ -1003,18 +1058,23 @@ function renderServerSummary() {
 
   const body = rows.map((r) => {
     const name = el("span", { class: "link", title: "상세 보기", onclick: () => openRepoDownloadDetail(r.repository) }, r.repository);
+    const fmt = el("td", {}, `${r.format || "?"}/${r.type || "?"}`);
+    if (r.pending) {
+      return el("tr", { class: "dl-pending" }, [
+        el("td", {}, name), fmt,
+        el("td", { colspan: "4", class: "num pending" }, "조회 중…"),
+      ]);
+    }
     if (r.error) {
       return el("tr", {}, [
-        el("td", {}, name),
-        el("td", {}, `${r.format || "?"}/${r.type || "?"}`),
+        el("td", {}, name), fmt,
         el("td", { colspan: "4", class: "site-error" }, `조회 불가: ${r.error}`),
       ]);
     }
     return el("tr", {}, [
-      el("td", {}, name),
-      el("td", {}, `${r.format || "?"}/${r.type || "?"}`),
-      el("td", { class: "num" }, r.total_assets.toLocaleString()),
-      el("td", { class: "num" }, r.downloaded_assets.toLocaleString()),
+      el("td", {}, name), fmt,
+      el("td", { class: "num" }, (r.total_assets || 0).toLocaleString()),
+      el("td", { class: "num" }, (r.downloaded_assets || 0).toLocaleString()),
       el("td", { class: "num" }, fmtBytes(r.total_size_bytes)),
       el("td", { class: "num" }, fmtBytes(r.downloaded_size_bytes) + (r.truncated ? " *" : "")),
     ]);
@@ -1022,8 +1082,9 @@ function renderServerSummary() {
   table.append(el("table", {}, [thead, el("tbody", {}, body)]));
 
   const notes = [];
+  if (pendingCount) notes.push(`진행 ${reps.length - pendingCount}/${reps.length} …`);
   if (errorCount) notes.push(`조회 불가 ${errorCount}개`);
-  if (data.repositories.some((r) => r.truncated)) notes.push("'*'는 일부만 스캔(하한값)");
+  if (reps.some((r) => r.truncated)) notes.push("'*'는 일부만 스캔(하한값)");
   note.textContent = notes.length ? `※ ${notes.join(" · ")}` : "";
 }
 
