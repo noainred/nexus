@@ -109,6 +109,7 @@ document.querySelectorAll(".tab").forEach((tab) => {
     if (tab.dataset.tab === "blobstore") loadBlobstores();
     if (tab.dataset.tab === "metrics") loadMetrics();
     if (tab.dataset.tab === "overview") loadOverview();
+    if (tab.dataset.tab === "about") renderHistory();
   });
 });
 
@@ -1519,6 +1520,10 @@ async function refreshInstances() {
   state.contentSetup = false;
 }
 
+function showSettingsForm(show) {
+  document.getElementById("settings-form-box").classList.toggle("hidden", !show);
+}
+
 function settingsResetForm() {
   const form = document.getElementById("settings-form");
   form.reset();
@@ -1528,11 +1533,11 @@ function settingsResetForm() {
   form.use_in_comparison.checked = true;
   document.getElementById("settings-form-title").textContent = "새 서버 추가";
   document.getElementById("settings-submit").textContent = "서버 추가";
-  document.getElementById("settings-cancel").classList.add("hidden");
 }
 
 function settingsEdit(inst) {
   const form = document.getElementById("settings-form");
+  showSettingsForm(true);
   form.editing_id.value = inst.id;
   form.id.value = inst.id;
   form.id.disabled = true;                 // id is the key; not editable
@@ -1546,8 +1551,7 @@ function settingsEdit(inst) {
   form.use_in_comparison.checked = inst.use_in_comparison !== false;
   document.getElementById("settings-form-title").textContent = `서버 수정 — ${inst.name}`;
   document.getElementById("settings-submit").textContent = "변경 저장";
-  document.getElementById("settings-cancel").classList.remove("hidden");
-  document.getElementById("settings-form").scrollIntoView({ behavior: "smooth" });
+  document.getElementById("settings-form-box").scrollIntoView({ behavior: "smooth" });
 }
 
 function flagToggle(inst, field) {
@@ -1623,7 +1627,6 @@ async function loadSettings() {
     ["이름", "식별자", "그룹", "주소", "계정", "모니터링", "비교", "기준", ""], rows
   ));
   loadGroupOrder();
-  renderHistory();
 }
 
 async function setReference(inst) {
@@ -1683,14 +1686,22 @@ async function importSettings(file) {
 
 function setupSettings() {
   const form = document.getElementById("settings-form");
-  document.getElementById("settings-cancel").addEventListener("click", settingsResetForm);
+  // "새 서버 추가" button reveals the form (add mode); 취소 hides it.
+  document.getElementById("settings-add-toggle").addEventListener("click", () => {
+    settingsResetForm();
+    showSettingsForm(true);
+    document.getElementById("settings-form-box").scrollIntoView({ behavior: "smooth" });
+  });
+  document.getElementById("settings-cancel").addEventListener("click", () => {
+    settingsResetForm();
+    showSettingsForm(false);
+  });
 
   document.getElementById("export-btn").addEventListener("click", () => {
     window.location.href = "/api/instances/export";
   });
   const fileInput = document.getElementById("import-file");
   document.getElementById("import-btn").addEventListener("click", () => fileInput.click());
-  document.getElementById("history-btn").addEventListener("click", openReleaseNotes);
   fileInput.addEventListener("change", () => {
     if (fileInput.files && fileInput.files[0]) importSettings(fileInput.files[0]);
     fileInput.value = "";  // allow re-selecting the same file
@@ -1751,6 +1762,7 @@ function setupSettings() {
         );
       }
       settingsResetForm();
+      showSettingsForm(false);
       await refreshInstances();
       loadSettings();
     } catch (e) {
@@ -1851,6 +1863,8 @@ async function setupReleaseNotes() {
   }
   state.releaseNotes = data;
   badge.textContent = `v${data.version}`;
+  const about = document.getElementById("about-version");
+  if (about) about.textContent = `v${data.version}`;
   badge.addEventListener("click", () => openReleaseNotes());
 
   document.getElementById("release-modal-close").addEventListener("click", () =>
@@ -1859,14 +1873,17 @@ async function setupReleaseNotes() {
   document.getElementById("release-modal").addEventListener("click", (ev) => {
     if (ev.target.id === "release-modal") ev.currentTarget.classList.add("hidden");
   });
-  renderHistory();  // fill the 서버 설정 History section if present
 }
+
+const HISTORY_LIMIT = 5;
 
 function renderReleaseNotesInto(container) {
   container.innerHTML = "";
   const data = state.releaseNotes;
   if (!data) { container.textContent = "이력을 불러오는 중…"; return; }
-  data.notes.forEach((entry) => {
+  const expanded = !!state.historyExpanded;
+  const notes = expanded ? data.notes : data.notes.slice(0, HISTORY_LIMIT);
+  notes.forEach((entry) => {
     container.append(el("div", { class: "rel-ver" }, [
       el("span", { class: "rel-ver-num" }, `v${entry.version}`),
       el("span", { class: "rel-ver-date" }, entry.date),
@@ -1882,6 +1899,12 @@ function renderReleaseNotesInto(container) {
     });
     container.append(list);
   });
+  if (data.notes.length > HISTORY_LIMIT) {
+    container.append(el("button", {
+      class: "ghost",
+      onclick: () => { state.historyExpanded = !expanded; renderReleaseNotesInto(container); },
+    }, expanded ? "접기 ▴" : `더 보기 (${data.notes.length - HISTORY_LIMIT}개 더) ▾`));
+  }
 }
 
 function openReleaseNotes() {
@@ -1890,7 +1913,7 @@ function openReleaseNotes() {
 }
 
 function renderHistory() {
-  const c = document.getElementById("settings-history");
+  const c = document.getElementById("about-history");
   if (c) renderReleaseNotesInto(c);
 }
 

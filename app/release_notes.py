@@ -7,6 +7,16 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.7.0",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "changed", "text": "서버 설정 화면을 카드(박스)로 묶어 가독성 향상"},
+            {"type": "changed", "text": "'새 서버 추가' 폼은 버튼을 눌렀을 때만 표시"},
+            {"type": "added", "text": "About 메뉴 추가, 변경 이력을 About으로 이동"},
+            {"type": "changed", "text": "변경 이력은 최근 5개만 표시하고 '더 보기'로 나머지 확인"},
+        ],
+    },
+    {
         "version": "0.6.5",
         "date": "2026-06-04",
         "changes": [
