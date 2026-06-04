@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.5.5",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "changed", "text": "개요는 인스턴스 상태만 표시"},
+            {"type": "added", "text": "'Blob Store'와 'JVM / 리소스'를 별도 메뉴(탭)로 분리 (개요–토폴로지 사이)"},
+        ],
+    },
+    {
         "version": "0.5.4",
         "date": "2026-06-04",
         "changes": [

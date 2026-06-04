@@ -21,6 +21,8 @@
 
     <nav class="tabs">
       <button class="tab active" data-tab="overview">개요</button>
+      <button class="tab" data-tab="blobstore">Blob Store</button>
+      <button class="tab" data-tab="metrics">JVM / 리소스</button>
       <button class="tab" data-tab="topology">토폴로지</button>
       <button class="tab" data-tab="matrix">비교 매트릭스</button>
       <button class="tab" data-tab="compare">저장소 1:1 비교</button>
@@ -54,8 +56,14 @@
       <section id="overview" class="panel active">
         <h2>인스턴스 상태</h2>
         <div id="status-cards" class="cards"></div>
+      </section>
+
+      <section id="blobstore" class="panel">
         <h2>Blob Store 사용량</h2>
         <div id="blobstore-table"></div>
+      </section>
+
+      <section id="metrics" class="panel">
         <h2>JVM / 리소스</h2>
         <div id="metrics-table"></div>
       </section>

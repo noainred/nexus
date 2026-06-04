@@ -106,6 +106,8 @@ document.querySelectorAll(".tab").forEach((tab) => {
       state.topologyLoaded = true;
       loadTopology();
     }
+    if (tab.dataset.tab === "blobstore") loadBlobstores();
+    if (tab.dataset.tab === "metrics") loadMetrics();
   });
 });
 
@@ -200,9 +202,6 @@ async function loadOverview() {
     if (s.error) card.append(el("div", { class: "url", style: "color:var(--red);margin-top:8px" }, s.error));
     cards.append(card);
   });
-
-  loadBlobstores();
-  loadMetrics();
 }
 
 function fmtUptime(ms) {
@@ -1834,6 +1833,9 @@ function refreshActiveTab() {
   loadMatrix();
   loadRepositories();
   loadCleanup();
+  const active = (document.querySelector(".tab.active") || {}).dataset;
+  if (active && active.tab === "blobstore") loadBlobstores();
+  if (active && active.tab === "metrics") loadMetrics();
 }
 
 async function init() {
