@@ -87,6 +87,29 @@ def test_instance_test_connection_fails(http_client):
     assert body["error"]
 
 
+def test_set_reference_is_exclusive(http_client, monkeypatch):
+    monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
+    deps.registry._instances["core"] = InstanceConfig(
+        id="core", name="Core", base_url="http://core.test",
+        username="admin", password="secret",
+    )
+    # Designate "test" as reference.
+    r1 = http_client.post("/api/instances/test/reference")
+    assert r1.status_code == 200
+    flags = {i["id"]: i["is_reference"] for i in r1.json()}
+    assert flags == {"test": True, "core": False}
+
+    # Designating "core" moves the reference (exclusive).
+    r2 = http_client.post("/api/instances/core/reference")
+    flags = {i["id"]: i["is_reference"] for i in r2.json()}
+    assert flags == {"test": False, "core": True}
+
+    # Toggling the current reference clears it.
+    r3 = http_client.post("/api/instances/core/reference")
+    flags = {i["id"]: i["is_reference"] for i in r3.json()}
+    assert flags == {"test": False, "core": False}
+
+
 def test_instance_crud(http_client, monkeypatch, tmp_path):
     # Avoid touching a real instances.yaml during the test.
     monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)

@@ -16,6 +16,7 @@ class InstanceSummary(BaseModel):
     verify_tls: Optional[bool] = None
     use_in_monitoring: bool = True
     use_in_comparison: bool = True
+    is_reference: bool = False
 
 
 class InstanceCreate(BaseModel):

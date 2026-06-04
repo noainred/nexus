@@ -66,6 +66,20 @@ class InstanceRegistry:
         del self._instances[instance_id]
         self._persist()
 
+    def set_reference(self, instance_id: str) -> None:
+        if instance_id not in self._instances:
+            raise HTTPException(
+                status_code=404, detail=f"Unknown instance: {instance_id!r}"
+            )
+        for key, cfg in self._instances.items():
+            cfg.is_reference = key == instance_id
+        self._persist()
+
+    def clear_reference(self) -> None:
+        for cfg in self._instances.values():
+            cfg.is_reference = False
+        self._persist()
+
     def _persist(self) -> None:
         save_instances(self.all())
 

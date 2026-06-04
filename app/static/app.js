@@ -561,7 +561,9 @@ function renderMatrix() {
 
 function populateMatrixRef() {
   const sel = document.getElementById("matrix-ref");
-  const prev = state.matrixReference || "";
+  // Default to the designated reference server (from 서버 설정), if any.
+  const designated = (state.instances.find((i) => i.is_reference) || {}).id || "";
+  const prev = state.matrixReference || designated || "";
   sel.innerHTML = "";
   sel.append(el("option", { value: "" }, "(자동: 다수 기준)"));
   (state.matrix ? state.matrix.columns : []).forEach((col) =>
@@ -1369,6 +1371,11 @@ async function loadSettings() {
       el("td", {}, i.username || "—"),
       el("td", {}, flagToggle(i, "use_in_monitoring")),
       el("td", {}, flagToggle(i, "use_in_comparison")),
+      el("td", {}, el("span", {
+        class: `ref-star ${i.is_reference ? "on" : ""}`,
+        title: i.is_reference ? "기준 서버 (클릭하여 해제)" : "이 서버를 비교 기준으로 지정",
+        onclick: () => setReference(i),
+      }, i.is_reference ? "★ 기준" : "☆")),
       el("td", {}, [
         el("button", { onclick: () => settingsEdit(i) }, "수정"),
         " ",
@@ -1377,8 +1384,25 @@ async function loadSettings() {
     ])
   );
   container.append(buildTable(
-    ["이름", "식별자", "주소", "계정", "모니터링", "비교", ""], rows
+    ["이름", "식별자", "주소", "계정", "모니터링", "비교", "기준", ""], rows
   ));
+}
+
+async function setReference(inst) {
+  try {
+    await api(`/api/instances/${encodeURIComponent(inst.id)}/reference`, { method: "POST" });
+    await refreshInstances();
+    // Apply immediately to the matrix (reference is evaluated client-side).
+    const ref = (state.instances.find((i) => i.is_reference) || {}).id || "";
+    state.matrixReference = ref;
+    const sel = document.getElementById("matrix-ref");
+    if (sel) sel.value = ref;
+    if (state.matrix) renderMatrix();
+    loadSettings();
+    toast(inst.is_reference ? "기준 해제됨" : `'${inst.name}'을(를) 비교 기준으로 지정`);
+  } catch (e) {
+    toast(e.message, "err");
+  }
 }
 
 async function settingsDelete(inst) {

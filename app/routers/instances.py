@@ -28,6 +28,7 @@ def _summary(cfg: InstanceConfig) -> InstanceSummary:
         verify_tls=cfg.verify_tls,
         use_in_monitoring=cfg.use_in_monitoring,
         use_in_comparison=cfg.use_in_comparison,
+        is_reference=cfg.is_reference,
     )
 
 
@@ -104,9 +105,23 @@ async def update_instance(
         verify_tls=body.verify_tls,
         use_in_monitoring=body.use_in_monitoring,
         use_in_comparison=body.use_in_comparison,
+        is_reference=existing.is_reference,  # preserved; set via /reference
     )
     registry.update(instance_id, cfg)
     return _summary(cfg)
+
+
+@router.post("/{instance_id}/reference", response_model=List[InstanceSummary])
+async def toggle_reference(
+    instance_id: str, registry: InstanceRegistry = Depends(get_registry)
+) -> List[InstanceSummary]:
+    """Designate (or clear) the baseline/reference instance for comparisons."""
+    inst = registry.get(instance_id)  # 404 if unknown
+    if inst.is_reference:
+        registry.clear_reference()
+    else:
+        registry.set_reference(instance_id)
+    return [_summary(i) for i in registry.all()]
 
 
 @router.delete("/{instance_id}", status_code=204, response_class=Response)

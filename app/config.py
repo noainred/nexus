@@ -31,6 +31,10 @@ class InstanceConfig(BaseModel):
         default=True,
         description="Include this instance in comparison views.",
     )
+    is_reference: bool = Field(
+        default=False,
+        description="Designated baseline/reference instance for comparisons.",
+    )
 
     @property
     def api_root(self) -> str:
@@ -128,6 +132,7 @@ def save_instances(
                 "verify_tls": c.verify_tls,
                 "use_in_monitoring": c.use_in_monitoring,
                 "use_in_comparison": c.use_in_comparison,
+                "is_reference": c.is_reference,
             }
             for c in instances
         ]
