@@ -61,7 +61,9 @@ button:hover { border-color: var(--accent); }
 }
 .tab.active { color: var(--text); border-bottom-color: var(--accent); }
 
-main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+main { padding: 24px; max-width: 1600px; margin: 0 auto; }
+/* Wide comparison panels use the full window width. */
+main:has(#matrix.active), main:has(#topology.active), main:has(#content.active) { max-width: none; }
 .panel { display: none; }
 .panel.active { display: block; }
 h2 { font-size: 16px; margin-top: 28px; }
@@ -314,12 +316,14 @@ table.matrix td.rowhead .row-status { margin-left: 8px; }
   display: block;
   padding: 10px 8px;
   min-width: 86px;
+  max-width: 200px;
+  margin: 0 auto;
   font-size: 11px;
   line-height: 1.4;
   cursor: default;
 }
 .mcell .mark { font-size: 14px; font-weight: 700; }
-.mcell .meta { color: var(--muted); display: block; }
+.mcell .meta { color: var(--muted); display: block; word-break: break-all; }
 .mcell.consistent { background: rgba(63,185,80,.12); }
 .mcell.consistent .mark { color: var(--green); }
 .mcell.drift { background: rgba(248,81,73,.16); }
