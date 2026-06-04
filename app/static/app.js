@@ -473,17 +473,52 @@ function renderInfraChart(s) {
     const by = yOf(s.baseline);
     svg.append(svgEl("line", { x1: padL, y1: by, x2: W - padR, y2: by, class: "baseline" }));
   }
-  const d = s.points.map((p, i) => `${i ? "L" : "M"}${xOf(p.t).toFixed(1)} ${yOf(p.v).toFixed(1)}`).join(" ");
+  const coords = s.points.map((p) => ({ x: xOf(p.t), y: yOf(p.v), p }));
+  const d = coords.map((c, i) => `${i ? "L" : "M"}${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(" ");
   svg.append(svgEl("path", { d, class: "infra-line", fill: "none" }));
-  s.points.forEach((p) => {
-    const c = svgEl("circle", { cx: xOf(p.t).toFixed(1), cy: yOf(p.v).toFixed(1), r: p.color === "ok" ? 2.2 : 3.4, fill: pingColor(p.color) });
-    c.append(svgEl("title", {}, `${p.v} ms · ${new Date(p.t * 1000).toLocaleString()}`));
-    svg.append(c);
-  });
+  coords.forEach((c) =>
+    svg.append(svgEl("circle", { cx: c.x.toFixed(1), cy: c.y.toFixed(1), r: c.p.color === "ok" ? 2.2 : 3.4, fill: pingColor(c.p.color) }))
+  );
+
+  // Hover crosshair + highlight ring (hidden until mousemove).
+  const crosshair = svgEl("line", { x1: 0, y1: padT, x2: 0, y2: H - padB, class: "crosshair", style: "display:none" });
+  const hi = svgEl("circle", { cx: 0, cy: 0, r: 5, class: "hi", style: "display:none" });
+  svg.append(crosshair, hi);
+
   svg.append(svgEl("text", { x: 4, y: padT + 8, class: "axis-label" }, `${Math.round(vmax)}ms`));
   svg.append(svgEl("text", { x: padL, y: H - 8, class: "axis-label" }, new Date(tmin * 1000).toLocaleString()));
   svg.append(svgEl("text", { x: W - padR, y: H - 8, class: "axis-label", "text-anchor": "end" }, new Date(tmax * 1000).toLocaleString()));
   wrap.append(svg);
+
+  const tip = el("div", { class: "infra-tip" });
+  wrap.append(tip);
+
+  svg.addEventListener("mousemove", (ev) => {
+    const rect = svg.getBoundingClientRect();
+    if (!rect.width) return;
+    const vbX = ((ev.clientX - rect.left) / rect.width) * W;
+    let best = coords[0], bd = Infinity;
+    coords.forEach((c) => { const dx = Math.abs(c.x - vbX); if (dx < bd) { bd = dx; best = c; } });
+    crosshair.setAttribute("x1", best.x);
+    crosshair.setAttribute("x2", best.x);
+    crosshair.style.display = "";
+    hi.setAttribute("cx", best.x);
+    hi.setAttribute("cy", best.y);
+    hi.setAttribute("stroke", pingColor(best.p.color));
+    hi.style.display = "";
+    tip.textContent = `${best.p.v} ms · ${new Date(best.p.t * 1000).toLocaleString()}`;
+    tip.style.display = "block";
+    const wr = wrap.getBoundingClientRect();
+    let left = ev.clientX - wr.left + 12;
+    if (left + tip.offsetWidth > wr.width - 4) left = ev.clientX - wr.left - tip.offsetWidth - 12;
+    tip.style.left = `${Math.max(2, left)}px`;
+    tip.style.top = `${Math.max(2, ev.clientY - wr.top - 28)}px`;
+  });
+  svg.addEventListener("mouseleave", () => {
+    tip.style.display = "none";
+    crosshair.style.display = "none";
+    hi.style.display = "none";
+  });
   return wrap;
 }
 

@@ -138,7 +138,11 @@ tr:hover td { background: var(--panel); }
 .infra-range { display: inline-flex; gap: 4px; }
 .infra-range button { padding: 4px 10px; }
 .infra-range button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-.infra-chart { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 12px 0; background: var(--panel); }
+.infra-chart { position: relative; border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 12px 0; background: var(--panel); }
+.infra-tip { position: absolute; display: none; pointer-events: none; z-index: 5; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.45); }
+.infra-svg .crosshair { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.infra-svg .hi { fill: none; stroke-width: 1.6; }
+.infra-svg { cursor: crosshair; }
 .infra-chart-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
 .infra-chart-head .infra-name { font-weight: 600; }
 .infra-chart-head .url { color: var(--muted); font-size: 12px; }

@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.2",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "added", "text": "인프라 체크 차트에 마우스를 올리면 가장 가까운 측정점의 시간·값 툴팁(+십자선) 표시"},
+        ],
+    },
+    {
         "version": "0.8.1",
         "date": "2026-06-04",
         "changes": [
