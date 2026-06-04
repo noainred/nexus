@@ -468,7 +468,24 @@ async function loadInfra() {
     container.append(el("div", { class: "empty" }, "측정 데이터가 아직 없습니다. 잠시 후 다시 확인하세요. (백그라운드에서 누적 중)"));
     return;
   }
-  data.series.forEach((s) => container.append(renderInfraChart(s)));
+  // Group the charts and lay them out 3-per-row (each 1/3 width).
+  const order = state.groupOrder || [];
+  const groups = new Map();
+  data.series.forEach((s) => {
+    const g = (s.group || "").trim() || "(그룹 미지정)";
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(s);
+  });
+  const rank = (g) => (g === "(그룹 미지정)" ? 1e9 : (order.indexOf(g) === -1 ? 1e8 : order.indexOf(g)));
+  const names = [...groups.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, "ko"));
+  const showHeads = names.length > 1 || (names.length === 1 && names[0] !== "(그룹 미지정)");
+
+  const grid = el("div", { class: "infra-grid" });
+  names.forEach((g) => {
+    if (showHeads) grid.append(el("div", { class: "infra-grouphead" }, g));
+    groups.get(g).forEach((s) => grid.append(renderInfraChart(s)));
+  });
+  container.append(grid);
 }
 
 function renderInfraChart(s) {
@@ -481,7 +498,7 @@ function renderInfraChart(s) {
     wrap.append(el("div", { class: "empty" }, "측정 데이터가 아직 없습니다."));
     return wrap;
   }
-  const W = 1000, H = 220, padL = 48, padR = 12, padT = 12, padB = 26;
+  const W = 520, H = 200, padL = 44, padR = 10, padT = 12, padB = 26;
   const ts = s.points.map((p) => p.t);
   const tmin = Math.min(...ts), tmax = Math.max(...ts);
   const tspan = Math.max(tmax - tmin, 1);

@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.4",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "changed", "text": "인프라 체크 차트를 그룹별로 묶어 3열(각 1/3) 그리드로 배치"},
+        ],
+    },
+    {
         "version": "0.8.3",
         "date": "2026-06-04",
         "changes": [

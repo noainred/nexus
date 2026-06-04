@@ -77,6 +77,7 @@ class PingPoint(BaseModel):
 class PingSeries(BaseModel):
     id: str
     name: str
+    group: str = ""
     baseline: Optional[float] = None
     points: List[PingPoint] = Field(default_factory=list)
 

@@ -16,5 +16,9 @@ async def ping_history(
     registry: InstanceRegistry = Depends(get_registry),
 ) -> PingHistory:
     names = {i.id: i.name for i in registry.all()}
+    groups = {i.id: i.group for i in registry.all()}
     cfg = registry.ping_config()
-    return PingHistory(**pingmon.query(days, names, cfg["warn_pct"], cfg["crit_pct"]))
+    res = pingmon.query(days, names, cfg["warn_pct"], cfg["crit_pct"])
+    for s in res["series"]:
+        s["group"] = groups.get(s["id"], "")
+    return PingHistory(**res)
