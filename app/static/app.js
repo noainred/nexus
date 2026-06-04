@@ -111,6 +111,56 @@ document.querySelectorAll(".tab").forEach((tab) => {
 
 // ---- overview ------------------------------------------------------------
 
+function openStatusDetail(s) {
+  const body = document.getElementById("status-modal-body");
+  document.getElementById("status-modal-title").textContent = `${s.name} — 상태 상세`;
+  body.innerHTML = "";
+
+  body.append(el("div", { class: "url", style: "margin-bottom:10px" }, s.base_url));
+
+  if (!s.reachable) {
+    body.append(el("div", { class: "status-line down" }, "● 연결 불가"));
+    body.append(el("div", { class: "site-error", style: "margin-top:8px" }, s.error || "원인 불명"));
+    document.getElementById("status-modal").classList.remove("hidden");
+    return;
+  }
+
+  const checks = s.checks || {};
+  const keys = Object.keys(checks);
+  const failed = keys.filter((k) => !checks[k]);
+
+  if (!s.healthy) {
+    body.append(el("div", { class: "status-line warn" },
+      failed.length ? `● 주의 — 다음 점검이 실패했습니다 (${failed.length}건)` : "● 주의"));
+  } else {
+    body.append(el("div", { class: "status-line up" }, "● 정상"));
+  }
+
+  if (!keys.length) {
+    body.append(el("div", { class: "empty" },
+      "세부 점검 정보가 없습니다. (계정에 시스템 상태 조회 권한이 필요할 수 있어요)"));
+  } else {
+    const rows = keys.sort().map((k) =>
+      el("tr", { class: checks[k] ? "" : "differs" }, [
+        el("td", {}, checks[k]
+          ? el("span", { class: "badge up" }, "정상")
+          : el("span", { class: "badge down" }, "실패")),
+        el("td", {}, k),
+      ])
+    );
+    body.append(buildTable(["점검", "항목"], rows));
+  }
+
+  document.getElementById("status-modal").classList.remove("hidden");
+}
+
+document.getElementById("status-modal-close").addEventListener("click", () =>
+  document.getElementById("status-modal").classList.add("hidden")
+);
+document.getElementById("status-modal").addEventListener("click", (ev) => {
+  if (ev.target.id === "status-modal") ev.currentTarget.classList.add("hidden");
+});
+
 async function loadOverview() {
   const cards = document.getElementById("status-cards");
   cards.innerHTML = "";
@@ -127,9 +177,9 @@ async function loadOverview() {
   }
   statuses.forEach((s) => {
     let badge;
-    if (!s.reachable) badge = el("span", { class: "badge down" }, "연결 불가");
-    else if (!s.healthy) badge = el("span", { class: "badge warn" }, "주의");
-    else badge = el("span", { class: "badge up" }, "정상");
+    if (!s.reachable) badge = el("span", { class: "badge down status-badge", title: "클릭하여 원인 보기", onclick: () => openStatusDetail(s) }, "연결 불가");
+    else if (!s.healthy) badge = el("span", { class: "badge warn status-badge", title: "클릭하여 원인 보기", onclick: () => openStatusDetail(s) }, "주의");
+    else badge = el("span", { class: "badge up status-badge", title: "클릭하여 점검 상세 보기", onclick: () => openStatusDetail(s) }, "정상");
 
     const metrics = el("div", { class: "metrics" }, [
       el("div", { class: "metric" }, [

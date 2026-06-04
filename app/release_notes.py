@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.5.4",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "added", "text": "개요의 상태 배지(주의/연결불가/정상) 클릭 시 원인(실패한 health 점검·연결 에러) 팝업 표시"},
+        ],
+    },
+    {
         "version": "0.5.3",
         "date": "2026-06-04",
         "changes": [
