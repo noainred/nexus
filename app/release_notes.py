@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.5.0",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "added", "text": "서버 설정 화면에 변경 이력(History) 섹션 추가"},
+            {"type": "changed", "text": "수정·업데이트마다 버전을 올리고 변경 이력을 기록하는 정책 적용"},
+        ],
+    },
+    {
         "version": "0.4.0",
         "date": "2026-06-04",
         "changes": [

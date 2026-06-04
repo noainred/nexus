@@ -17,6 +17,7 @@ const state = {
   topologyLoaded: false,
   downloadSummary: null,
   dlRunId: 0,
+  releaseNotes: null,
 };
 
 // ---- helpers -------------------------------------------------------------
@@ -1512,6 +1513,7 @@ async function loadSettings() {
   container.append(buildTable(
     ["이름", "식별자", "주소", "계정", "모니터링", "비교", "기준", ""], rows
   ));
+  renderHistory();
 }
 
 async function setReference(inst) {
@@ -1722,8 +1724,9 @@ async function setupReleaseNotes() {
     badge.textContent = "";
     return;
   }
+  state.releaseNotes = data;
   badge.textContent = `v${data.version}`;
-  badge.addEventListener("click", () => openReleaseNotes(data));
+  badge.addEventListener("click", () => openReleaseNotes());
 
   document.getElementById("release-modal-close").addEventListener("click", () =>
     document.getElementById("release-modal").classList.add("hidden")
@@ -1731,13 +1734,15 @@ async function setupReleaseNotes() {
   document.getElementById("release-modal").addEventListener("click", (ev) => {
     if (ev.target.id === "release-modal") ev.currentTarget.classList.add("hidden");
   });
+  renderHistory();  // fill the 서버 설정 History section if present
 }
 
-function openReleaseNotes(data) {
-  const body = document.getElementById("release-modal-body");
-  body.innerHTML = "";
+function renderReleaseNotesInto(container) {
+  container.innerHTML = "";
+  const data = state.releaseNotes;
+  if (!data) { container.textContent = "이력을 불러오는 중…"; return; }
   data.notes.forEach((entry) => {
-    body.append(el("div", { class: "rel-ver" }, [
+    container.append(el("div", { class: "rel-ver" }, [
       el("span", { class: "rel-ver-num" }, `v${entry.version}`),
       el("span", { class: "rel-ver-date" }, entry.date),
     ]));
@@ -1750,9 +1755,18 @@ function openReleaseNotes(data) {
         c.text,
       ]));
     });
-    body.append(list);
+    container.append(list);
   });
+}
+
+function openReleaseNotes() {
+  renderReleaseNotesInto(document.getElementById("release-modal-body"));
   document.getElementById("release-modal").classList.remove("hidden");
+}
+
+function renderHistory() {
+  const c = document.getElementById("settings-history");
+  if (c) renderReleaseNotesInto(c);
 }
 
 // ---- bootstrap -----------------------------------------------------------
