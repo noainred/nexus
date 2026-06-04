@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.3",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "changed", "text": "개요: 카드 골격을 즉시 표시하고 상태 데이터는 도착 시 채우도록 변경(체감 로딩 속도 개선)"},
+        ],
+    },
+    {
         "version": "0.8.2",
         "date": "2026-06-04",
         "changes": [

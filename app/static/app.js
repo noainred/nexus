@@ -18,6 +18,7 @@ const state = {
   downloadSummary: null,
   dlRunId: 0,
   releaseNotes: null,
+  groupOrder: [],
 };
 
 // ---- helpers -------------------------------------------------------------
@@ -168,9 +169,21 @@ document.getElementById("status-modal").addEventListener("click", (ev) => {
 
 async function loadOverview() {
   const cards = document.getElementById("status-cards");
-  cards.innerHTML = "";
-  let statuses = [];
-  let order = [];
+
+  // 1) Instantly render skeleton cards from the known instance list, so the
+  //    page is responsive while the (potentially slow) status probe runs.
+  if (state.instances && state.instances.length) {
+    renderStatusCards(
+      state.instances.map((i) => ({ ...i, loading: true })),
+      state.groupOrder || []
+    );
+  } else {
+    cards.innerHTML = "";
+    cards.append(el("div", { class: "empty" }, "불러오는 중…"));
+  }
+
+  // 2) Fetch the real status + group order, then re-render with data.
+  let statuses, order;
   try {
     const [st, ord] = await Promise.all([
       api("/api/status"),
@@ -178,23 +191,30 @@ async function loadOverview() {
     ]);
     statuses = st;
     order = (ord && ord.groups) || [];
+    state.groupOrder = order;
   } catch (e) {
+    cards.innerHTML = "";
     cards.append(el("div", { class: "empty" }, `상태를 불러올 수 없습니다: ${e.message}`));
     return;
   }
   if (!statuses.length) {
+    cards.innerHTML = "";
     cards.append(el("div", { class: "empty" }, "구성된 인스턴스가 없습니다. instances.yaml을 확인하세요."));
     return;
   }
+  renderStatusCards(statuses, order);
+}
 
-  // Group the cards by their group label.
+function renderStatusCards(items, order) {
+  const cards = document.getElementById("status-cards");
+  cards.innerHTML = "";
+
   const groups = new Map();
-  statuses.forEach((s) => {
+  items.forEach((s) => {
     const g = (s.group || "").trim() || "(그룹 미지정)";
     if (!groups.has(g)) groups.set(g, []);
     groups.get(g).push(s);
   });
-  // Order by the saved group order; "(그룹 미지정)" always last.
   const rank = (g) => {
     if (g === "(그룹 미지정)") return 1e9;
     const i = order.indexOf(g);
@@ -204,33 +224,36 @@ async function loadOverview() {
   const showHeaders = names.length > 1 || (names.length === 1 && names[0] !== "(그룹 미지정)");
 
   names.forEach((g) => {
+    const list = groups.get(g);
     if (showHeaders) {
-      const up = groups.get(g).filter((s) => s.reachable && s.healthy).length;
+      const loading = list.some((s) => s.loading);
+      const up = list.filter((s) => s.reachable && s.healthy).length;
       cards.append(el("div", { class: "group-head" }, [
         el("span", { class: "group-name" }, g),
-        el("span", { class: "group-count" }, `${up}/${groups.get(g).length} 정상`),
+        el("span", { class: "group-count" }, loading ? `${list.length}대` : `${up}/${list.length} 정상`),
       ]));
     }
     const grid = el("div", { class: "cards" });
-    groups.get(g).forEach((s) => grid.append(makeStatusCard(s)));
+    list.forEach((s) => grid.append(makeStatusCard(s)));
     cards.append(grid);
   });
 }
 
 function makeStatusCard(s) {
   let badge;
-  if (!s.reachable) badge = el("span", { class: "badge down status-badge", title: "클릭하여 원인 보기", onclick: () => openStatusDetail(s) }, "연결 불가");
+  if (s.loading) badge = el("span", { class: "badge loading-badge" }, "측정 중…");
+  else if (!s.reachable) badge = el("span", { class: "badge down status-badge", title: "클릭하여 원인 보기", onclick: () => openStatusDetail(s) }, "연결 불가");
   else if (!s.healthy) badge = el("span", { class: "badge warn status-badge", title: "클릭하여 원인 보기", onclick: () => openStatusDetail(s) }, "주의");
   else badge = el("span", { class: "badge up status-badge", title: "클릭하여 점검 상세 보기", onclick: () => openStatusDetail(s) }, "정상");
 
   const metrics = el("div", { class: "metrics" }, [
     el("div", { class: "metric" }, [
       el("div", { class: "label" }, "응답시간"),
-      el("div", { class: "value" }, s.response_ms != null ? `${s.response_ms} ms` : "—"),
+      el("div", { class: "value" }, s.loading ? "…" : (s.response_ms != null ? `${s.response_ms} ms` : "—")),
     ]),
     el("div", { class: "metric" }, [
       el("div", { class: "label" }, "저장소"),
-      el("div", { class: "value" }, s.repository_count != null ? s.repository_count : "—"),
+      el("div", { class: "value" }, s.loading ? "…" : (s.repository_count != null ? s.repository_count : "—")),
     ]),
   ]);
 
@@ -239,7 +262,7 @@ function makeStatusCard(s) {
     el("div", { class: "url" }, s.base_url),
     metrics,
   ]);
-  if (s.error) card.append(el("div", { class: "url", style: "color:var(--red);margin-top:8px" }, s.error));
+  if (!s.loading && s.error) card.append(el("div", { class: "url", style: "color:var(--red);margin-top:8px" }, s.error));
   return card;
 }
 
@@ -2175,6 +2198,7 @@ function renderGroupOrderList(groups) {
 async function loadGroupOrder() {
   try {
     const r = await api("/api/instances/group-order");
+    state.groupOrder = r.groups || [];
     renderGroupOrderList(r.groups || []);
   } catch (e) {
     const c = document.getElementById("group-order");

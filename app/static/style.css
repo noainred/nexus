@@ -124,6 +124,8 @@ h3 { font-size: 14px; color: var(--muted); }
 .badge.up { background: rgba(63,185,80,.15); color: var(--green); }
 .badge.down { background: rgba(248,81,73,.15); color: var(--red); }
 .badge.warn { background: rgba(210,153,34,.15); color: var(--amber); }
+.badge.loading-badge { background: var(--panel-2); color: var(--muted); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
 
 table { width: 100%; border-collapse: collapse; margin-top: 8px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
