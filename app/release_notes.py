@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.6.4",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "changed", "text": "Blob Store 사용량 표의 숫자 열(사용량·가용 공간·사용률·Blob 수) 중앙 정렬"},
+        ],
+    },
+    {
         "version": "0.6.3",
         "date": "2026-06-04",
         "changes": [

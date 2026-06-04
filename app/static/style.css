@@ -200,6 +200,9 @@ th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
 th.sortable:hover { color: var(--text); }
 /* download summary: center every column (overrides td.num right-align) */
 table.dl-summary th, table.dl-summary td { text-align: center; }
+/* blob store: center the numeric columns (사용량·가용 공간·사용률·Blob 수) */
+#blobstore-table th:nth-child(n+4) { text-align: center; }
+#blobstore-table td.num { text-align: center; }
 .status-badge { cursor: pointer; }
 .status-badge:hover { filter: brightness(1.2); }
 .status-line { font-weight: 600; font-size: 14px; }
