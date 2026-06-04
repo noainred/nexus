@@ -80,11 +80,7 @@ document.querySelectorAll(".tab").forEach((tab) => {
     document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
     tab.classList.add("active");
     document.getElementById(tab.dataset.tab).classList.add("active");
-    // Lazy-load the (potentially heavy) download scan when first opened.
-    if (tab.dataset.tab === "downloads" && !state.downloadsLoaded) {
-      state.downloadsLoaded = true;
-      runDownloadsView();
-    }
+    // Lazy-load tabs that need it (downloads is started manually via 시작).
     if (tab.dataset.tab === "tasks" && !state.tasksLoaded) {
       state.tasksLoaded = true;
       loadTasks();
@@ -873,15 +869,21 @@ async function fillDownloadRepoSelect(instanceId, repoSel) {
   }
 }
 
+function clearDownloads() {
+  document.getElementById("dl-summary").innerHTML = "";
+  document.getElementById("dl-note").textContent = "";
+  document.getElementById("dl-table").innerHTML = "";
+}
+
 async function setupDownloads() {
   const inst = document.getElementById("dl-inst");
   const repo = document.getElementById("dl-repo");
   fillInstanceSelect(inst);
   inst.addEventListener("change", async () => {
-    await fillDownloadRepoSelect(inst.value, repo); // resets to "전체"
-    runDownloadsView();
+    clearDownloads();                       // selection no longer auto-runs
+    await fillDownloadRepoSelect(inst.value, repo);
   });
-  repo.addEventListener("change", runDownloadsView);
+  repo.addEventListener("change", clearDownloads);
   if (inst.value) await fillDownloadRepoSelect(inst.value, repo);
 }
 
