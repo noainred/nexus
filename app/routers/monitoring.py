@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..config import get_settings
 from ..deps import InstanceRegistry, get_client, get_registry
-from ..models import BlobStore, InstanceBlobStores, InstanceStatus
+from ..models import BlobStore, InstanceBlobStores, InstanceStatus, NodeMetrics
 from ..nexus_client import NexusClient, NexusError
 
 router = APIRouter(prefix="/api", tags=["monitoring"])
@@ -62,6 +62,54 @@ async def status_one(
 ) -> InstanceStatus:
     instance = registry.get(instance_id)
     return await _status_for(instance)
+
+
+def _gauge(gauges: dict, *names: str):
+    for name in names:
+        val = gauges.get(name)
+        if isinstance(val, dict) and "value" in val:
+            return val["value"]
+    return None
+
+
+async def _metrics_for(instance) -> NodeMetrics:
+    client = NexusClient(instance, timeout=get_settings().request_timeout)
+    result = NodeMetrics(id=instance.id, name=instance.name)
+    try:
+        data = await client.get_metrics()
+    except NexusError as exc:
+        result.reachable = False
+        result.error = exc.message
+        return result
+
+    gauges = data.get("gauges", {}) if isinstance(data, dict) else {}
+    used = _gauge(gauges, "jvm.memory.heap.used")
+    mx = _gauge(gauges, "jvm.memory.heap.max")
+    usage = _gauge(gauges, "jvm.memory.heap.usage")
+    result.heap_used_bytes = int(used) if isinstance(used, (int, float)) else None
+    result.heap_max_bytes = int(mx) if isinstance(mx, (int, float)) and mx > 0 else None
+    if isinstance(usage, (int, float)):
+        result.heap_usage_pct = round(usage * 100, 1)
+    elif result.heap_used_bytes and result.heap_max_bytes:
+        result.heap_usage_pct = round(
+            result.heap_used_bytes / result.heap_max_bytes * 100, 1
+        )
+    threads = _gauge(gauges, "jvm.threads.count", "jvm.thread-states.count")
+    result.thread_count = int(threads) if isinstance(threads, (int, float)) else None
+    uptime = _gauge(gauges, "jvm.attribute.uptime", "jvm.uptime")
+    result.uptime_ms = int(uptime) if isinstance(uptime, (int, float)) else None
+    return result
+
+
+@router.get("/metrics", response_model=List[NodeMetrics])
+async def metrics_all(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> List[NodeMetrics]:
+    """JVM/resource metrics for every monitoring-enabled node."""
+    results = await asyncio.gather(
+        *(_metrics_for(instance) for instance in registry.monitoring())
+    )
+    return list(results)
 
 
 @router.get("/instances/{instance_id}/blobstores", response_model=List[BlobStore])

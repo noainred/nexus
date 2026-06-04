@@ -150,6 +150,49 @@ async function loadOverview() {
   });
 
   loadBlobstores();
+  loadMetrics();
+}
+
+function fmtUptime(ms) {
+  if (ms == null) return "—";
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
+  return d > 0 ? `${d}일 ${h}시간` : `${h}시간`;
+}
+
+async function loadMetrics() {
+  const container = document.getElementById("metrics-table");
+  container.innerHTML = "";
+  let list;
+  try {
+    list = await api("/api/metrics");
+  } catch (e) {
+    container.append(el("div", { class: "empty" }, `메트릭 조회 실패: ${e.message}`));
+    return;
+  }
+  if (!list.length) {
+    container.append(el("div", { class: "empty" }, "구성된 인스턴스가 없습니다."));
+    return;
+  }
+  const rows = list.map((m) => {
+    if (!m.reachable) {
+      return el("tr", {}, [
+        el("td", {}, m.name),
+        el("td", { colspan: "4", class: "site-error" }, `조회 불가: ${m.error || ""} (nx-metrics-all 권한 필요)`),
+      ]);
+    }
+    const pct = m.heap_usage_pct;
+    const pctCls = pct == null ? "" : pct >= 90 ? "usage-crit" : pct >= 80 ? "usage-warn" : "";
+    return el("tr", {}, [
+      el("td", {}, m.name),
+      el("td", { class: "num" }, fmtBytes(m.heap_used_bytes)),
+      el("td", { class: "num" }, fmtBytes(m.heap_max_bytes)),
+      el("td", { class: `num ${pctCls}` }, pct != null ? `${pct}%` : "—"),
+      el("td", { class: "num" }, m.thread_count != null ? m.thread_count.toLocaleString() : "—"),
+      el("td", {}, fmtUptime(m.uptime_ms)),
+    ]);
+  });
+  container.append(buildTable(["노드", "Heap 사용", "Heap 최대", "Heap %", "스레드", "가동시간"], rows));
 }
 
 function usagePct(b) {

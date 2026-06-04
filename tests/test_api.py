@@ -243,6 +243,30 @@ def test_matrix_endpoint_marks_unreachable_column(http_client):
 
 
 @respx.mock
+def test_metrics_parses_heap_and_threads(http_client):
+    respx.get("https://nexus.test/service/rest/metrics/data").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "gauges": {
+                    "jvm.memory.heap.used": {"value": 800},
+                    "jvm.memory.heap.max": {"value": 1000},
+                    "jvm.memory.heap.usage": {"value": 0.8},
+                    "jvm.threads.count": {"value": 142},
+                    "jvm.attribute.uptime": {"value": 90000000},
+                }
+            },
+        )
+    )
+    resp = http_client.get("/api/metrics")
+    assert resp.status_code == 200
+    m = resp.json()[0]
+    assert m["heap_used_bytes"] == 800
+    assert m["heap_usage_pct"] == 80.0
+    assert m["thread_count"] == 142
+
+
+@respx.mock
 def test_blobstores_all_aggregates_per_instance(http_client):
     respx.get(f"{API}/blobstores").mock(
         return_value=httpx.Response(

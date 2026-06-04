@@ -200,6 +200,37 @@ class NexusClient:
         ]
         return AssetPage(items=items, continuation_token=data.get("continuationToken"))
 
+    # -- Metrics ------------------------------------------------------------
+
+    async def get_metrics(self) -> dict[str, Any]:
+        """Dropwizard metrics JSON from the (non-v1) /service/metrics endpoint.
+
+        Requires the ``nx-metrics-all`` privilege. Tries the 3.81+ path first
+        and falls back to the legacy path.
+        """
+        base = self.instance.base_url.rstrip("/")
+        verify = True if self.instance.verify_tls is None else self.instance.verify_tls
+        last_status: Optional[int] = None
+        for path in ("/service/rest/metrics/data", "/service/metrics/data"):
+            try:
+                async with httpx.AsyncClient(
+                    auth=(self.instance.username, self.instance.password),
+                    timeout=self._timeout,
+                    verify=verify,
+                    headers={"Accept": "application/json"},
+                ) as client:
+                    resp = await client.get(base + path)
+            except httpx.HTTPError as exc:
+                raise NexusError(f"Connection error: {exc}") from exc
+            if resp.status_code < 400:
+                return resp.json()
+            last_status = resp.status_code
+            if resp.status_code != 404:
+                break
+        raise NexusError(
+            f"Metrics endpoint returned {last_status}", status_code=last_status
+        )
+
     # -- Security -----------------------------------------------------------
 
     async def get_anonymous(self) -> dict[str, Any]:

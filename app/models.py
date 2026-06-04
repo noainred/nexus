@@ -303,6 +303,20 @@ class RepositoryMatrix(BaseModel):
     rows: List[MatrixRow] = Field(default_factory=list)
 
 
+class NodeMetrics(BaseModel):
+    """JVM / resource metrics for one node (from /service/metrics/data)."""
+
+    id: str
+    name: str
+    reachable: bool = True
+    error: Optional[str] = None
+    heap_used_bytes: Optional[int] = None
+    heap_max_bytes: Optional[int] = None
+    heap_usage_pct: Optional[float] = None
+    thread_count: Optional[int] = None
+    uptime_ms: Optional[int] = None
+
+
 class ProxyLink(BaseModel):
     """A proxy repository's upstream link (an edge in the topology)."""
 
