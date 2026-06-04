@@ -156,6 +156,22 @@ def test_export_and_import(http_client, monkeypatch):
     assert bad.status_code == 400
 
 
+def test_compare_fields(http_client, monkeypatch):
+    monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
+    deps.registry._compare_fields = ["format", "type", "remote_url"]
+
+    r = http_client.get("/api/instances/compare-fields")
+    assert r.json()["fields"] == ["format", "type", "remote_url"]
+
+    # Invalid fields are filtered out; valid ones kept.
+    r2 = http_client.put(
+        "/api/instances/compare-fields",
+        json={"fields": ["format", "online", "bogus"]},
+    )
+    assert r2.json()["fields"] == ["format", "online"]
+    assert deps.registry._compare_fields == ["format", "online"]
+
+
 def test_group_order(http_client, monkeypatch):
     monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
     deps.registry._instances["test"].group = "DMZ"

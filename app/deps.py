@@ -27,6 +27,15 @@ class InstanceRegistry:
             i.id: i for i in document.instances
         }
         self._group_order: List[str] = list(document.group_order)
+        self._compare_fields: List[str] = list(document.compare_fields)
+
+    def compare_fields(self) -> List[str]:
+        return list(self._compare_fields)
+
+    def set_compare_fields(self, fields: List[str]) -> None:
+        allowed = ["format", "type", "remote_url", "online"]
+        self._compare_fields = [f for f in fields if f in allowed]
+        self._persist()
 
     def all(self) -> List[InstanceConfig]:
         return list(self._instances.values())
@@ -109,12 +118,13 @@ class InstanceRegistry:
         self._persist()
 
     def _persist(self) -> None:
-        save_instances(self.all(), self._group_order)
+        save_instances(self.all(), self._group_order, self._compare_fields)
 
     def reload(self) -> None:
         doc = load_document()
         self._instances = {i.id: i for i in doc.instances}
         self._group_order = list(doc.group_order)
+        self._compare_fields = list(doc.compare_fields)
 
 
 # Singleton registry, initialised at import time from the configured file.

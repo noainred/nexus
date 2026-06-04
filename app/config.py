@@ -68,6 +68,9 @@ class InstancesDocument(BaseModel):
 
     instances: List[InstanceConfig] = Field(default_factory=list)
     group_order: List[str] = Field(default_factory=list)
+    compare_fields: List[str] = Field(
+        default_factory=lambda: ["format", "type", "remote_url"]
+    )
 
 
 @lru_cache
@@ -116,7 +119,9 @@ def load_instances(settings: Optional[Settings] = None) -> List[InstanceConfig]:
 
 
 def instances_to_dict(
-    instances: List[InstanceConfig], group_order: Optional[List[str]] = None
+    instances: List[InstanceConfig],
+    group_order: Optional[List[str]] = None,
+    compare_fields: Optional[List[str]] = None,
 ) -> dict:
     """Serialise instances to the plain dict written to YAML / exported."""
     data: dict = {
@@ -138,14 +143,20 @@ def instances_to_dict(
     }
     if group_order:
         data["group_order"] = list(group_order)
+    if compare_fields is not None:
+        data["compare_fields"] = list(compare_fields)
     return data
 
 
 def instances_to_yaml(
-    instances: List[InstanceConfig], group_order: Optional[List[str]] = None
+    instances: List[InstanceConfig],
+    group_order: Optional[List[str]] = None,
+    compare_fields: Optional[List[str]] = None,
 ) -> str:
     return yaml.safe_dump(
-        instances_to_dict(instances, group_order), allow_unicode=True, sort_keys=False
+        instances_to_dict(instances, group_order, compare_fields),
+        allow_unicode=True,
+        sort_keys=False,
     )
 
 
@@ -158,10 +169,13 @@ def parse_document(raw_text: str) -> InstancesDocument:
 def save_instances(
     instances: List[InstanceConfig],
     group_order: Optional[List[str]] = None,
+    compare_fields: Optional[List[str]] = None,
     settings: Optional[Settings] = None,
 ) -> None:
-    """Persist the managed instances (and group order) back to the YAML file."""
+    """Persist the managed instances (and view prefs) back to the YAML file."""
     settings = settings or get_settings()
     path = _instance_path(settings)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(instances_to_yaml(instances, group_order), encoding="utf-8")
+    path.write_text(
+        instances_to_yaml(instances, group_order, compare_fields), encoding="utf-8"
+    )

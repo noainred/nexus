@@ -13,6 +13,7 @@ from ..config import (
 )
 from ..deps import InstanceRegistry, get_registry
 from ..models import (
+    CompareFields,
     GroupOrder,
     InstanceCreate,
     InstanceSummary,
@@ -62,12 +63,29 @@ async def set_group_order(
     return GroupOrder(groups=registry.group_order())
 
 
+@router.get("/compare-fields", response_model=CompareFields)
+async def get_compare_fields(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> CompareFields:
+    return CompareFields(fields=registry.compare_fields())
+
+
+@router.put("/compare-fields", response_model=CompareFields)
+async def set_compare_fields(
+    body: CompareFields, registry: InstanceRegistry = Depends(get_registry)
+) -> CompareFields:
+    registry.set_compare_fields(body.fields)
+    return CompareFields(fields=registry.compare_fields())
+
+
 @router.get("/export")
 async def export_instances(
     registry: InstanceRegistry = Depends(get_registry),
 ) -> Response:
     """Download the full server list as a YAML backup (includes passwords)."""
-    text = instances_to_yaml(registry.all(), registry.group_order())
+    text = instances_to_yaml(
+        registry.all(), registry.group_order(), registry.compare_fields()
+    )
     return Response(
         content=text,
         media_type="application/x-yaml",
@@ -99,6 +117,8 @@ async def import_instances(
         registry.replace_all(document.instances)
     if document.group_order:
         registry.set_group_order(document.group_order)
+    if document.compare_fields:
+        registry.set_compare_fields(document.compare_fields)
     return [_summary(i) for i in registry.all()]
 
 

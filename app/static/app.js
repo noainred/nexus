@@ -492,7 +492,13 @@ function rowStatusBadge(status) {
 }
 
 function cellSignature(c) {
-  return `${c.format || ""}|${c.type || ""}|${c.remote_url || ""}`;
+  const fields = (state.compareFields && state.compareFields.length)
+    ? state.compareFields
+    : ["format", "type", "remote_url"];
+  return fields.map((f) => {
+    if (f === "online") return c.online === false ? "offline" : "online";
+    return c[f] || "";
+  }).join("|");
 }
 
 // Human-readable value of a cell (format/type + proxy remote URL).
@@ -662,7 +668,12 @@ function populateMatrixRef() {
 async function loadMatrix() {
   const container = document.getElementById("matrix-table");
   try {
-    state.matrix = await api("/api/matrix");
+    const [matrix, cf] = await Promise.all([
+      api("/api/matrix"),
+      api("/api/instances/compare-fields"),
+    ]);
+    state.matrix = matrix;
+    state.compareFields = (cf && cf.fields) || [];
   } catch (e) {
     container.innerHTML = "";
     container.append(el("div", { class: "empty" }, `매트릭스 로드 실패: ${e.message}`));
@@ -1627,6 +1638,7 @@ async function loadSettings() {
     ["이름", "식별자", "그룹", "주소", "계정", "모니터링", "비교", "기준", ""], rows
   ));
   loadGroupOrder();
+  loadCompareFields();
 }
 
 async function setReference(inst) {
@@ -1915,6 +1927,54 @@ function openReleaseNotes() {
 function renderHistory() {
   const c = document.getElementById("about-history");
   if (c) renderReleaseNotesInto(c);
+}
+
+// ---- comparison fields ---------------------------------------------------
+
+const COMPARE_FIELD_OPTIONS = [
+  ["format", "포맷"],
+  ["type", "유형(hosted/proxy/group)"],
+  ["remote_url", "원격 URL(프록시)"],
+  ["online", "온라인 상태"],
+];
+
+function renderCompareFields(selected) {
+  const c = document.getElementById("compare-fields");
+  if (!c) return;
+  c.innerHTML = "";
+  COMPARE_FIELD_OPTIONS.forEach(([key, label]) => {
+    const cb = el("input", { type: "checkbox" });
+    cb.checked = selected.includes(key);
+    cb.dataset.field = key;
+    cb.addEventListener("change", saveCompareFields);
+    c.append(el("label", { class: "chk" }, [cb, " ", label]));
+  });
+}
+
+async function loadCompareFields() {
+  try {
+    const r = await api("/api/instances/compare-fields");
+    state.compareFields = r.fields || [];
+    renderCompareFields(state.compareFields);
+  } catch (e) {
+    /* non-fatal */
+  }
+}
+
+async function saveCompareFields() {
+  const fields = [...document.querySelectorAll("#compare-fields input:checked")]
+    .map((cb) => cb.dataset.field);
+  try {
+    const r = await api("/api/instances/compare-fields", {
+      method: "PUT",
+      body: JSON.stringify({ fields }),
+    });
+    state.compareFields = r.fields || fields;
+    toast("비교 기준 저장됨");
+    if (state.matrix) renderMatrix();  // re-evaluate drift live
+  } catch (e) {
+    toast(e.message, "err");
+  }
 }
 
 // ---- group display order -------------------------------------------------

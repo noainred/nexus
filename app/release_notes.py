@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.7.1",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "added", "text": "비교 매트릭스의 비교 기준 항목(포맷·유형·원격 URL·온라인)을 설정에서 선택, 선택 항목만으로 drift 판단"},
+        ],
+    },
+    {
         "version": "0.7.0",
         "date": "2026-06-04",
         "changes": [

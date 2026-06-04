@@ -54,6 +54,12 @@ class GroupOrder(BaseModel):
     groups: List[str] = Field(default_factory=list)
 
 
+class CompareFields(BaseModel):
+    """Which repository attributes the comparison matrix uses for drift."""
+
+    fields: List[str] = Field(default_factory=list)
+
+
 class InstanceTestRequest(BaseModel):
     """Connection-test payload (does not persist anything)."""
 
