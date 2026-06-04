@@ -18,6 +18,7 @@ from .routers import (
     downloads,
     instances,
     matrix,
+    meta,
     monitoring,
     repositories,
     security,
@@ -62,6 +63,7 @@ app.include_router(security.router)
 app.include_router(content.router)
 app.include_router(topology.router)
 app.include_router(alerts.router)
+app.include_router(meta.router)
 
 
 @app.middleware("http")

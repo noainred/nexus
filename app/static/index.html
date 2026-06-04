@@ -8,7 +8,10 @@
   </head>
   <body>
     <header class="topbar">
-      <h1>Nexus Repository 통합 관리</h1>
+      <div class="title-wrap">
+        <h1>Nexus Repository 통합 관리</h1>
+        <button id="app-version" class="version-badge" title="릴리스 노트 보기">v…</button>
+      </div>
       <div class="instance-picker">
         <label for="instance-select">인스턴스</label>
         <select id="instance-select"></select>
@@ -231,6 +234,16 @@
         <p class="hint">※ 수정 시 비밀번호를 비워두면 기존 비밀번호가 유지됩니다.</p>
       </section>
     </main>
+
+    <div id="release-modal" class="modal hidden">
+      <div class="modal-box">
+        <div class="modal-head">
+          <h3>릴리스 노트</h3>
+          <button id="release-modal-close" title="닫기">✕</button>
+        </div>
+        <div id="release-modal-body" class="modal-body"></div>
+      </div>
+    </div>
 
     <div id="repo-modal" class="modal hidden">
       <div class="modal-box">

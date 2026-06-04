@@ -261,6 +261,22 @@ class ApiError(BaseModel):
     detail: str
 
 
+class ReleaseChange(BaseModel):
+    type: str   # added | changed | removed
+    text: str
+
+
+class ReleaseEntry(BaseModel):
+    version: str
+    date: str
+    changes: List[ReleaseChange] = Field(default_factory=list)
+
+
+class ReleaseNotes(BaseModel):
+    version: str
+    notes: List[ReleaseEntry] = Field(default_factory=list)
+
+
 # -- Repository comparison matrix -----------------------------------------
 
 

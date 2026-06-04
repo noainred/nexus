@@ -42,6 +42,19 @@ def test_healthz(http_client):
     assert resp.json()["status"] == "ok"
 
 
+def test_release_notes(http_client):
+    from app import __version__
+
+    resp = http_client.get("/api/release-notes")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["version"] == __version__
+    # Newest entry first and matches the app version.
+    assert body["notes"][0]["version"] == __version__
+    assert body["notes"][0]["changes"]
+    assert body["notes"][0]["changes"][0]["type"] in {"added", "changed", "removed"}
+
+
 def test_list_instances_hides_credentials(http_client):
     resp = http_client.get("/api/instances")
     assert resp.status_code == 200

@@ -1543,6 +1543,56 @@ document.getElementById("cleanup-form").addEventListener("submit", async (ev) =>
   }
 });
 
+// ---- version & release notes ---------------------------------------------
+
+const RELEASE_LABELS = {
+  added: ["추가", "up"],
+  changed: ["변경", "warn"],
+  removed: ["삭제", "down"],
+};
+
+async function setupReleaseNotes() {
+  const badge = document.getElementById("app-version");
+  let data;
+  try {
+    data = await api("/api/release-notes");
+  } catch (e) {
+    badge.textContent = "";
+    return;
+  }
+  badge.textContent = `v${data.version}`;
+  badge.addEventListener("click", () => openReleaseNotes(data));
+
+  document.getElementById("release-modal-close").addEventListener("click", () =>
+    document.getElementById("release-modal").classList.add("hidden")
+  );
+  document.getElementById("release-modal").addEventListener("click", (ev) => {
+    if (ev.target.id === "release-modal") ev.currentTarget.classList.add("hidden");
+  });
+}
+
+function openReleaseNotes(data) {
+  const body = document.getElementById("release-modal-body");
+  body.innerHTML = "";
+  data.notes.forEach((entry) => {
+    body.append(el("div", { class: "rel-ver" }, [
+      el("span", { class: "rel-ver-num" }, `v${entry.version}`),
+      el("span", { class: "rel-ver-date" }, entry.date),
+    ]));
+    const list = el("ul", { class: "rel-list" });
+    entry.changes.forEach((c) => {
+      const [label, cls] = RELEASE_LABELS[c.type] || ["기타", ""];
+      list.append(el("li", {}, [
+        el("span", { class: `badge ${cls} rel-tag` }, label),
+        " ",
+        c.text,
+      ]));
+    });
+    body.append(list);
+  });
+  document.getElementById("release-modal").classList.remove("hidden");
+}
+
 // ---- bootstrap -----------------------------------------------------------
 
 function refreshActiveTab() {
@@ -1579,6 +1629,7 @@ async function init() {
   setupSettings();
   setupTopology();
   setupAlerts();
+  setupReleaseNotes();
   refreshActiveTab();
 }
 
