@@ -24,6 +24,8 @@ router = APIRouter(prefix="/api/instances/{instance_id}", tags=["downloads"])
 
 # Safety cap so a huge repository cannot make a single request page forever.
 _MAX_PAGES = 50
+# Max repositories scanned at once in the server-wide summary.
+_SUMMARY_CONCURRENCY = 6
 
 
 async def _scan_repo(
@@ -111,18 +113,23 @@ async def downloads_summary(instance_id: str) -> ServerDownloadSummary:
 
     scannable = [r for r in repos if (r.type or "").lower() != "group"]
 
+    # Limit concurrency so scanning many repos at once doesn't overwhelm the
+    # Nexus server (which otherwise surfaces as spurious connection errors).
+    sem = asyncio.Semaphore(_SUMMARY_CONCURRENCY)
+
     async def summarise(repo) -> RepoDownloadSummary:
-        try:
-            total, downloaded, total_size, dl_size, truncated, _ = await _scan_repo(
-                client, repo.name, collect_items=False
-            )
-        except NexusError as exc:
-            return RepoDownloadSummary(
-                repository=repo.name,
-                format=repo.format,
-                type=repo.type,
-                error=exc.message,
-            )
+        async with sem:
+            try:
+                total, downloaded, total_size, dl_size, truncated, _ = await _scan_repo(
+                    client, repo.name, collect_items=False
+                )
+            except NexusError as exc:
+                return RepoDownloadSummary(
+                    repository=repo.name,
+                    format=repo.format,
+                    type=repo.type,
+                    error=exc.message,
+                )
         return RepoDownloadSummary(
             repository=repo.name,
             format=repo.format,
@@ -135,7 +142,7 @@ async def downloads_summary(instance_id: str) -> ServerDownloadSummary:
         )
 
     summaries = await asyncio.gather(*(summarise(r) for r in scannable))
-    summaries = sorted(summaries, key=lambda s: s.repository)
+    summaries = sorted(summaries, key=lambda s: s.repository.lower())
 
     return ServerDownloadSummary(
         instance_id=instance_id,

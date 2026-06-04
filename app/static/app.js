@@ -15,6 +15,7 @@ const state = {
   contentSetup: false,
   contentMatrix: null,
   topologyLoaded: false,
+  downloadSummary: null,
 };
 
 // ---- helpers -------------------------------------------------------------
@@ -884,6 +885,10 @@ async function setupDownloads() {
     await fillDownloadRepoSelect(inst.value, repo);
   });
   repo.addEventListener("change", clearDownloads);
+  document.getElementById("dl-hide-errors").addEventListener("change", () => {
+    // Re-filter the cached summary without re-scanning.
+    if (state.downloadSummary && !repo.value) renderServerSummary();
+  });
   if (inst.value) await fillDownloadRepoSelect(inst.value, repo);
 }
 
@@ -909,22 +914,46 @@ function runDownloadsView() {
 }
 
 async function loadServerDownloadSummary(instId) {
-  const summary = document.getElementById("dl-summary");
-  const note = document.getElementById("dl-note");
   const table = document.getElementById("dl-table");
-  summary.innerHTML = "";
-  note.textContent = "";
+  document.getElementById("dl-summary").innerHTML = "";
+  document.getElementById("dl-note").textContent = "";
   table.innerHTML = "";
   table.append(el("div", { class: "empty" }, "모든 저장소를 스캔하는 중… (저장소가 많으면 시간이 걸릴 수 있어요)"));
 
-  let data;
   try {
-    data = await api(`/api/instances/${instId}/downloads-summary`);
+    state.downloadSummary = await api(`/api/instances/${instId}/downloads-summary`);
   } catch (e) {
     table.innerHTML = "";
     table.append(el("div", { class: "empty" }, `조회 실패: ${e.message}`));
     return;
   }
+  renderServerSummary();
+}
+
+// Sort state for the summary table.
+state.dlSort = { col: "repository", dir: "asc" };
+
+const DL_COLUMNS = [
+  { key: "repository", label: "저장소", num: false },
+  { key: "fmt", label: "포맷/유형", num: false },
+  { key: "total_assets", label: "전체 자산", num: true },
+  { key: "downloaded_assets", label: "다운로드 자산", num: true },
+  { key: "total_size_bytes", label: "전체 용량", num: true },
+  { key: "downloaded_size_bytes", label: "다운로드 용량", num: true },
+];
+
+function renderServerSummary() {
+  const summary = document.getElementById("dl-summary");
+  const note = document.getElementById("dl-note");
+  const table = document.getElementById("dl-table");
+  const data = state.downloadSummary;
+  summary.innerHTML = "";
+  note.textContent = "";
+  table.innerHTML = "";
+  if (!data) return;
+
+  const hideErrors = document.getElementById("dl-hide-errors").checked;
+  const errorCount = data.repositories.filter((r) => r.error).length;
 
   summary.append(
     summaryCard("저장소 수", data.repositories.length.toLocaleString()),
@@ -933,12 +962,46 @@ async function loadServerDownloadSummary(instId) {
     summaryCard("다운로드된 용량", fmtBytes(data.downloaded_size_bytes))
   );
 
-  table.innerHTML = "";
-  if (!data.repositories.length) {
-    table.append(el("div", { class: "empty" }, "스캔할 저장소가 없습니다."));
+  let rows = data.repositories.slice();
+  if (hideErrors) rows = rows.filter((r) => !r.error);
+
+  // Sort: error rows always sink to the bottom; the rest by the chosen column.
+  const { col, dir } = state.dlSort;
+  const colDef = DL_COLUMNS.find((c) => c.key === col) || DL_COLUMNS[0];
+  const val = (r) => {
+    if (col === "fmt") return `${r.format || ""}/${r.type || ""}`.toLowerCase();
+    if (colDef.num) return r[col] || 0;
+    return (r[col] || "").toLowerCase();
+  };
+  rows.sort((a, b) => {
+    if (!!a.error !== !!b.error) return a.error ? 1 : -1;
+    let cmp;
+    if (colDef.num) cmp = val(a) - val(b);
+    else cmp = val(a) < val(b) ? -1 : val(a) > val(b) ? 1 : 0;
+    return dir === "asc" ? cmp : -cmp;
+  });
+
+  if (!rows.length) {
+    table.append(el("div", { class: "empty" },
+      hideErrors && errorCount ? "표시할 (조회 가능한) 저장소가 없습니다." : "스캔할 저장소가 없습니다."));
     return;
   }
-  const rows = data.repositories.map((r) => {
+
+  // Sortable header.
+  const headCells = DL_COLUMNS.map((c) => {
+    const arrow = state.dlSort.col === c.key ? (state.dlSort.dir === "asc" ? " ▲" : " ▼") : "";
+    return el("th", {
+      class: "sortable",
+      onclick: () => {
+        if (state.dlSort.col === c.key) state.dlSort.dir = state.dlSort.dir === "asc" ? "desc" : "asc";
+        else { state.dlSort.col = c.key; state.dlSort.dir = c.num ? "desc" : "asc"; }
+        renderServerSummary();
+      },
+    }, c.label + arrow);
+  });
+  const thead = el("thead", {}, el("tr", {}, headCells));
+
+  const body = rows.map((r) => {
     const name = el("span", { class: "link", title: "상세 보기", onclick: () => openRepoDownloadDetail(r.repository) }, r.repository);
     if (r.error) {
       return el("tr", {}, [
@@ -956,12 +1019,12 @@ async function loadServerDownloadSummary(instId) {
       el("td", { class: "num" }, fmtBytes(r.downloaded_size_bytes) + (r.truncated ? " *" : "")),
     ]);
   });
-  table.append(buildTable(
-    ["저장소", "포맷/유형", "전체 자산", "다운로드 자산", "전체 용량", "다운로드 용량"], rows
-  ));
-  if (data.repositories.some((r) => r.truncated)) {
-    note.textContent = "※ '*' 표시 저장소는 자산이 매우 많아 일부만 스캔했습니다(하한값).";
-  }
+  table.append(el("table", {}, [thead, el("tbody", {}, body)]));
+
+  const notes = [];
+  if (errorCount) notes.push(`조회 불가 ${errorCount}개`);
+  if (data.repositories.some((r) => r.truncated)) notes.push("'*'는 일부만 스캔(하한값)");
+  note.textContent = notes.length ? `※ ${notes.join(" · ")}` : "";
 }
 
 // Select a repo in the dropdown and show its detail (used by summary links).

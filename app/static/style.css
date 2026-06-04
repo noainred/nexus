@@ -184,6 +184,8 @@ tr:hover td { background: var(--panel); }
 #dl-summary .metric .value { font-size: 16px; }
 #dl-note { margin-bottom: 8px; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover { color: var(--text); }
 td.usage-warn { color: var(--amber); font-weight: 600; }
 td.usage-crit { color: var(--red); font-weight: 700; background: rgba(248,81,73,.12); }
 
