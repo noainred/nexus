@@ -24,6 +24,12 @@ from .models import (
 )
 
 
+def _describe(exc: Exception) -> str:
+    """Readable detail for an httpx error (timeouts often have empty str())."""
+    text = str(exc).strip()
+    return text or type(exc).__name__
+
+
 class NexusError(Exception):
     """Raised when a Nexus REST call fails.
 
@@ -63,7 +69,7 @@ class NexusClient:
                 f"Invalid base_url '{self.instance.base_url}': {exc}"
             ) from exc
         except httpx.HTTPError as exc:  # connection refused, DNS, timeout, TLS...
-            raise NexusError(f"Connection error: {exc}") from exc
+            raise NexusError(f"Connection error: {_describe(exc)}") from exc
 
         if response.status_code >= 400:
             raise NexusError(
@@ -221,7 +227,7 @@ class NexusClient:
                 ) as client:
                     resp = await client.get(base + path)
             except httpx.HTTPError as exc:
-                raise NexusError(f"Connection error: {exc}") from exc
+                raise NexusError(f"Connection error: {_describe(exc)}") from exc
             if resp.status_code < 400:
                 return resp.json()
             last_status = resp.status_code
@@ -335,7 +341,7 @@ class NexusClient:
                 f"Invalid base_url '{self.instance.base_url}': {exc}"
             ) from exc
         except httpx.HTTPError as exc:
-            raise NexusError(f"Connection error: {exc}") from exc
+            raise NexusError(f"Connection error: {_describe(exc)}") from exc
         if response.status_code >= 400:
             raise NexusError(
                 f"Nexus returned {response.status_code} for {method} {path}",
