@@ -82,8 +82,8 @@
         <p class="hint">매니저에서 각 서버로의 TCP 연결 지연(ms)을 주기적으로 측정해 1년간 누적합니다. 평소(중앙값) 대비 +20% 노랑, +50% 빨강으로 표시됩니다.</p>
         <div class="legend">
           <span><i class="sw" style="background:var(--accent)"></i> 정상</span>
-          <span><i class="sw" style="background:var(--amber)"></i> +20% 이상</span>
-          <span><i class="sw" style="background:var(--red)"></i> +50% 이상</span>
+          <span><i class="sw" style="background:var(--amber)"></i> <span id="infra-warn-label">+20% 이상</span></span>
+          <span><i class="sw" style="background:var(--red)"></i> <span id="infra-crit-label">+50% 이상</span></span>
           <span><i class="sw" style="border-top:2px dashed var(--muted);background:transparent"></i> 평소(중앙값)</span>
         </div>
         <div id="infra-charts"></div>
@@ -295,6 +295,17 @@
           <h3>비교 기준 항목</h3>
           <p class="hint">비교 매트릭스에서 '설정 상이(drift)'를 판단할 때 사용할 항목을 선택합니다. 체크한 항목만 비교합니다.</p>
           <div id="compare-fields" class="compare-fields-box"></div>
+        </div>
+
+        <div class="settings-card">
+          <h3>Ping 모니터링 설정</h3>
+          <p class="hint">인프라 체크 탭의 측정 주기와 색상 임계치(평소 중앙값 대비 %)입니다.</p>
+          <form id="ping-form" class="form">
+            <label>측정 주기 (초) <input name="interval" type="number" min="10" step="1" /></label>
+            <label>노랑 임계치 (평소 대비 +%) <input name="warn_pct" type="number" min="0" step="1" /></label>
+            <label>빨강 임계치 (평소 대비 +%) <input name="crit_pct" type="number" min="0" step="1" /></label>
+            <div class="form-actions"><button type="submit">저장</button></div>
+          </form>
         </div>
       </section>
 

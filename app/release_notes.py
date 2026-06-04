@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.1",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "added", "text": "서버 설정에서 Ping 측정 주기·색상 임계치(노랑/빨강 %)를 조정 (instances.yaml 저장)"},
+        ],
+    },
+    {
         "version": "0.8.0",
         "date": "2026-06-04",
         "changes": [

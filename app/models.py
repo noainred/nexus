@@ -60,6 +60,14 @@ class CompareFields(BaseModel):
     fields: List[str] = Field(default_factory=list)
 
 
+class PingConfig(BaseModel):
+    """Ping monitoring settings (interval + colour thresholds)."""
+
+    interval: float = 60.0
+    warn_pct: float = 20.0
+    crit_pct: float = 50.0
+
+
 class PingPoint(BaseModel):
     t: int            # epoch seconds
     v: float          # ping ms
@@ -75,6 +83,8 @@ class PingSeries(BaseModel):
 
 class PingHistory(BaseModel):
     days: int
+    warn_pct: float = 20.0
+    crit_pct: float = 50.0
     series: List[PingSeries] = Field(default_factory=list)
 
 

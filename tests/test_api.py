@@ -156,6 +156,23 @@ def test_export_and_import(http_client, monkeypatch):
     assert bad.status_code == 400
 
 
+def test_ping_config(http_client, monkeypatch):
+    monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
+    r = http_client.get("/api/instances/ping-config")
+    body = r.json()
+    assert set(body) == {"interval", "warn_pct", "crit_pct"}
+
+    r2 = http_client.put(
+        "/api/instances/ping-config",
+        json={"interval": 5, "warn_pct": 30, "crit_pct": 10},
+    )
+    cfg = r2.json()
+    assert cfg["interval"] == 10.0          # clamped to >= 10
+    assert cfg["warn_pct"] == 30.0
+    assert cfg["crit_pct"] == 30.0          # raised to >= warn
+    assert deps.registry.ping_interval() == 10.0
+
+
 def test_compare_fields(http_client, monkeypatch):
     monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
     deps.registry._compare_fields = ["format", "type", "remote_url"]

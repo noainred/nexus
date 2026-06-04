@@ -436,6 +436,10 @@ async function loadInfra() {
     container.append(el("div", { class: "empty" }, `조회 실패: ${e.message}`));
     return;
   }
+  const wl = document.getElementById("infra-warn-label");
+  const cl = document.getElementById("infra-crit-label");
+  if (wl) wl.textContent = `+${data.warn_pct}% 이상`;
+  if (cl) cl.textContent = `+${data.crit_pct}% 이상`;
   container.innerHTML = "";
   if (!data.series.length) {
     container.append(el("div", { class: "empty" }, "측정 데이터가 아직 없습니다. 잠시 후 다시 확인하세요. (백그라운드에서 누적 중)"));
@@ -1739,6 +1743,20 @@ async function loadSettings() {
   ));
   loadGroupOrder();
   loadCompareFields();
+  loadPingConfig();
+}
+
+async function loadPingConfig() {
+  const form = document.getElementById("ping-form");
+  if (!form) return;
+  try {
+    const c = await api("/api/instances/ping-config");
+    form.interval.value = c.interval;
+    form.warn_pct.value = c.warn_pct;
+    form.crit_pct.value = c.crit_pct;
+  } catch (e) {
+    /* non-fatal */
+  }
 }
 
 async function setReference(inst) {
@@ -1798,6 +1816,24 @@ async function importSettings(file) {
 
 function setupSettings() {
   const form = document.getElementById("settings-form");
+  document.getElementById("ping-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const fd = new FormData(ev.target);
+    try {
+      await api("/api/instances/ping-config", {
+        method: "PUT",
+        body: JSON.stringify({
+          interval: Number(fd.get("interval")),
+          warn_pct: Number(fd.get("warn_pct")),
+          crit_pct: Number(fd.get("crit_pct")),
+        }),
+      });
+      toast("Ping 설정 저장됨");
+      loadPingConfig();
+    } catch (e) {
+      toast(e.message, "err");
+    }
+  });
   // "새 서버 추가" button reveals the form (add mode); 취소 hides it.
   document.getElementById("settings-add-toggle").addEventListener("click", () => {
     settingsResetForm();

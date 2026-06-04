@@ -15,6 +15,7 @@ from ..deps import InstanceRegistry, get_registry
 from ..models import (
     CompareFields,
     GroupOrder,
+    PingConfig,
     InstanceCreate,
     InstanceSummary,
     InstanceTestRequest,
@@ -78,13 +79,31 @@ async def set_compare_fields(
     return CompareFields(fields=registry.compare_fields())
 
 
+@router.get("/ping-config", response_model=PingConfig)
+async def get_ping_config(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> PingConfig:
+    return PingConfig(**registry.ping_config())
+
+
+@router.put("/ping-config", response_model=PingConfig)
+async def set_ping_config(
+    body: PingConfig, registry: InstanceRegistry = Depends(get_registry)
+) -> PingConfig:
+    registry.set_ping_config(body.interval, body.warn_pct, body.crit_pct)
+    return PingConfig(**registry.ping_config())
+
+
 @router.get("/export")
 async def export_instances(
     registry: InstanceRegistry = Depends(get_registry),
 ) -> Response:
     """Download the full server list as a YAML backup (includes passwords)."""
     text = instances_to_yaml(
-        registry.all(), registry.group_order(), registry.compare_fields()
+        registry.all(),
+        registry.group_order(),
+        registry.compare_fields(),
+        registry.ping_config(),
     )
     return Response(
         content=text,
@@ -119,6 +138,9 @@ async def import_instances(
         registry.set_group_order(document.group_order)
     if document.compare_fields:
         registry.set_compare_fields(document.compare_fields)
+    registry.set_ping_config(
+        document.ping_interval, document.ping_warn_pct, document.ping_crit_pct
+    )
     return [_summary(i) for i in registry.all()]
 
 

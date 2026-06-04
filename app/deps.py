@@ -28,6 +28,9 @@ class InstanceRegistry:
         }
         self._group_order: List[str] = list(document.group_order)
         self._compare_fields: List[str] = list(document.compare_fields)
+        self._ping_interval: float = document.ping_interval
+        self._ping_warn_pct: float = document.ping_warn_pct
+        self._ping_crit_pct: float = document.ping_crit_pct
 
     def compare_fields(self) -> List[str]:
         return list(self._compare_fields)
@@ -35,6 +38,22 @@ class InstanceRegistry:
     def set_compare_fields(self, fields: List[str]) -> None:
         allowed = ["format", "type", "remote_url", "online"]
         self._compare_fields = [f for f in fields if f in allowed]
+        self._persist()
+
+    def ping_interval(self) -> float:
+        return self._ping_interval
+
+    def ping_config(self) -> dict:
+        return {
+            "interval": self._ping_interval,
+            "warn_pct": self._ping_warn_pct,
+            "crit_pct": self._ping_crit_pct,
+        }
+
+    def set_ping_config(self, interval: float, warn_pct: float, crit_pct: float) -> None:
+        self._ping_interval = max(10.0, float(interval))
+        self._ping_warn_pct = max(0.0, float(warn_pct))
+        self._ping_crit_pct = max(self._ping_warn_pct, float(crit_pct))
         self._persist()
 
     def all(self) -> List[InstanceConfig]:
@@ -118,13 +137,18 @@ class InstanceRegistry:
         self._persist()
 
     def _persist(self) -> None:
-        save_instances(self.all(), self._group_order, self._compare_fields)
+        save_instances(
+            self.all(), self._group_order, self._compare_fields, self.ping_config()
+        )
 
     def reload(self) -> None:
         doc = load_document()
         self._instances = {i.id: i for i in doc.instances}
         self._group_order = list(doc.group_order)
         self._compare_fields = list(doc.compare_fields)
+        self._ping_interval = doc.ping_interval
+        self._ping_warn_pct = doc.ping_warn_pct
+        self._ping_crit_pct = doc.ping_crit_pct
 
 
 # Singleton registry, initialised at import time from the configured file.

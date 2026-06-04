@@ -19,8 +19,6 @@ from .config import Settings, get_settings
 
 _TS_FMT = "%Y-%m-%dT%H:%M:%SZ"
 _BUCKETS = 200            # max charted points per series
-_WARN_RATIO = 1.2
-_CRIT_RATIO = 1.5
 _RETENTION_DAYS = 366
 
 
@@ -84,20 +82,28 @@ def _prune(settings: Settings) -> None:
         path.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
 
 
-def _color(value: float, baseline: Optional[float]) -> str:
+def _color(value: float, baseline: Optional[float], warn_ratio: float, crit_ratio: float) -> str:
     if not baseline or baseline <= 0:
         return "ok"
     ratio = value / baseline
-    if ratio >= _CRIT_RATIO:
+    if ratio >= crit_ratio:
         return "crit"
-    if ratio >= _WARN_RATIO:
+    if ratio >= warn_ratio:
         return "warn"
     return "ok"
 
 
-def query(days: int, names: Dict[str, str], settings: Optional[Settings] = None) -> dict:
+def query(
+    days: int,
+    names: Dict[str, str],
+    warn_pct: float = 20.0,
+    crit_pct: float = 50.0,
+    settings: Optional[Settings] = None,
+) -> dict:
     """Return down-sampled, colour-coded ping series for the last ``days``."""
     settings = settings or get_settings()
+    warn_ratio = 1.0 + max(0.0, warn_pct) / 100.0
+    crit_ratio = 1.0 + max(0.0, crit_pct) / 100.0
     path = _ping_path(settings)
     now = datetime.now(timezone.utc)
     cutoff_dt = now - timedelta(days=days)
@@ -139,7 +145,10 @@ def query(days: int, names: Dict[str, str], settings: Optional[Settings] = None)
         for b in sorted(buckets):
             avg = round(sum(buckets[b]) / len(buckets[b]), 1)
             bt = int(t0 + (b + 0.5) / _BUCKETS * span)
-            points.append({"t": bt, "v": avg, "color": _color(avg, baseline)})
+            points.append({
+                "t": bt, "v": avg,
+                "color": _color(avg, baseline, warn_ratio, crit_ratio),
+            })
 
         series.append({
             "id": iid,
@@ -148,7 +157,7 @@ def query(days: int, names: Dict[str, str], settings: Optional[Settings] = None)
             "points": points,
         })
 
-    return {"days": days, "series": series}
+    return {"days": days, "warn_pct": warn_pct, "crit_pct": crit_pct, "series": series}
 
 
 async def run_loop() -> None:
@@ -166,4 +175,4 @@ async def run_loop() -> None:
                     _prune(settings)
         except Exception:  # pragma: no cover - defensive
             pass
-        await asyncio.sleep(max(10.0, settings.ping_interval))
+        await asyncio.sleep(max(10.0, registry.ping_interval()))
