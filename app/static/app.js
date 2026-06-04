@@ -829,17 +829,30 @@ function buildTable(headers, rows) {
   return el("table", {}, [thead, tbody]);
 }
 
+function repoInst() {
+  return document.getElementById("repo-inst").value;
+}
+
+function setupRepositories() {
+  const sel = document.getElementById("repo-inst");
+  fillInstanceSelect(sel);
+  sel.addEventListener("change", loadRepositories);
+  document.getElementById("repo-refresh").addEventListener("click", loadRepositories);
+  loadRepositories();
+}
+
 async function loadRepositories() {
   const container = document.getElementById("repo-table");
   container.innerHTML = "";
   document.getElementById("component-heading").classList.add("hidden");
   document.getElementById("component-table").innerHTML = "";
   document.getElementById("component-pager").classList.add("hidden");
-  if (!state.current) return;
+  const inst = repoInst();
+  if (!inst) return;
 
   let repos = [];
   try {
-    repos = await api(`/api/instances/${state.current}/repositories`);
+    repos = await api(`/api/instances/${inst}/repositories`);
   } catch (e) {
     container.append(el("div", { class: "empty" }, `저장소 조회 실패: ${e.message}`));
     return;
@@ -867,7 +880,7 @@ async function loadRepositories() {
 async function deleteRepo(name) {
   if (!confirm(`저장소 '${name}'를 삭제하시겠습니까? 되돌릴 수 없습니다.`)) return;
   try {
-    await api(`/api/instances/${state.current}/repositories/${encodeURIComponent(name)}`, {
+    await api(`/api/instances/${repoInst()}/repositories/${encodeURIComponent(name)}`, {
       method: "DELETE",
     });
     toast(`저장소 '${name}' 삭제됨`);
@@ -885,7 +898,7 @@ async function browseComponents(repo, append = false) {
   heading.textContent = `컴포넌트 — ${repo}`;
   heading.classList.remove("hidden");
 
-  let url = `/api/instances/${state.current}/components?repository=${encodeURIComponent(repo)}`;
+  let url = `/api/instances/${repoInst()}/components?repository=${encodeURIComponent(repo)}`;
   if (append && state.componentToken) url += `&continuation_token=${encodeURIComponent(state.componentToken)}`;
 
   let page;
@@ -928,7 +941,7 @@ async function browseComponents(repo, append = false) {
 async function deleteComponent(id) {
   if (!confirm("이 컴포넌트를 삭제하시겠습니까?")) return;
   try {
-    await api(`/api/instances/${state.current}/components/${encodeURIComponent(id)}`, {
+    await api(`/api/instances/${repoInst()}/components/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
     toast("컴포넌트 삭제됨");
@@ -1489,7 +1502,7 @@ async function loadContent() {
 
 // ---- server settings (instance management) -------------------------------
 
-const SETTINGS_SELECTORS = ["cmp-left-inst", "cmp-right-inst", "dl-inst", "task-inst"];
+const SETTINGS_SELECTORS = ["cmp-left-inst", "cmp-right-inst", "dl-inst", "task-inst", "repo-inst", "cleanup-inst"];
 
 async function refreshInstances() {
   state.instances = await api("/api/instances");
@@ -1750,13 +1763,26 @@ function setupSettings() {
 
 // ---- cleanup -------------------------------------------------------------
 
+function cleanupInst() {
+  return document.getElementById("cleanup-inst").value;
+}
+
+function setupCleanup() {
+  const sel = document.getElementById("cleanup-inst");
+  fillInstanceSelect(sel);
+  sel.addEventListener("change", loadCleanup);
+  document.getElementById("cleanup-refresh").addEventListener("click", loadCleanup);
+  loadCleanup();
+}
+
 async function loadCleanup() {
   const container = document.getElementById("cleanup-table");
   container.innerHTML = "";
-  if (!state.current) return;
+  const inst = cleanupInst();
+  if (!inst) return;
   let policies = [];
   try {
-    policies = await api(`/api/instances/${state.current}/cleanup-policies`);
+    policies = await api(`/api/instances/${inst}/cleanup-policies`);
   } catch (e) {
     container.append(el("div", { class: "empty" }, `정책 조회 실패: ${e.message}`));
     return;
@@ -1778,8 +1804,8 @@ async function loadCleanup() {
 
 document.getElementById("cleanup-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
-  if (!state.current) {
-    toast("인스턴스를 먼저 선택하세요.", "err");
+  if (!cleanupInst()) {
+    toast("서버를 먼저 선택하세요.", "err");
     return;
   }
   const fd = new FormData(ev.target);
@@ -1794,7 +1820,7 @@ document.getElementById("cleanup-form").addEventListener("submit", async (ev) =>
   if (downloaded) payload.criteria_last_downloaded = Number(downloaded);
 
   try {
-    await api(`/api/instances/${state.current}/cleanup-policies`, {
+    await api(`/api/instances/${cleanupInst()}/cleanup-policies`, {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -1922,16 +1948,6 @@ async function moveGroupOrder(groups, idx, delta) {
 
 // ---- bootstrap -----------------------------------------------------------
 
-function refreshActiveTab() {
-  loadOverview();
-  loadMatrix();
-  loadRepositories();
-  loadCleanup();
-  const active = (document.querySelector(".tab.active") || {}).dataset;
-  if (active && active.tab === "blobstore") loadBlobstores();
-  if (active && active.tab === "metrics") loadMetrics();
-}
-
 async function init() {
   try {
     state.instances = await api("/api/instances");
@@ -1939,19 +1955,8 @@ async function init() {
     toast(`인스턴스 목록 로드 실패: ${e.message}`, "err");
     return;
   }
-  const select = document.getElementById("instance-select");
-  select.innerHTML = "";
-  state.instances.forEach((i) => {
-    select.append(el("option", { value: i.id }, i.name));
-  });
-  if (state.instances.length) {
-    state.current = state.instances[0].id;
-  }
-  select.addEventListener("change", () => {
-    state.current = select.value;
-    refreshActiveTab();
-  });
-  document.getElementById("refresh-btn").addEventListener("click", refreshActiveTab);
+  setupRepositories();
+  setupCleanup();
   setupCompare();
   setupDownloads();
   setupTasks();
@@ -1960,7 +1965,8 @@ async function init() {
   setupTopology();
   setupAlerts();
   setupReleaseNotes();
-  refreshActiveTab();
+  loadOverview();
+  loadMatrix();
 }
 
 init();

@@ -12,11 +12,6 @@
         <h1>Nexus Repository 통합 관리</h1>
         <button id="app-version" class="version-badge" title="릴리스 노트 보기">v…</button>
       </div>
-      <div class="instance-picker">
-        <label for="instance-select">인스턴스</label>
-        <select id="instance-select"></select>
-        <button id="refresh-btn" title="새로고침">↻</button>
-      </div>
     </header>
 
     <nav class="tabs">
@@ -117,6 +112,10 @@
 
       <section id="repositories" class="panel">
         <h2>저장소 목록</h2>
+        <div class="dl-controls">
+          <label>서버 <select id="repo-inst"></select></label>
+          <button id="repo-refresh">새로고침</button>
+        </div>
         <div id="repo-table"></div>
         <h2 id="component-heading" class="hidden">컴포넌트</h2>
         <div id="component-table"></div>
@@ -185,6 +184,10 @@
 
       <section id="cleanup" class="panel">
         <h2>정리(Cleanup) 정책</h2>
+        <div class="dl-controls">
+          <label>서버 <select id="cleanup-inst"></select></label>
+          <button id="cleanup-refresh">새로고침</button>
+        </div>
         <div id="cleanup-table"></div>
         <h3>새 정책 만들기</h3>
         <form id="cleanup-form" class="form">

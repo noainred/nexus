@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.6.5",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "removed", "text": "상단 전역 인스턴스 선택 박스 제거"},
+            {"type": "added", "text": "저장소 관리·정리 정책 탭에 각자 서버 선택 추가(자립)"},
+        ],
+    },
+    {
         "version": "0.6.4",
         "date": "2026-06-04",
         "changes": [
