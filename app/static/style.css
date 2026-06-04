@@ -134,6 +134,20 @@ tr:hover td { background: var(--panel); }
 .form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .form button { grid-column: 1 / -1; background: var(--accent); border-color: var(--accent); color: #fff; }
 .form-actions button { grid-column: auto; }
+/* infra check (ping charts) */
+.infra-range { display: inline-flex; gap: 4px; }
+.infra-range button { padding: 4px 10px; }
+.infra-range button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.infra-chart { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 12px 0; background: var(--panel); }
+.infra-chart-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.infra-chart-head .infra-name { font-weight: 600; }
+.infra-chart-head .url { color: var(--muted); font-size: 12px; }
+.infra-svg { width: 100%; height: auto; display: block; }
+.infra-svg .axis { stroke: var(--border); stroke-width: 1; }
+.infra-svg .baseline { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 5 4; }
+.infra-svg .infra-line { stroke: var(--border); stroke-width: 1.2; }
+.infra-svg .axis-label { fill: var(--muted); font-size: 11px; }
+
 /* topology */
 .topo-node { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 10px 0; background: var(--panel); }
 .topo-node-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }

@@ -16,6 +16,9 @@ env/
 instances.local.yaml
 instances.yaml
 
+# Runtime data
+ping-history.csv
+
 # Offline deployment artifacts
 wheelhouse/
 *.tar.gz

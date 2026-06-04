@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     alert_heap_pct: float = 90.0
     alert_disk_pct: float = 90.0
 
+    # Infra ping monitoring.
+    ping_file: str = "ping-history.csv"
+    ping_interval: float = 60.0
+
 
 class InstancesDocument(BaseModel):
     """Schema of the instances YAML file."""

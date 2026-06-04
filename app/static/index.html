@@ -18,6 +18,7 @@
       <button class="tab active" data-tab="overview">개요</button>
       <button class="tab" data-tab="blobstore">Blob Store</button>
       <button class="tab" data-tab="metrics">JVM / 리소스</button>
+      <button class="tab" data-tab="infra">인프라 체크</button>
       <button class="tab" data-tab="topology">토폴로지</button>
       <button class="tab" data-tab="matrix">비교 매트릭스</button>
       <button class="tab" data-tab="compare">저장소 1:1 비교</button>
@@ -62,6 +63,30 @@
       <section id="metrics" class="panel">
         <h2>JVM / 리소스</h2>
         <div id="metrics-table"></div>
+      </section>
+
+      <section id="infra" class="panel">
+        <div class="matrix-header">
+          <h2>인프라 체크 (서버 Ping)</h2>
+          <div class="matrix-controls">
+            <div id="infra-range" class="infra-range">
+              <button data-days="1">1일</button>
+              <button data-days="7">7일</button>
+              <button data-days="30">30일</button>
+              <button data-days="90">90일</button>
+              <button data-days="365">365일</button>
+            </div>
+            <button id="infra-refresh">새로고침</button>
+          </div>
+        </div>
+        <p class="hint">매니저에서 각 서버로의 TCP 연결 지연(ms)을 주기적으로 측정해 1년간 누적합니다. 평소(중앙값) 대비 +20% 노랑, +50% 빨강으로 표시됩니다.</p>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--accent)"></i> 정상</span>
+          <span><i class="sw" style="background:var(--amber)"></i> +20% 이상</span>
+          <span><i class="sw" style="background:var(--red)"></i> +50% 이상</span>
+          <span><i class="sw" style="border-top:2px dashed var(--muted);background:transparent"></i> 평소(중앙값)</span>
+        </div>
+        <div id="infra-charts"></div>
       </section>
 
       <section id="matrix" class="panel">

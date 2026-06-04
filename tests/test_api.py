@@ -612,6 +612,32 @@ def test_downloads_summary_scans_all_non_group_repos(http_client):
     assert body["downloaded_size_bytes"] == 100
 
 
+def test_ping_query_colors(tmp_path):
+    from datetime import datetime, timedelta, timezone
+    from app import pingmon
+
+    now = datetime.now(timezone.utc)
+    fmt = "%Y-%m-%dT%H:%M:%SZ"
+    f = tmp_path / "ping.csv"
+    # baseline (median) of [10,10,12,20,40] = 12; distinct hourly timestamps.
+    rows = [
+        f"{(now - timedelta(hours=i)).strftime(fmt)},a,{v}"
+        for i, v in enumerate([10, 10, 12, 20, 40])
+    ]
+    f.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+    class S:
+        ping_file = str(f)
+
+    out = pingmon.query(1, {"a": "A"}, settings=S())
+    s = out["series"][0]
+    assert s["baseline"] == 12.0
+    colors = {p["v"]: p["color"] for p in s["points"]}
+    assert colors.get(40.0) == "crit"   # 3.3x baseline
+    assert colors.get(20.0) == "crit"   # 1.67x baseline
+    assert colors.get(10.0) == "ok"
+
+
 @respx.mock
 def test_tasks_list_and_run(http_client):
     respx.get(f"{API}/tasks").mock(

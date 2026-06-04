@@ -108,6 +108,7 @@ document.querySelectorAll(".tab").forEach((tab) => {
     }
     if (tab.dataset.tab === "blobstore") loadBlobstores();
     if (tab.dataset.tab === "metrics") loadMetrics();
+    if (tab.dataset.tab === "infra") loadInfra();
     if (tab.dataset.tab === "overview") loadOverview();
     if (tab.dataset.tab === "about") renderHistory();
   });
@@ -389,6 +390,97 @@ async function loadBlobstores() {
   container.append(
     buildTable(["사이트", "Blob Store", "유형", "사용량", "가용 공간", "사용률", "Blob 수"], rows)
   );
+}
+
+// ---- infra check (ping charts) -------------------------------------------
+
+function svgEl(tag, attrs = {}, children = []) {
+  const n = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  Object.entries(attrs).forEach(([k, v]) => n.setAttribute(k, v));
+  (Array.isArray(children) ? children : [children]).forEach((c) => {
+    if (c == null) return;
+    n.append(c.nodeType ? c : document.createTextNode(String(c)));
+  });
+  return n;
+}
+
+function pingColor(c) {
+  return c === "crit" ? "var(--red)" : c === "warn" ? "var(--amber)" : "var(--accent)";
+}
+
+function setupInfra() {
+  document.querySelectorAll("#infra-range button").forEach((b) => {
+    b.addEventListener("click", () => {
+      state.infraDays = Number(b.dataset.days);
+      document.querySelectorAll("#infra-range button").forEach((x) => x.classList.remove("active"));
+      b.classList.add("active");
+      loadInfra();
+    });
+  });
+  document.getElementById("infra-refresh").addEventListener("click", loadInfra);
+  // default 1일 active
+  const first = document.querySelector('#infra-range button[data-days="1"]');
+  if (first) first.classList.add("active");
+}
+
+async function loadInfra() {
+  const container = document.getElementById("infra-charts");
+  container.innerHTML = "";
+  container.append(el("div", { class: "empty" }, "불러오는 중…"));
+  const days = state.infraDays || 1;
+  let data;
+  try {
+    data = await api(`/api/ping-history?days=${days}`);
+  } catch (e) {
+    container.innerHTML = "";
+    container.append(el("div", { class: "empty" }, `조회 실패: ${e.message}`));
+    return;
+  }
+  container.innerHTML = "";
+  if (!data.series.length) {
+    container.append(el("div", { class: "empty" }, "측정 데이터가 아직 없습니다. 잠시 후 다시 확인하세요. (백그라운드에서 누적 중)"));
+    return;
+  }
+  data.series.forEach((s) => container.append(renderInfraChart(s)));
+}
+
+function renderInfraChart(s) {
+  const wrap = el("div", { class: "infra-chart" });
+  wrap.append(el("div", { class: "infra-chart-head" }, [
+    el("span", { class: "infra-name" }, s.name),
+    el("span", { class: "url" }, s.baseline != null ? `평소(중앙값) ${s.baseline} ms` : "데이터 없음"),
+  ]));
+  if (!s.points.length) {
+    wrap.append(el("div", { class: "empty" }, "측정 데이터가 아직 없습니다."));
+    return wrap;
+  }
+  const W = 1000, H = 220, padL = 48, padR = 12, padT = 12, padB = 26;
+  const ts = s.points.map((p) => p.t);
+  const tmin = Math.min(...ts), tmax = Math.max(...ts);
+  const tspan = Math.max(tmax - tmin, 1);
+  const vmax = (Math.max(s.baseline || 0, ...s.points.map((p) => p.v)) || 1) * 1.15;
+  const xOf = (t) => padL + ((t - tmin) / tspan) * (W - padL - padR);
+  const yOf = (v) => H - padB - (v / vmax) * (H - padT - padB);
+
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "infra-svg" });
+  svg.append(svgEl("line", { x1: padL, y1: H - padB, x2: W - padR, y2: H - padB, class: "axis" }));
+  svg.append(svgEl("line", { x1: padL, y1: padT, x2: padL, y2: H - padB, class: "axis" }));
+  if (s.baseline != null) {
+    const by = yOf(s.baseline);
+    svg.append(svgEl("line", { x1: padL, y1: by, x2: W - padR, y2: by, class: "baseline" }));
+  }
+  const d = s.points.map((p, i) => `${i ? "L" : "M"}${xOf(p.t).toFixed(1)} ${yOf(p.v).toFixed(1)}`).join(" ");
+  svg.append(svgEl("path", { d, class: "infra-line", fill: "none" }));
+  s.points.forEach((p) => {
+    const c = svgEl("circle", { cx: xOf(p.t).toFixed(1), cy: yOf(p.v).toFixed(1), r: p.color === "ok" ? 2.2 : 3.4, fill: pingColor(p.color) });
+    c.append(svgEl("title", {}, `${p.v} ms · ${new Date(p.t * 1000).toLocaleString()}`));
+    svg.append(c);
+  });
+  svg.append(svgEl("text", { x: 4, y: padT + 8, class: "axis-label" }, `${Math.round(vmax)}ms`));
+  svg.append(svgEl("text", { x: padL, y: H - 8, class: "axis-label" }, new Date(tmin * 1000).toLocaleString()));
+  svg.append(svgEl("text", { x: W - padR, y: H - 8, class: "axis-label", "text-anchor": "end" }, new Date(tmax * 1000).toLocaleString()));
+  wrap.append(svg);
+  return wrap;
 }
 
 // ---- topology ------------------------------------------------------------
@@ -2055,6 +2147,7 @@ async function init() {
   setupSettings();
   setupTopology();
   setupAlerts();
+  setupInfra();
   setupReleaseNotes();
   loadOverview();
   loadMatrix();

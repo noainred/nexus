@@ -60,6 +60,24 @@ class CompareFields(BaseModel):
     fields: List[str] = Field(default_factory=list)
 
 
+class PingPoint(BaseModel):
+    t: int            # epoch seconds
+    v: float          # ping ms
+    color: str        # ok | warn | crit
+
+
+class PingSeries(BaseModel):
+    id: str
+    name: str
+    baseline: Optional[float] = None
+    points: List[PingPoint] = Field(default_factory=list)
+
+
+class PingHistory(BaseModel):
+    days: int
+    series: List[PingSeries] = Field(default_factory=list)
+
+
 class InstanceTestRequest(BaseModel):
     """Connection-test payload (does not persist anything)."""
 
