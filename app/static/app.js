@@ -108,6 +108,7 @@ document.querySelectorAll(".tab").forEach((tab) => {
     }
     if (tab.dataset.tab === "blobstore") loadBlobstores();
     if (tab.dataset.tab === "metrics") loadMetrics();
+    if (tab.dataset.tab === "overview") loadOverview();
   });
 });
 
@@ -167,8 +168,14 @@ async function loadOverview() {
   const cards = document.getElementById("status-cards");
   cards.innerHTML = "";
   let statuses = [];
+  let order = [];
   try {
-    statuses = await api("/api/status");
+    const [st, ord] = await Promise.all([
+      api("/api/status"),
+      api("/api/instances/group-order"),
+    ]);
+    statuses = st;
+    order = (ord && ord.groups) || [];
   } catch (e) {
     cards.append(el("div", { class: "empty" }, `상태를 불러올 수 없습니다: ${e.message}`));
     return;
@@ -185,7 +192,13 @@ async function loadOverview() {
     if (!groups.has(g)) groups.set(g, []);
     groups.get(g).push(s);
   });
-  const names = [...groups.keys()].sort((a, b) => a.localeCompare(b, "ko"));
+  // Order by the saved group order; "(그룹 미지정)" always last.
+  const rank = (g) => {
+    if (g === "(그룹 미지정)") return 1e9;
+    const i = order.indexOf(g);
+    return i === -1 ? 1e8 : i;
+  };
+  const names = [...groups.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, "ko"));
   const showHeaders = names.length > 1 || (names.length === 1 && names[0] !== "(그룹 미지정)");
 
   names.forEach((g) => {
@@ -1596,6 +1609,7 @@ async function loadSettings() {
   container.append(buildTable(
     ["이름", "식별자", "그룹", "주소", "계정", "모니터링", "비교", "기준", ""], rows
   ));
+  loadGroupOrder();
   renderHistory();
 }
 
@@ -1852,6 +1866,58 @@ function openReleaseNotes() {
 function renderHistory() {
   const c = document.getElementById("settings-history");
   if (c) renderReleaseNotesInto(c);
+}
+
+// ---- group display order -------------------------------------------------
+
+function renderGroupOrderList(groups) {
+  const c = document.getElementById("group-order");
+  if (!c) return;
+  c.innerHTML = "";
+  if (!groups.length) {
+    c.append(el("div", { class: "empty" }, "그룹이 없습니다. 서버에 그룹을 지정하세요."));
+    return;
+  }
+  const list = el("div", { class: "grouporder-list" });
+  groups.forEach((g, i) => {
+    list.append(el("div", { class: "grouporder-row" }, [
+      el("span", { class: "go-rank" }, `${i + 1}.`),
+      el("span", { class: "go-name" }, g),
+      el("span", { class: "go-btns" }, [
+        el("button", i === 0 ? { disabled: "true" } : { onclick: () => moveGroupOrder(groups, i, -1) }, "▲"),
+        el("button", i === groups.length - 1 ? { disabled: "true" } : { onclick: () => moveGroupOrder(groups, i, 1) }, "▼"),
+      ]),
+    ]));
+  });
+  c.append(list);
+}
+
+async function loadGroupOrder() {
+  try {
+    const r = await api("/api/instances/group-order");
+    renderGroupOrderList(r.groups || []);
+  } catch (e) {
+    const c = document.getElementById("group-order");
+    if (c) c.textContent = "";
+  }
+}
+
+async function moveGroupOrder(groups, idx, delta) {
+  const j = idx + delta;
+  if (j < 0 || j >= groups.length) return;
+  const next = groups.slice();
+  [next[idx], next[j]] = [next[j], next[idx]];
+  try {
+    const r = await api("/api/instances/group-order", {
+      method: "PUT",
+      body: JSON.stringify({ groups: next }),
+    });
+    renderGroupOrderList(r.groups || next);
+    loadOverview();  // refresh the (possibly hidden) overview ordering
+    toast("그룹 순서 저장됨");
+  } catch (e) {
+    toast(e.message, "err");
+  }
 }
 
 // ---- bootstrap -----------------------------------------------------------

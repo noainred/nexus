@@ -9,10 +9,11 @@ from ..config import (
     InstanceConfig,
     get_settings,
     instances_to_yaml,
-    parse_instances,
+    parse_document,
 )
 from ..deps import InstanceRegistry, get_registry
 from ..models import (
+    GroupOrder,
     InstanceCreate,
     InstanceSummary,
     InstanceTestRequest,
@@ -46,12 +47,27 @@ async def list_instances(
     return [_summary(i) for i in registry.all()]
 
 
+@router.get("/group-order", response_model=GroupOrder)
+async def get_group_order(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> GroupOrder:
+    return GroupOrder(groups=registry.group_order())
+
+
+@router.put("/group-order", response_model=GroupOrder)
+async def set_group_order(
+    body: GroupOrder, registry: InstanceRegistry = Depends(get_registry)
+) -> GroupOrder:
+    registry.set_group_order(body.groups)
+    return GroupOrder(groups=registry.group_order())
+
+
 @router.get("/export")
 async def export_instances(
     registry: InstanceRegistry = Depends(get_registry),
 ) -> Response:
     """Download the full server list as a YAML backup (includes passwords)."""
-    text = instances_to_yaml(registry.all())
+    text = instances_to_yaml(registry.all(), registry.group_order())
     return Response(
         content=text,
         media_type="application/x-yaml",
@@ -72,15 +88,17 @@ async def import_instances(
     """
     raw = (await request.body()).decode("utf-8")
     try:
-        instances = parse_instances(raw)
+        document = parse_document(raw)
     except Exception as exc:  # noqa: BLE001 - surface a clean 400
         raise HTTPException(status_code=400, detail=f"유효하지 않은 구성 파일: {exc}")
-    if not instances:
+    if not document.instances:
         raise HTTPException(status_code=400, detail="가져올 서버가 없습니다.")
     if mode == "merge":
-        registry.merge(instances)
+        registry.merge(document.instances)
     else:
-        registry.replace_all(instances)
+        registry.replace_all(document.instances)
+    if document.group_order:
+        registry.set_group_order(document.group_order)
     return [_summary(i) for i in registry.all()]
 
 

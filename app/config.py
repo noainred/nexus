@@ -67,46 +67,13 @@ class InstancesDocument(BaseModel):
     """Schema of the instances YAML file."""
 
     instances: List[InstanceConfig] = Field(default_factory=list)
+    group_order: List[str] = Field(default_factory=list)
 
 
 @lru_cache
 def get_settings() -> Settings:
     """Return cached process settings."""
     return Settings()
-
-
-def load_instances(settings: Optional[Settings] = None) -> List[InstanceConfig]:
-    """Load and validate managed instances from the configured YAML file.
-
-    Returns an empty list when the file is absent so the app can still start
-    (the dashboard will simply show no instances).
-    """
-    settings = settings or get_settings()
-    path = Path(settings.instances_file)
-    if not path.is_absolute():
-        path = Path(os.getcwd()) / path
-
-    if not path.exists():
-        return []
-
-    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    try:
-        document = InstancesDocument.model_validate(raw)
-    except ValidationError as exc:  # pragma: no cover - surfaced to operator
-        raise RuntimeError(f"Invalid instances file {path}: {exc}") from exc
-
-    seen: set[str] = set()
-    for instance in document.instances:
-        if instance.id in seen:
-            raise RuntimeError(f"Duplicate instance id in {path}: {instance.id!r}")
-        seen.add(instance.id)
-
-    # Apply the global TLS default when an instance does not override it.
-    for instance in document.instances:
-        if instance.verify_tls is None:
-            instance.verify_tls = settings.verify_tls
-
-    return document.instances
 
 
 def _instance_path(settings: Settings) -> Path:
@@ -116,9 +83,43 @@ def _instance_path(settings: Settings) -> Path:
     return path
 
 
-def instances_to_dict(instances: List[InstanceConfig]) -> dict:
+def _validate_document(raw: dict, where: str = "config") -> InstancesDocument:
+    try:
+        document = InstancesDocument.model_validate(raw)
+    except ValidationError as exc:  # pragma: no cover - surfaced to operator
+        raise RuntimeError(f"Invalid instances {where}: {exc}") from exc
+    seen: set[str] = set()
+    for instance in document.instances:
+        if instance.id in seen:
+            raise RuntimeError(f"Duplicate instance id in {where}: {instance.id!r}")
+        seen.add(instance.id)
+    return document
+
+
+def load_document(settings: Optional[Settings] = None) -> InstancesDocument:
+    """Load and validate the full instances document (instances + group order)."""
+    settings = settings or get_settings()
+    path = _instance_path(settings)
+    if not path.exists():
+        return InstancesDocument()
+    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    document = _validate_document(raw, where=str(path))
+    for instance in document.instances:
+        if instance.verify_tls is None:
+            instance.verify_tls = settings.verify_tls
+    return document
+
+
+def load_instances(settings: Optional[Settings] = None) -> List[InstanceConfig]:
+    """Convenience wrapper returning just the instances list."""
+    return load_document(settings).instances
+
+
+def instances_to_dict(
+    instances: List[InstanceConfig], group_order: Optional[List[str]] = None
+) -> dict:
     """Serialise instances to the plain dict written to YAML / exported."""
-    return {
+    data: dict = {
         "instances": [
             {
                 "id": c.id,
@@ -135,31 +136,32 @@ def instances_to_dict(instances: List[InstanceConfig]) -> dict:
             for c in instances
         ]
     }
+    if group_order:
+        data["group_order"] = list(group_order)
+    return data
 
 
-def instances_to_yaml(instances: List[InstanceConfig]) -> str:
+def instances_to_yaml(
+    instances: List[InstanceConfig], group_order: Optional[List[str]] = None
+) -> str:
     return yaml.safe_dump(
-        instances_to_dict(instances), allow_unicode=True, sort_keys=False
+        instances_to_dict(instances, group_order), allow_unicode=True, sort_keys=False
     )
 
 
-def parse_instances(raw_text: str) -> List[InstanceConfig]:
-    """Parse an exported YAML/JSON config into validated instances."""
+def parse_document(raw_text: str) -> InstancesDocument:
+    """Parse an exported YAML/JSON config into a validated document."""
     data = yaml.safe_load(raw_text) or {}
-    document = InstancesDocument.model_validate(data)
-    seen: set[str] = set()
-    for instance in document.instances:
-        if instance.id in seen:
-            raise ValueError(f"Duplicate instance id: {instance.id!r}")
-        seen.add(instance.id)
-    return document.instances
+    return _validate_document(data, where="imported file")
 
 
 def save_instances(
-    instances: List[InstanceConfig], settings: Optional[Settings] = None
+    instances: List[InstanceConfig],
+    group_order: Optional[List[str]] = None,
+    settings: Optional[Settings] = None,
 ) -> None:
-    """Persist the managed instances back to the YAML file."""
+    """Persist the managed instances (and group order) back to the YAML file."""
     settings = settings or get_settings()
     path = _instance_path(settings)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(instances_to_yaml(instances), encoding="utf-8")
+    path.write_text(instances_to_yaml(instances, group_order), encoding="utf-8")

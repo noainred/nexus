@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.6.1",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "added", "text": "서버 설정에서 개요 그룹 표시 순서 조정(▲▼) — instances.yaml에 저장"},
+        ],
+    },
+    {
         "version": "0.6.0",
         "date": "2026-06-04",
         "changes": [

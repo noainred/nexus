@@ -48,6 +48,12 @@ class InstanceUpdate(BaseModel):
     use_in_comparison: bool = True
 
 
+class GroupOrder(BaseModel):
+    """Display order of instance groups in the overview."""
+
+    groups: List[str] = Field(default_factory=list)
+
+
 class InstanceTestRequest(BaseModel):
     """Connection-test payload (does not persist anything)."""
 

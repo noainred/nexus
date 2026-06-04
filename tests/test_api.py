@@ -156,6 +156,25 @@ def test_export_and_import(http_client, monkeypatch):
     assert bad.status_code == 400
 
 
+def test_group_order(http_client, monkeypatch):
+    monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
+    deps.registry._instances["test"].group = "DMZ"
+    deps.registry._instances["oc"] = InstanceConfig(
+        id="oc", name="OC", base_url="http://oc", username="a", password="p", group="OC2"
+    )
+    deps.registry._group_order = []
+
+    # Default: present groups (sorted) when no explicit order saved.
+    r = http_client.get("/api/instances/group-order")
+    assert set(r.json()["groups"]) == {"DMZ", "OC2"}
+
+    # Set an explicit order; it is returned and persisted.
+    r2 = http_client.put("/api/instances/group-order", json={"groups": ["OC2", "DMZ"]})
+    assert r2.status_code == 200
+    assert r2.json()["groups"] == ["OC2", "DMZ"]
+    assert deps.registry._group_order == ["OC2", "DMZ"]
+
+
 def test_instance_crud(http_client, monkeypatch, tmp_path):
     # Avoid touching a real instances.yaml during the test.
     monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)

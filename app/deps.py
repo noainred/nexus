@@ -7,8 +7,9 @@ from fastapi import HTTPException
 
 from .config import (
     InstanceConfig,
+    InstancesDocument,
     get_settings,
-    load_instances,
+    load_document,
     save_instances,
 )
 from .nexus_client import NexusClient
@@ -21,11 +22,29 @@ class InstanceRegistry:
     Insertion order is preserved so the dashboard column order is stable.
     """
 
-    def __init__(self, instances: List[InstanceConfig]) -> None:
-        self._instances: Dict[str, InstanceConfig] = {i.id: i for i in instances}
+    def __init__(self, document: InstancesDocument) -> None:
+        self._instances: Dict[str, InstanceConfig] = {
+            i.id: i for i in document.instances
+        }
+        self._group_order: List[str] = list(document.group_order)
 
     def all(self) -> List[InstanceConfig]:
         return list(self._instances.values())
+
+    def group_order(self) -> List[str]:
+        """Saved group order, plus any present-but-unordered groups appended."""
+        present = []
+        for inst in self._instances.values():
+            g = (inst.group or "").strip()
+            if g and g not in present:
+                present.append(g)
+        ordered = [g for g in self._group_order if g in present]
+        extra = sorted(g for g in present if g not in ordered)
+        return ordered + extra
+
+    def set_group_order(self, order: List[str]) -> None:
+        self._group_order = [g for g in order if g]
+        self._persist()
 
     def monitoring(self) -> List[InstanceConfig]:
         return [i for i in self._instances.values() if i.use_in_monitoring]
@@ -90,14 +109,16 @@ class InstanceRegistry:
         self._persist()
 
     def _persist(self) -> None:
-        save_instances(self.all())
+        save_instances(self.all(), self._group_order)
 
     def reload(self) -> None:
-        self._instances = {i.id: i for i in load_instances()}
+        doc = load_document()
+        self._instances = {i.id: i for i in doc.instances}
+        self._group_order = list(doc.group_order)
 
 
 # Singleton registry, initialised at import time from the configured file.
-registry = InstanceRegistry(load_instances())
+registry = InstanceRegistry(load_document())
 
 
 def get_registry() -> InstanceRegistry:

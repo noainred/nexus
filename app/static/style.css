@@ -93,6 +93,13 @@ h3 { font-size: 14px; color: var(--muted); }
 .group-head { display: flex; align-items: baseline; gap: 12px; margin: 14px 0 4px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
 .group-head .group-name { font-weight: 700; font-size: 15px; }
 .group-head .group-count { color: var(--muted); font-size: 12px; }
+
+.grouporder-list { display: flex; flex-direction: column; gap: 6px; max-width: 420px; }
+.grouporder-row { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+.grouporder-row .go-rank { color: var(--muted); width: 22px; }
+.grouporder-row .go-name { flex: 1; font-weight: 500; }
+.grouporder-row .go-btns { display: flex; gap: 4px; }
+.grouporder-row .go-btns button { padding: 2px 10px; }
 .card {
   background: var(--panel);
   border: 1px solid var(--border);
