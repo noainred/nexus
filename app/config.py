@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     request_timeout: float = 15.0
     verify_tls: bool = True
 
+    # Alerting (Slack-compatible incoming webhook; empty disables sending).
+    alert_webhook: str = ""
+    alert_interval: float = 60.0
+    alert_heap_pct: float = 90.0
+    alert_disk_pct: float = 90.0
+
 
 class InstancesDocument(BaseModel):
     """Schema of the instances YAML file."""

@@ -25,6 +25,7 @@
       <button class="tab" data-tab="downloads">다운로드 현황</button>
       <button class="tab" data-tab="tasks">작업</button>
       <button class="tab" data-tab="security">보안 점검</button>
+      <button class="tab" data-tab="alerts">알림</button>
       <button class="tab" data-tab="content">콘텐츠 동기화</button>
       <button class="tab" data-tab="cleanup">정리 정책</button>
       <button class="tab" data-tab="settings">서버 설정</button>
@@ -157,6 +158,16 @@
         </div>
         <div id="content-note" class="hint"></div>
         <div id="content-table" class="matrix-wrap"></div>
+      </section>
+
+      <section id="alerts" class="panel">
+        <div class="matrix-header">
+          <h2>알림 (임계치)</h2>
+          <button id="alerts-refresh">새로고침</button>
+        </div>
+        <p class="hint">노드 다운·Heap·디스크 임계치를 주기적으로 점검합니다. Webhook(Slack 호환)을 설정하면 발생/해제 시 푸시됩니다.</p>
+        <div id="alerts-config" class="hint"></div>
+        <div id="alerts-table"></div>
       </section>
 
       <section id="cleanup" class="panel">

@@ -93,6 +93,9 @@ document.querySelectorAll(".tab").forEach((tab) => {
       state.securityLoaded = true;
       loadSecurity();
     }
+    if (tab.dataset.tab === "alerts") {
+      loadAlerts();
+    }
     if (tab.dataset.tab === "content" && !state.contentSetup) {
       state.contentSetup = true;
       setupContent();
@@ -1041,6 +1044,47 @@ async function taskAction(instId, taskId, action, name) {
   }
 }
 
+// ---- alerts --------------------------------------------------------------
+
+function setupAlerts() {
+  document.getElementById("alerts-refresh").addEventListener("click", loadAlerts);
+}
+
+async function loadAlerts() {
+  const cfg = document.getElementById("alerts-config");
+  const container = document.getElementById("alerts-table");
+  cfg.textContent = "";
+  container.innerHTML = "";
+  container.append(el("div", { class: "empty" }, "점검 중…"));
+  let data;
+  try {
+    data = await api("/api/alerts?refresh=true");
+  } catch (e) {
+    container.innerHTML = "";
+    container.append(el("div", { class: "empty" }, `알림 조회 실패: ${e.message}`));
+    return;
+  }
+  cfg.textContent = data.webhook_configured
+    ? `Webhook: 설정됨 · 점검 주기 ${data.interval}초`
+    : `Webhook: 미설정 (환경변수 NEXUS_MANAGER_ALERT_WEBHOOK 로 Slack/Webhook URL 지정) · 점검 주기 ${data.interval}초`;
+
+  container.innerHTML = "";
+  if (!data.alerts.length) {
+    container.append(el("div", { class: "empty" }, "현재 알림 없음 ✓"));
+    return;
+  }
+  const rows = data.alerts.map((a) =>
+    el("tr", { class: a.severity === "critical" ? "differs" : "" }, [
+      el("td", {}, a.severity === "critical"
+        ? el("span", { class: "badge down" }, "심각")
+        : el("span", { class: "badge warn" }, "경고")),
+      el("td", {}, a.node || "—"),
+      el("td", {}, a.message),
+    ])
+  );
+  container.append(buildTable(["심각도", "노드", "내용"], rows));
+}
+
 // ---- security check ------------------------------------------------------
 
 function setupSecurity() {
@@ -1473,6 +1517,7 @@ async function init() {
   setupSecurity();
   setupSettings();
   setupTopology();
+  setupAlerts();
   refreshActiveTab();
 }
 

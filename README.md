@@ -8,7 +8,9 @@ REST API를 호출하고, 가벼운 단일 페이지(SPA) 프런트엔드가 이
 
 | 영역 | 설명 |
 | --- | --- |
-| **상태/모니터링** | 모든 인스턴스의 도달 가능성·응답 시간·서브시스템 health를 동시 점검하고, Blob Store 사용량을 표시 |
+| **상태/모니터링** | 모든 인스턴스의 도달 가능성·응답 시간·서브시스템 health, Blob Store 사용량(사용률 경고), 노드별 JVM/힙/스레드 메트릭 |
+| **토폴로지** | 프록시 remoteUrl로 노드 간 부모↔자식 관계 자동 도출, 끊긴 링크(Auto-block 위험) 감지 |
+| **알림** | 노드 다운·Heap·디스크 임계치 주기 점검 + Slack 호환 Webhook 푸시 |
 | **비교 매트릭스** | 저장소(행) × 인스턴스(열) 격자에서 각 저장소의 **존재 여부와 설정 일치 여부**를 색으로 한눈에 비교. Core(타 리전)와 DMZ/사이트 간 구성 드리프트를 즉시 식별 |
 | **저장소 관리** | 저장소 목록 조회, 삭제, 컴포넌트(아티팩트) 탐색 및 삭제 (페이지네이션 지원) |
 | **다운로드 현황** | 서버 선택 시 모든 저장소의 다운로드 요약(저장소별 자산·용량)을 자동 표시, 저장소 선택 시 실제 다운로드된 패키지 상세 목록 표시 |
@@ -133,6 +135,9 @@ instances:
 | `NEXUS_MANAGER_INSTANCES_FILE` | `instances.yaml` | 인스턴스 정의 파일 경로 |
 | `NEXUS_MANAGER_REQUEST_TIMEOUT` | `15` | Nexus 호출 타임아웃(초) |
 | `NEXUS_MANAGER_VERIFY_TLS` | `true` | 전역 TLS 검증 기본값 |
+| `NEXUS_MANAGER_ALERT_WEBHOOK` | (없음) | 알림 Webhook URL(Slack 호환). 비우면 푸시 비활성(대시보드 알림 탭은 동작) |
+| `NEXUS_MANAGER_ALERT_INTERVAL` | `60` | 임계치 점검 주기(초) |
+| `NEXUS_MANAGER_ALERT_HEAP_PCT` / `_DISK_PCT` | `90` | Heap/디스크 알림 임계치(%) |
 
 ## REST API 요약
 
@@ -145,6 +150,9 @@ instances:
 | `GET` | `/api/compare?left_instance=&left_repo=&right_instance=&right_repo=` | 임의의 두 저장소(다른 서버·다른 이름) 1:1 설정 비교 |
 | `GET` | `/api/content-compare?repository=` | 사이트 간 실제 컴포넌트 존재 비교(콘텐츠 드리프트) |
 | `GET` | `/api/security` | 사이트별 보안 점검(익명 접근·admin 계정) |
+| `GET` | `/api/topology` | 프록시 토폴로지·끊긴 링크 (`?probe=true` 원격 실점검) |
+| `GET` | `/api/metrics` | 노드별 JVM/힙/스레드 메트릭 |
+| `GET` | `/api/alerts` | 현재 알림 상태 (`?refresh=true` 즉시 재평가) |
 | `GET` | `/api/instances/{id}/tasks` | 스케줄 작업 목록·상태 |
 | `POST` | `/api/instances/{id}/tasks/{taskId}/run` · `/stop` | 작업 실행 / 중지 |
 | `GET` | `/api/status` | 전체 인스턴스 상태 동시 점검 |

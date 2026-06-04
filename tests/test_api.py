@@ -559,6 +559,25 @@ def test_content_compare_detects_missing_component(http_client):
 
 
 @respx.mock
+def test_alerts_fire_on_node_down(http_client):
+    # test instance is unreachable -> a critical down alert.
+    respx.get(f"{API}/status").mock(side_effect=httpx.ConnectError("down"))
+    respx.get(f"{API}/repositories").mock(side_effect=httpx.ConnectError("down"))
+    respx.get(f"{API}/blobstores").mock(side_effect=httpx.ConnectError("down"))
+    respx.get("https://nexus.test/service/rest/metrics/data").mock(
+        side_effect=httpx.ConnectError("down")
+    )
+    respx.get("https://nexus.test/service/metrics/data").mock(
+        side_effect=httpx.ConnectError("down")
+    )
+    resp = http_client.get("/api/alerts?refresh=true")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["webhook_configured"] is False
+    assert any(a["key"] == "down:test" and a["severity"] == "critical" for a in body["alerts"])
+
+
+@respx.mock
 def test_topology_internal_link_and_broken(http_client):
     # core is a managed node; test proxies it. core is unreachable -> broken.
     deps.registry._instances["core"] = InstanceConfig(

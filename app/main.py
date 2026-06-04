@@ -1,6 +1,8 @@
 """FastAPI application entry point for the Nexus integrated manager."""
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -8,7 +10,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
+from .alerts import run_loop
 from .routers import (
+    alerts,
     cleanup,
     content,
     downloads,
@@ -23,6 +27,19 @@ from .routers import (
 
 STATIC_DIR = Path(__file__).parent / "static"
 
+
+@contextlib.asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Run the background threshold-alert loop for the app's lifetime."""
+    task = asyncio.create_task(run_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
 app = FastAPI(
     title="Nexus Integrated Manager",
     description=(
@@ -31,6 +48,7 @@ app = FastAPI(
         "and health monitoring."
     ),
     version=__version__,
+    lifespan=lifespan,
 )
 
 app.include_router(instances.router)
@@ -43,6 +61,7 @@ app.include_router(tasks.router)
 app.include_router(security.router)
 app.include_router(content.router)
 app.include_router(topology.router)
+app.include_router(alerts.router)
 
 
 @app.middleware("http")

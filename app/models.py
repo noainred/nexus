@@ -303,6 +303,23 @@ class RepositoryMatrix(BaseModel):
     rows: List[MatrixRow] = Field(default_factory=list)
 
 
+class Alert(BaseModel):
+    """A single active alert condition."""
+
+    key: str
+    severity: str = "warning"   # warning | critical
+    node: Optional[str] = None
+    message: str
+
+
+class AlertsStatus(BaseModel):
+    """Current alert state plus notifier configuration."""
+
+    webhook_configured: bool = False
+    interval: float = 60.0
+    alerts: List[Alert] = Field(default_factory=list)
+
+
 class NodeMetrics(BaseModel):
     """JVM / resource metrics for one node (from /service/metrics/data)."""
 
