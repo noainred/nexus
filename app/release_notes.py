@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.6.2",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "added", "text": "릴리스 압축본에 버전 표시 파일 ver_<버전>.md 포함 및 릴리스 자산으로 업로드"},
+            {"type": "changed", "text": "latest 릴리스 제목·설명이 현재 버전을 반영하도록 자동 갱신"},
+        ],
+    },
+    {
         "version": "0.6.1",
         "date": "2026-06-04",
         "changes": [

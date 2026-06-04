@@ -30,12 +30,19 @@ echo "==> Downloading dependency wheels into ./wheelhouse ..."
 python3 -m pip download --only-binary=:all: \
   -r requirements.txt -d wheelhouse
 
+# Version marker file so the archive's version is unambiguous.
+VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' app/__init__.py | head -1)
+VERFILE="ver_${VERSION}.md"
+printf '# Nexus Repository 통합 관리 — v%s\n\n- 버전: %s\n- 빌드 시각(UTC): %s\n' \
+  "$VERSION" "$VERSION" "$(date -u +'%Y-%m-%d %H:%M:%S')" > "$VERFILE"
+echo "==> Version marker: ${VERFILE}"
+
 echo "==> Packaging source + wheels into ${OUT} ..."
 tar --exclude='.git' --exclude='.venv' --exclude='__pycache__' \
     --exclude='*.pyc' --exclude='instances.yaml' --exclude='.env' \
     -czf "$OUT" \
     app requirements.txt instances.example.yaml .env.example \
-    README.md pytest.ini deploy wheelhouse
+    README.md pytest.ini deploy wheelhouse "$VERFILE"
 
 echo ""
 echo "==> Done: ${OUT}  ($(du -h "$OUT" | cut -f1))"

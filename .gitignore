@@ -19,6 +19,7 @@ instances.yaml
 # Offline deployment artifacts
 wheelhouse/
 *.tar.gz
+ver_*.md
 
 # Editor / OS
 .idea/
