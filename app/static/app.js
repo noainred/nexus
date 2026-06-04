@@ -969,7 +969,14 @@ async function loadServerDownloadSummary(instId) {
       const row = byName[res.repository];
       if (!row) return;
       row.pending = false;
-      Object.assign(row, res);
+      // Merge only the scanned metrics; keep format/type from the repo list
+      // (the batch result doesn't carry them and would blank them out).
+      row.error = res.error || null;
+      row.total_assets = res.total_assets;
+      row.downloaded_assets = res.downloaded_assets;
+      row.total_size_bytes = res.total_size_bytes;
+      row.downloaded_size_bytes = res.downloaded_size_bytes;
+      row.truncated = res.truncated;
     });
     renderServerSummary();
   }
@@ -1080,7 +1087,7 @@ function renderServerSummary() {
       el("td", { class: "num" }, fmtBytes(r.downloaded_size_bytes) + (r.truncated ? " *" : "")),
     ]);
   });
-  table.append(el("table", {}, [thead, el("tbody", {}, body)]));
+  table.append(el("table", { class: "dl-summary" }, [thead, el("tbody", {}, body)]));
 
   const notes = [];
   if (pendingCount) notes.push(`진행 ${reps.length - pendingCount}/${reps.length} …`);

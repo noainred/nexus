@@ -186,6 +186,8 @@ tr:hover td { background: var(--panel); }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
 th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
 th.sortable:hover { color: var(--text); }
+/* download summary: center every column (overrides td.num right-align) */
+table.dl-summary th, table.dl-summary td { text-align: center; }
 td.pending { color: var(--muted); font-style: italic; }
 tr.dl-pending td { opacity: .85; }
 td.usage-warn { color: var(--amber); font-weight: 600; }

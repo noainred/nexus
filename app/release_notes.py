@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.5.3",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "changed", "text": "다운로드 현황 요약 표 중앙 정렬, 열 머리글 클릭 정렬 명확화"},
+            {"type": "changed", "text": "진행 조회 시 포맷/유형이 '?/?'로 깨지던 문제 수정"},
+        ],
+    },
+    {
         "version": "0.5.2",
         "date": "2026-06-04",
         "changes": [
