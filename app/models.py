@@ -13,6 +13,7 @@ class InstanceSummary(BaseModel):
     name: str
     base_url: str
     username: Optional[str] = None
+    group: str = ""
     verify_tls: Optional[bool] = None
     use_in_monitoring: bool = True
     use_in_comparison: bool = True
@@ -27,6 +28,7 @@ class InstanceCreate(BaseModel):
     base_url: str = Field(..., min_length=1)
     username: str = ""
     password: str = ""
+    group: str = ""
     verify_tls: Optional[bool] = None
     use_in_monitoring: bool = True
     use_in_comparison: bool = True
@@ -40,6 +42,7 @@ class InstanceUpdate(BaseModel):
     username: str = ""
     # Blank password means "keep the existing one".
     password: Optional[str] = None
+    group: str = ""
     verify_tls: Optional[bool] = None
     use_in_monitoring: bool = True
     use_in_comparison: bool = True
@@ -70,6 +73,7 @@ class InstanceStatus(BaseModel):
     id: str
     name: str
     base_url: str
+    group: str = ""
     reachable: bool
     healthy: bool
     response_ms: Optional[float] = None

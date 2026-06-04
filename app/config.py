@@ -19,6 +19,7 @@ class InstanceConfig(BaseModel):
     base_url: str = Field(..., description="Root URL of the Nexus instance.")
     username: str = Field(..., description="Account used for management calls.")
     password: str = Field(..., description="Password or token for the account.")
+    group: str = Field(default="", description="Group label for the overview.")
     verify_tls: Optional[bool] = Field(
         default=None,
         description="Per-instance TLS verification override.",
@@ -125,6 +126,7 @@ def instances_to_dict(instances: List[InstanceConfig]) -> dict:
                 "base_url": c.base_url,
                 "username": c.username,
                 "password": c.password,
+                "group": c.group,
                 "verify_tls": c.verify_tls,
                 "use_in_monitoring": c.use_in_monitoring,
                 "use_in_comparison": c.use_in_comparison,

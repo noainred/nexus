@@ -21,6 +21,7 @@ async def _status_for(instance) -> InstanceStatus:
         id=instance.id,
         name=instance.name,
         base_url=instance.base_url,
+        group=instance.group,
         reachable=False,
         healthy=False,
     )

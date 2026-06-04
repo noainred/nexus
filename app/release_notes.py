@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.6.0",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "added", "text": "인스턴스 그룹 지정(서버 설정)과 개요의 그룹별 상태 표시"},
+        ],
+    },
+    {
         "version": "0.5.5",
         "date": "2026-06-04",
         "changes": [
