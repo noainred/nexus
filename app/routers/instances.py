@@ -3,9 +3,14 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from ..config import InstanceConfig, get_settings
+from ..config import (
+    InstanceConfig,
+    get_settings,
+    instances_to_yaml,
+    parse_instances,
+)
 from ..deps import InstanceRegistry, get_registry
 from ..models import (
     InstanceCreate,
@@ -37,6 +42,44 @@ async def list_instances(
     registry: InstanceRegistry = Depends(get_registry),
 ) -> List[InstanceSummary]:
     """Return the managed instances (without passwords)."""
+    return [_summary(i) for i in registry.all()]
+
+
+@router.get("/export")
+async def export_instances(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> Response:
+    """Download the full server list as a YAML backup (includes passwords)."""
+    text = instances_to_yaml(registry.all())
+    return Response(
+        content=text,
+        media_type="application/x-yaml",
+        headers={"Content-Disposition": 'attachment; filename="instances-backup.yaml"'},
+    )
+
+
+@router.post("/import", response_model=List[InstanceSummary])
+async def import_instances(
+    request: Request,
+    mode: str = Query("replace", pattern="^(replace|merge)$"),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> List[InstanceSummary]:
+    """Import a previously exported server list (YAML or JSON).
+
+    ``mode=replace`` (default) overwrites the whole list; ``mode=merge``
+    upserts the imported entries by id, keeping the rest.
+    """
+    raw = (await request.body()).decode("utf-8")
+    try:
+        instances = parse_instances(raw)
+    except Exception as exc:  # noqa: BLE001 - surface a clean 400
+        raise HTTPException(status_code=400, detail=f"유효하지 않은 구성 파일: {exc}")
+    if not instances:
+        raise HTTPException(status_code=400, detail="가져올 서버가 없습니다.")
+    if mode == "merge":
+        registry.merge(instances)
+    else:
+        registry.replace_all(instances)
     return [_summary(i) for i in registry.all()]
 
 

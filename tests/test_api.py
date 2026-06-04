@@ -123,6 +123,39 @@ def test_set_reference_is_exclusive(http_client, monkeypatch):
     assert flags == {"test": False, "core": False}
 
 
+def test_export_and_import(http_client, monkeypatch):
+    monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
+
+    # Export returns YAML including the password (a full backup).
+    exp = http_client.get("/api/instances/export")
+    assert exp.status_code == 200
+    assert "attachment" in exp.headers["content-disposition"]
+    assert "password: secret" in exp.text
+
+    # Import (replace) swaps the whole list.
+    new_yaml = (
+        "instances:\n"
+        "  - id: imported\n"
+        "    name: Imported\n"
+        "    base_url: http://imp:8081\n"
+        "    username: admin\n"
+        "    password: pw\n"
+    )
+    imp = http_client.post(
+        "/api/instances/import?mode=replace",
+        content=new_yaml,
+        headers={"Content-Type": "application/x-yaml"},
+    )
+    assert imp.status_code == 200
+    ids = {i["id"] for i in imp.json()}
+    assert ids == {"imported"}
+    assert "imported" in deps.registry._instances
+
+    # Invalid payload -> 400
+    bad = http_client.post("/api/instances/import", content="not: [valid")
+    assert bad.status_code == 400
+
+
 def test_instance_crud(http_client, monkeypatch, tmp_path):
     # Avoid touching a real instances.yaml during the test.
     monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)

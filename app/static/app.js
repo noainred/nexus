@@ -1417,9 +1417,45 @@ async function settingsDelete(inst) {
   }
 }
 
+async function importSettings(file) {
+  const merge = document.getElementById("import-merge").checked;
+  if (!merge && !confirm("전체 교체 모드입니다. 현재 서버 목록이 가져온 내용으로 대체됩니다. 진행할까요?")) {
+    return;
+  }
+  let text;
+  try {
+    text = await file.text();
+  } catch (e) {
+    toast("파일을 읽지 못했습니다.", "err");
+    return;
+  }
+  try {
+    await api(`/api/instances/import?mode=${merge ? "merge" : "replace"}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-yaml" },
+      body: text,
+    });
+    toast(`가져오기 완료 (${merge ? "병합" : "전체 교체"})`);
+    await refreshInstances();
+    loadSettings();
+  } catch (e) {
+    toast(e.message, "err");
+  }
+}
+
 function setupSettings() {
   const form = document.getElementById("settings-form");
   document.getElementById("settings-cancel").addEventListener("click", settingsResetForm);
+
+  document.getElementById("export-btn").addEventListener("click", () => {
+    window.location.href = "/api/instances/export";
+  });
+  const fileInput = document.getElementById("import-file");
+  document.getElementById("import-btn").addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files && fileInput.files[0]) importSettings(fileInput.files[0]);
+    fileInput.value = "";  // allow re-selecting the same file
+  });
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const fd = new FormData(form);

@@ -80,6 +80,15 @@ class InstanceRegistry:
             cfg.is_reference = False
         self._persist()
 
+    def replace_all(self, instances: List[InstanceConfig]) -> None:
+        self._instances = {i.id: i for i in instances}
+        self._persist()
+
+    def merge(self, instances: List[InstanceConfig]) -> None:
+        for i in instances:
+            self._instances[i.id] = i  # upsert by id
+        self._persist()
+
     def _persist(self) -> None:
         save_instances(self.all())
 

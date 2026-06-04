@@ -128,6 +128,8 @@ tr:hover td { background: var(--panel); }
 
 .flag-toggle { cursor: pointer; user-select: none; }
 .flag-toggle:hover { filter: brightness(1.25); }
+.settings-io { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 8px 0 4px; }
+.settings-io .chk { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
 .ref-star { cursor: pointer; user-select: none; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .ref-star.on { color: var(--amber); }
 .ref-star:hover { filter: brightness(1.3); }

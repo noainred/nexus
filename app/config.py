@@ -115,13 +115,9 @@ def _instance_path(settings: Settings) -> Path:
     return path
 
 
-def save_instances(
-    instances: List[InstanceConfig], settings: Optional[Settings] = None
-) -> None:
-    """Persist the managed instances back to the YAML file."""
-    settings = settings or get_settings()
-    path = _instance_path(settings)
-    data = {
+def instances_to_dict(instances: List[InstanceConfig]) -> dict:
+    """Serialise instances to the plain dict written to YAML / exported."""
+    return {
         "instances": [
             {
                 "id": c.id,
@@ -137,7 +133,31 @@ def save_instances(
             for c in instances
         ]
     }
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8"
+
+
+def instances_to_yaml(instances: List[InstanceConfig]) -> str:
+    return yaml.safe_dump(
+        instances_to_dict(instances), allow_unicode=True, sort_keys=False
     )
+
+
+def parse_instances(raw_text: str) -> List[InstanceConfig]:
+    """Parse an exported YAML/JSON config into validated instances."""
+    data = yaml.safe_load(raw_text) or {}
+    document = InstancesDocument.model_validate(data)
+    seen: set[str] = set()
+    for instance in document.instances:
+        if instance.id in seen:
+            raise ValueError(f"Duplicate instance id: {instance.id!r}")
+        seen.add(instance.id)
+    return document.instances
+
+
+def save_instances(
+    instances: List[InstanceConfig], settings: Optional[Settings] = None
+) -> None:
+    """Persist the managed instances back to the YAML file."""
+    settings = settings or get_settings()
+    path = _instance_path(settings)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(instances_to_yaml(instances), encoding="utf-8")

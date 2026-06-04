@@ -207,6 +207,12 @@
       <section id="settings" class="panel">
         <h2>Nexus 서버 설정</h2>
         <p class="hint">관리할 Nexus 서버를 추가·수정·삭제합니다. 각 서버를 모니터링/비교에 사용할지 선택할 수 있습니다.</p>
+        <div class="settings-io">
+          <button id="export-btn">현재 목록 내보내기</button>
+          <button id="import-btn">목록 가져오기</button>
+          <label class="chk"><input type="checkbox" id="import-merge" /> 병합(merge) — 해제 시 전체 교체</label>
+          <input type="file" id="import-file" accept=".yaml,.yml,.json" class="hidden" />
+        </div>
         <div id="settings-table"></div>
 
         <h3 id="settings-form-title">새 서버 추가</h3>

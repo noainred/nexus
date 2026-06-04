@@ -145,6 +145,8 @@ instances:
 | --- | --- | --- |
 | `GET` | `/api/instances` | 관리 인스턴스 목록 (비밀번호 제외, 사용 플래그 포함) |
 | `POST`·`PUT`·`DELETE` | `/api/instances[/{id}]` | 인스턴스 추가·수정·삭제 (instances.yaml에 영속) |
+| `GET` | `/api/instances/export` | 현재 서버 목록을 YAML 백업으로 다운로드 |
+| `POST` | `/api/instances/import?mode=replace\|merge` | 저장한 서버 목록 가져오기 |
 | `GET` | `/api/matrix` | 저장소 × 인스턴스 구성 비교 매트릭스 |
 | `GET` | `/api/repository-detail?repository=` | 한 저장소의 설정 항목별 인스턴스 비교(diff) |
 | `GET` | `/api/compare?left_instance=&left_repo=&right_instance=&right_repo=` | 임의의 두 저장소(다른 서버·다른 이름) 1:1 설정 비교 |
