@@ -1,0 +1,60 @@
+name: Build release archive
+
+# Every push to the dev branch (i.e. every version bump) rebuilds
+# downloadable archives — the offline bundle (source + all Python wheels)
+# and a source-only tarball — and publishes them to a per-version release
+# (vX.Y.Z) and a rolling "latest" release. An air-gapped server then only
+# needs to download ONE file.
+on:
+  push:
+    branches:
+      - claude/practical-noether-uPpi9
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Python 3.9 so the downloaded wheels match CentOS 7 / RHEL 8 targets
+      # (cp39, manylinux2014 -> glibc 2.17 = CentOS 7 compatible).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Read app version
+        id: ver
+        run: |
+          V=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' app/__init__.py | head -1)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Build offline bundle (source + wheels)
+        run: bash deploy/build-offline-bundle.sh nexus-manager-offline.tar.gz
+
+      - name: Build source-only archive
+        run: git archive --format=tar.gz -o nexus-manager-src.tar.gz HEAD
+
+      - name: Publish per-version and latest releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -e
+          FILES="nexus-manager-offline.tar.gz nexus-manager-src.tar.gz"
+          for TAG in "v${VERSION}" latest; do
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              gh release upload "$TAG" $FILES --clobber
+            else
+              PRE=""
+              [ "$TAG" = "latest" ] && PRE="--prerelease"
+              gh release create "$TAG" $FILES \
+                --target "$GITHUB_SHA" \
+                --title "$TAG" \
+                --notes "Auto-built from ${GITHUB_SHA} (app v${VERSION})" \
+                $PRE
+            fi
+          done

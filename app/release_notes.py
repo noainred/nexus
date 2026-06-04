@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.5.2",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "added", "text": "버전(푸시)마다 오프라인 번들·소스 압축본을 자동 생성하는 릴리스 워크플로(GitHub Actions)"},
+        ],
+    },
+    {
         "version": "0.5.1",
         "date": "2026-06-04",
         "changes": [
