@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.7.2",
+        "date": "2026-06-04",
+        "changes": [
+            {"type": "changed", "text": "저장소 드롭다운·저장소 관리 목록을 이름순으로 정렬"},
+        ],
+    },
+    {
         "version": "0.7.1",
         "date": "2026-06-04",
         "changes": [

@@ -764,6 +764,13 @@ function fillInstanceSelect(sel) {
   state.instances.forEach((i) => sel.append(el("option", { value: i.id }, i.name)));
 }
 
+// Case-insensitive name comparator for sorting repository/instance lists.
+function byName(a, b) {
+  const x = (a.name || "").toLowerCase();
+  const y = (b.name || "").toLowerCase();
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
 async function fillRepoSelect(instanceId, repoSel) {
   repoSel.innerHTML = "";
   repoSel.append(el("option", { value: "" }, "불러오는 중…"));
@@ -774,7 +781,7 @@ async function fillRepoSelect(instanceId, repoSel) {
       repoSel.append(el("option", { value: "" }, "저장소 없음"));
       return;
     }
-    repos.forEach((r) =>
+    repos.sort(byName).forEach((r) =>
       repoSel.append(el("option", { value: r.name }, `${r.name} (${r.format || "?"}/${r.type || "?"})`))
     );
   } catch (e) {
@@ -873,6 +880,7 @@ async function loadRepositories() {
     container.append(el("div", { class: "empty" }, "저장소가 없습니다."));
     return;
   }
+  repos.sort(byName);
   const rows = repos.map((r) =>
     el("tr", {}, [
       el("td", {}, el("span", { class: "link", onclick: () => browseComponents(r.name) }, r.name)),
@@ -975,7 +983,7 @@ async function fillDownloadRepoSelect(instanceId, repoSel) {
   repoSel.append(el("option", { value: "" }, "— 전체 (모든 저장소) —"));
   try {
     const repos = await api(`/api/instances/${instanceId}/repositories`);
-    repos.forEach((r) =>
+    repos.sort(byName).forEach((r) =>
       repoSel.append(el("option", { value: r.name }, `${r.name} (${r.format || "?"}/${r.type || "?"})`))
     );
   } catch (e) {
