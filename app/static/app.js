@@ -409,6 +409,35 @@ function cellSignature(c) {
   return `${c.format || ""}|${c.type || ""}|${c.remote_url || ""}`;
 }
 
+// Human-readable value of a cell (format/type + proxy remote URL).
+function cellValueText(c) {
+  if (!c || !c.present) return "없음";
+  const head = [c.format, c.type].filter(Boolean).join("/") || "설정";
+  return c.remote_url ? `${head} · ${c.remote_url}` : head;
+}
+
+// The representative "reference" cell for a row: the chosen reference
+// server's cell, or (auto mode) a cell with the majority configuration.
+function referenceCell(row, columns, refId) {
+  if (refId) {
+    const rc = row.cells[refId];
+    return rc && rc.present ? rc : null;
+  }
+  const present = columns.map((c) => row.cells[c.id]).filter((c) => c && c.present);
+  if (!present.length) return null;
+  const counts = {};
+  present.forEach((c) => {
+    const s = cellSignature(c);
+    counts[s] = (counts[s] || 0) + 1;
+  });
+  let bestSig = null;
+  let bestN = -1;
+  Object.entries(counts).forEach(([s, n]) => {
+    if (n > bestN) { bestN = n; bestSig = s; }
+  });
+  return present.find((c) => cellSignature(c) === bestSig) || null;
+}
+
 // Evaluate one row's status and per-cell match, either against the majority
 // (server-computed, refId == "") or against a chosen reference server.
 function evaluateRow(row, columns, refId) {
@@ -492,6 +521,10 @@ function renderMatrix() {
 
   const body = rows.map((row) => {
     const ev = evals.get(row);
+    const refCell = referenceCell(row, matrix.columns, refId);
+    const refLabel = refId
+      ? ((matrix.columns.find((c) => c.id === refId) || {}).name || "기준")
+      : "다수 기준";
     const tds = [
       el("td", { class: "rowhead" }, [
         el("span", { class: "link", title: "설정 자세히 비교", onclick: () => openRepoDiff(row.repository) }, row.repository),
@@ -508,8 +541,12 @@ function renderMatrix() {
       else if (match) { cls = "consistent"; mark = "✓"; meta = c.format || ""; }
       else { cls = "drift"; mark = "≠"; meta = [c.type, c.remote_url].filter(Boolean).join(" · ") || c.format || ""; }
 
+      let title = cellDetail(c);
+      if (cls === "drift" && refCell) {
+        title = `기준(${refLabel}): ${cellValueText(refCell)}\n이 서버(${col.name}): ${cellValueText(c)}`;
+      }
       const refMark = col.id === refId ? "ref-col" : "";
-      const inner = el("span", { class: `mcell ${cls}`, title: cellDetail(c) }, [
+      const inner = el("span", { class: `mcell ${cls}`, title }, [
         el("span", { class: "mark" }, mark),
         meta ? el("span", { class: "meta" }, meta) : null,
       ]);
