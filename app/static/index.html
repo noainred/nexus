@@ -19,6 +19,7 @@
       <button class="tab" data-tab="blobstore">Blob Store</button>
       <button class="tab" data-tab="metrics">JVM / 리소스</button>
       <button class="tab" data-tab="infra">인프라 체크</button>
+      <button class="tab" data-tab="throughput">네트워크 속도</button>
       <button class="tab" data-tab="topology">토폴로지</button>
       <button class="tab" data-tab="matrix">비교 매트릭스</button>
       <button class="tab" data-tab="compare">저장소 1:1 비교</button>
@@ -87,6 +88,32 @@
           <span><i class="sw" style="border-top:2px dashed var(--muted);background:transparent"></i> 평소(중앙값)</span>
         </div>
         <div id="infra-charts"></div>
+      </section>
+
+      <section id="throughput" class="panel">
+        <div class="matrix-header">
+          <h2>네트워크 속도 (서버 처리량)</h2>
+          <div class="matrix-controls">
+            <div id="tp-range" class="infra-range">
+              <button data-days="1">1일</button>
+              <button data-days="7">7일</button>
+              <button data-days="30">30일</button>
+              <button data-days="90">90일</button>
+              <button data-days="365">365일</button>
+            </div>
+            <button id="tp-run">지금 측정</button>
+            <button id="tp-refresh">새로고침</button>
+          </div>
+        </div>
+        <p class="hint">매니저에서 각 서버의 공통 자산(약 30MB)을 8081 포트로 내려받아 처리량(Mbps)을 측정해 1년간 누적합니다. 대륙 간 회선 속도 추세를 봅니다. 평소(중앙값) 대비 <b>-20% 노랑, -50% 빨강</b>(느릴수록 경고)으로 표시됩니다.</p>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--accent)"></i> 정상</span>
+          <span><i class="sw" style="background:var(--amber)"></i> <span id="tp-warn-label">-20% 이하</span></span>
+          <span><i class="sw" style="background:var(--red)"></i> <span id="tp-crit-label">-50% 이하</span></span>
+          <span><i class="sw" style="border-top:2px dashed var(--muted);background:transparent"></i> 평소(중앙값)</span>
+        </div>
+        <p id="tp-status" class="hint"></p>
+        <div id="tp-charts"></div>
       </section>
 
       <section id="matrix" class="panel">
@@ -304,6 +331,19 @@
             <label>측정 주기 (초) <input name="interval" type="number" min="10" step="1" /></label>
             <label>노랑 임계치 (평소 대비 +%) <input name="warn_pct" type="number" min="0" step="1" /></label>
             <label>빨강 임계치 (평소 대비 +%) <input name="crit_pct" type="number" min="0" step="1" /></label>
+            <div class="form-actions"><button type="submit">저장</button></div>
+          </form>
+        </div>
+
+        <div class="settings-card">
+          <h3>네트워크 속도 측정 설정</h3>
+          <p class="hint">방화벽이 8081만 열려 있어, 각 서버가 공통으로 가진 자산을 내려받아 처리량을 측정합니다. <b>자산 경로</b>는 각 서버 base URL 기준 상대 경로입니다(예: <code>repository/maven-central/org/.../some.jar</code>). 매일 지정 시각에 1회 측정하며, '지금 측정'으로 즉시 실행할 수 있습니다.</p>
+          <form id="tp-form" class="form">
+            <label>자산 경로 (공통 모듈) <input name="path" type="text" placeholder="repository/maven-central/.../artifact.jar" /></label>
+            <label>측정 시각 (HH:MM) <input name="time" type="text" placeholder="03:00" /></label>
+            <label>측정 크기 (MB) <input name="size_mb" type="number" min="1" step="1" /></label>
+            <label>노랑 임계치 (평소 대비 -%) <input name="warn_pct" type="number" min="0" step="1" /></label>
+            <label>빨강 임계치 (평소 대비 -%) <input name="crit_pct" type="number" min="0" step="1" /></label>
             <div class="form-actions"><button type="submit">저장</button></div>
           </form>
         </div>

@@ -110,6 +110,7 @@ document.querySelectorAll(".tab").forEach((tab) => {
     if (tab.dataset.tab === "blobstore") loadBlobstores();
     if (tab.dataset.tab === "metrics") loadMetrics();
     if (tab.dataset.tab === "infra") loadInfra();
+    if (tab.dataset.tab === "throughput") loadThroughput();
     if (tab.dataset.tab === "overview") loadOverview();
     if (tab.dataset.tab === "about") renderHistory();
   });
@@ -488,11 +489,12 @@ async function loadInfra() {
   container.append(grid);
 }
 
-function renderInfraChart(s) {
+function renderInfraChart(s, opts = {}) {
+  const unit = opts.unit || "ms";
   const wrap = el("div", { class: "infra-chart" });
   wrap.append(el("div", { class: "infra-chart-head" }, [
     el("span", { class: "infra-name" }, s.name),
-    el("span", { class: "url" }, s.baseline != null ? `평소(중앙값) ${s.baseline} ms` : "데이터 없음"),
+    el("span", { class: "url" }, s.baseline != null ? `평소(중앙값) ${s.baseline} ${unit}` : "데이터 없음"),
   ]));
   if (!s.points.length) {
     wrap.append(el("div", { class: "empty" }, "측정 데이터가 아직 없습니다."));
@@ -525,7 +527,7 @@ function renderInfraChart(s) {
   const hi = svgEl("circle", { cx: 0, cy: 0, r: 5, class: "hi", style: "display:none" });
   svg.append(crosshair, hi);
 
-  svg.append(svgEl("text", { x: 4, y: padT + 8, class: "axis-label" }, `${Math.round(vmax)}ms`));
+  svg.append(svgEl("text", { x: 4, y: padT + 8, class: "axis-label" }, `${Math.round(vmax)}${unit}`));
   svg.append(svgEl("text", { x: padL, y: H - 8, class: "axis-label" }, new Date(tmin * 1000).toLocaleString()));
   svg.append(svgEl("text", { x: W - padR, y: H - 8, class: "axis-label", "text-anchor": "end" }, new Date(tmax * 1000).toLocaleString()));
   wrap.append(svg);
@@ -546,7 +548,7 @@ function renderInfraChart(s) {
     hi.setAttribute("cy", best.y);
     hi.setAttribute("stroke", pingColor(best.p.color));
     hi.style.display = "";
-    tip.textContent = `${best.p.v} ms · ${new Date(best.p.t * 1000).toLocaleString()}`;
+    tip.textContent = `${best.p.v} ${unit} · ${new Date(best.p.t * 1000).toLocaleString()}`;
     tip.style.display = "block";
     const wr = wrap.getBoundingClientRect();
     let left = ev.clientX - wr.left + 12;
@@ -560,6 +562,83 @@ function renderInfraChart(s) {
     hi.style.display = "none";
   });
   return wrap;
+}
+
+// ---- network throughput --------------------------------------------------
+
+function setupThroughput() {
+  document.querySelectorAll("#tp-range button").forEach((b) => {
+    b.addEventListener("click", () => {
+      state.tpDays = Number(b.dataset.days);
+      document.querySelectorAll("#tp-range button").forEach((x) => x.classList.remove("active"));
+      b.classList.add("active");
+      loadThroughput();
+    });
+  });
+  document.getElementById("tp-refresh").addEventListener("click", loadThroughput);
+  document.getElementById("tp-run").addEventListener("click", runThroughput);
+  const first = document.querySelector('#tp-range button[data-days="1"]');
+  if (first) first.classList.add("active");
+}
+
+function renderThroughput(data) {
+  const container = document.getElementById("tp-charts");
+  const wl = document.getElementById("tp-warn-label");
+  const cl = document.getElementById("tp-crit-label");
+  if (wl) wl.textContent = `-${data.warn_pct}% 이하`;
+  if (cl) cl.textContent = `-${data.crit_pct}% 이하`;
+  container.innerHTML = "";
+  if (!data.series.length) {
+    container.append(el("div", { class: "empty" }, "측정 데이터가 아직 없습니다. 서버 설정에서 자산 경로를 지정하고 '지금 측정'을 눌러보세요."));
+    return;
+  }
+  const order = state.groupOrder || [];
+  const groups = new Map();
+  data.series.forEach((s) => {
+    const g = (s.group || "").trim() || "(그룹 미지정)";
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(s);
+  });
+  const rank = (g) => (g === "(그룹 미지정)" ? 1e9 : (order.indexOf(g) === -1 ? 1e8 : order.indexOf(g)));
+  const names = [...groups.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, "ko"));
+  const showHeads = names.length > 1 || (names.length === 1 && names[0] !== "(그룹 미지정)");
+  const grid = el("div", { class: "infra-grid" });
+  names.forEach((g) => {
+    if (showHeads) grid.append(el("div", { class: "infra-grouphead" }, g));
+    groups.get(g).forEach((s) => grid.append(renderInfraChart(s, { unit: "Mbps" })));
+  });
+  container.append(grid);
+}
+
+async function loadThroughput() {
+  const container = document.getElementById("tp-charts");
+  container.innerHTML = "";
+  container.append(el("div", { class: "empty" }, "불러오는 중…"));
+  const days = state.tpDays || 1;
+  try {
+    const data = await api(`/api/throughput-history?days=${days}`);
+    renderThroughput(data);
+  } catch (e) {
+    container.innerHTML = "";
+    container.append(el("div", { class: "empty" }, `조회 실패: ${e.message}`));
+  }
+}
+
+async function runThroughput() {
+  const status = document.getElementById("tp-status");
+  const btn = document.getElementById("tp-run");
+  const days = state.tpDays || 1;
+  btn.disabled = true;
+  status.textContent = "측정 중… (각 서버를 순차로 내려받으므로 시간이 걸릴 수 있습니다)";
+  try {
+    const data = await api(`/api/throughput-run?days=${days}`, { method: "POST" });
+    renderThroughput(data);
+    status.textContent = `측정 완료 · ${new Date().toLocaleString()}`;
+  } catch (e) {
+    status.textContent = `측정 실패: ${e.message}`;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ---- topology ------------------------------------------------------------
@@ -1819,6 +1898,7 @@ async function loadSettings() {
   loadGroupOrder();
   loadCompareFields();
   loadPingConfig();
+  loadThroughputConfig();
 }
 
 async function loadPingConfig() {
@@ -1827,6 +1907,21 @@ async function loadPingConfig() {
   try {
     const c = await api("/api/instances/ping-config");
     form.interval.value = c.interval;
+    form.warn_pct.value = c.warn_pct;
+    form.crit_pct.value = c.crit_pct;
+  } catch (e) {
+    /* non-fatal */
+  }
+}
+
+async function loadThroughputConfig() {
+  const form = document.getElementById("tp-form");
+  if (!form) return;
+  try {
+    const c = await api("/api/throughput-config");
+    form.path.value = c.path;
+    form.time.value = c.time;
+    form.size_mb.value = c.size_mb;
     form.warn_pct.value = c.warn_pct;
     form.crit_pct.value = c.crit_pct;
   } catch (e) {
@@ -1905,6 +2000,26 @@ function setupSettings() {
       });
       toast("Ping 설정 저장됨");
       loadPingConfig();
+    } catch (e) {
+      toast(e.message, "err");
+    }
+  });
+  document.getElementById("tp-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const fd = new FormData(ev.target);
+    try {
+      await api("/api/throughput-config", {
+        method: "PUT",
+        body: JSON.stringify({
+          path: String(fd.get("path") || "").trim(),
+          time: String(fd.get("time") || "03:00").trim(),
+          size_mb: Number(fd.get("size_mb")),
+          warn_pct: Number(fd.get("warn_pct")),
+          crit_pct: Number(fd.get("crit_pct")),
+        }),
+      });
+      toast("네트워크 속도 설정 저장됨");
+      loadThroughputConfig();
     } catch (e) {
       toast(e.message, "err");
     }
@@ -2260,6 +2375,7 @@ async function init() {
   setupTopology();
   setupAlerts();
   setupInfra();
+  setupThroughput();
   setupReleaseNotes();
   loadOverview();
   loadMatrix();

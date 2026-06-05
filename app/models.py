@@ -89,6 +89,41 @@ class PingHistory(BaseModel):
     series: List[PingSeries] = Field(default_factory=list)
 
 
+class ThroughputConfig(BaseModel):
+    """Network throughput test settings.
+
+    ``path`` is the asset path (relative to each instance base URL) downloaded
+    over port 8081 to measure speed; ``time`` is the daily HH:MM run time.
+    """
+
+    path: str = ""
+    time: str = "03:00"
+    size_mb: int = 30
+    warn_pct: float = 20.0
+    crit_pct: float = 50.0
+
+
+class ThroughputPoint(BaseModel):
+    t: int            # epoch seconds
+    v: float          # throughput Mbps
+    color: str        # ok | warn | crit
+
+
+class ThroughputSeries(BaseModel):
+    id: str
+    name: str
+    group: str = ""
+    baseline: Optional[float] = None
+    points: List[ThroughputPoint] = Field(default_factory=list)
+
+
+class ThroughputHistory(BaseModel):
+    days: int
+    warn_pct: float = 20.0
+    crit_pct: float = 50.0
+    series: List[ThroughputSeries] = Field(default_factory=list)
+
+
 class InstanceTestRequest(BaseModel):
     """Connection-test payload (does not persist anything)."""
 

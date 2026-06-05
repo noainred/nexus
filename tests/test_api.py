@@ -655,6 +655,45 @@ def test_ping_query_colors(tmp_path):
     assert colors.get(10.0) == "ok"
 
 
+def test_throughput_query_colors(tmp_path):
+    from datetime import datetime, timedelta, timezone
+    from app import throughput
+
+    now = datetime.now(timezone.utc)
+    fmt = "%Y-%m-%dT%H:%M:%SZ"
+    f = tmp_path / "throughput.csv"
+    # Each row: ts,id,bytes,ms. With 30MB downloaded, Mbps = 30*8/secs.
+    # secs -> Mbps: 0.24s=1000, 2.4s=100, 4.8s=50, 12s=20, 24s=10.
+    # Lower Mbps is worse. baseline(median of [1000,100,50,20,10]) = 50.
+    nbytes = 30 * 1024 * 1024
+    samples = [
+        (240.0, 1000.0),
+        (2400.0, 100.0),
+        (4800.0, 50.0),
+        (12000.0, 20.0),
+        (24000.0, 10.0),
+    ]
+    rows = [
+        f"{(now - timedelta(hours=i)).strftime(fmt)},a,{nbytes},{ms}"
+        for i, (ms, _mbps) in enumerate(samples)
+    ]
+    f.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+    class S:
+        throughput_file = str(f)
+
+    out = throughput.query(1, {"a": "A"}, settings=S())
+    s = out["series"][0]
+    # Mbps = bytes*8/secs/1e6; 30MiB*8/0.24s/1e6 ≈ 1048.6, median ≈ 52.4.
+    baseline = s["baseline"]
+    assert baseline is not None
+    colors = {p["v"]: p["color"] for p in s["points"]}
+    fastest = max(colors)
+    slowest = min(colors)
+    assert colors[fastest] == "ok"     # well above baseline
+    assert colors[slowest] == "crit"   # far below baseline (>50% drop)
+
+
 @respx.mock
 def test_tasks_list_and_run(http_client):
     respx.get(f"{API}/tasks").mock(

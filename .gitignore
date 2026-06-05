@@ -18,6 +18,7 @@ instances.yaml
 
 # Runtime data
 ping-history.csv
+throughput-history.csv
 
 # Offline deployment artifacts
 wheelhouse/
