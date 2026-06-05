@@ -580,6 +580,9 @@ function setupThroughput() {
   });
   document.getElementById("tp-refresh").addEventListener("click", loadThroughput);
   document.getElementById("tp-run").addEventListener("click", runThroughput);
+  document.getElementById("tp-progress-close").addEventListener("click", () => {
+    document.getElementById("tp-progress-modal").classList.add("hidden");
+  });
   const first = document.querySelector('#tp-range button[data-days="1"]');
   if (first) first.classList.add("active");
 }
@@ -638,18 +641,80 @@ async function loadThroughput() {
 async function runThroughput() {
   const status = document.getElementById("tp-status");
   const btn = document.getElementById("tp-run");
-  const days = state.tpDays || 1;
-  btn.disabled = true;
-  status.textContent = "측정 중… (각 서버를 순차로 내려받으므로 시간이 걸릴 수 있습니다)";
+  // Pre-checks: need a configured Spine + asset, and at least one Leaf.
+  let cfg, lv;
   try {
-    const data = await api(`/api/throughput-run?days=${days}`, { method: "POST" });
-    renderThroughput(data);
-    status.textContent = `측정 완료 · ${new Date().toLocaleString()}`;
+    cfg = await api("/api/throughput-config");
   } catch (e) {
-    status.textContent = `측정 실패: ${e.message}`;
-  } finally {
-    btn.disabled = false;
+    toast(e.message, "err");
+    return;
   }
+  if (!cfg.spine_id || !cfg.path) {
+    toast("서버 설정에서 Spine과 측정 자산을 먼저 지정하세요.", "err");
+    return;
+  }
+  try {
+    lv = await api("/api/throughput-leaves");
+  } catch (e) {
+    toast(e.message, "err");
+    return;
+  }
+  if (!lv.leaves.length) {
+    toast("측정할 Leaf 서버가 없습니다. (모니터링 사용 여부 확인)", "err");
+    return;
+  }
+
+  // Build the progress popup, one row per Leaf (sequential measurement).
+  const body = document.getElementById("tp-progress-body");
+  body.innerHTML = "";
+  const head = el("div", { class: "hint", style: "margin-top:0" },
+    `기준 Spine: ${lv.spine_name || "-"} · 대상 ${lv.leaves.length}개 (순차 측정, 시간이 걸릴 수 있습니다)`);
+  body.append(head);
+  const list = el("div", { class: "tp-test-list" });
+  const rows = {};
+  lv.leaves.forEach((lf) => {
+    const icon = el("span", { class: "tp-test-icon" }, "·");
+    const detail = el("span", { class: "tp-test-detail" }, "대기 중");
+    const row = el("div", { class: "tp-test-row wait" }, [
+      icon, el("span", { class: "tp-test-name" }, lf.name), detail,
+    ]);
+    rows[lf.id] = { row, icon, detail };
+    list.append(row);
+  });
+  body.append(list);
+  document.getElementById("tp-progress-modal").classList.remove("hidden");
+
+  btn.disabled = true;
+  let done = 0, okN = 0;
+  for (const lf of lv.leaves) {
+    const r = rows[lf.id];
+    r.row.className = "tp-test-row run";
+    r.icon.textContent = "⟳";
+    r.detail.textContent = "측정 중…";
+    try {
+      const d = await api(`/api/throughput-run-one?leaf_id=${encodeURIComponent(lf.id)}`, { method: "POST" });
+      if (d.ok) {
+        okN += 1;
+        r.row.className = "tp-test-row ok";
+        r.icon.textContent = "✓";
+        r.detail.textContent = d.mbps != null ? `${d.mbps} Mbps · ${d.detail}` : d.detail;
+      } else {
+        r.row.className = "tp-test-row err";
+        r.icon.textContent = "✗";
+        r.detail.textContent = d.detail;
+      }
+    } catch (e) {
+      r.row.className = "tp-test-row err";
+      r.icon.textContent = "✗";
+      r.detail.textContent = `오류: ${e.message}`;
+    }
+    done += 1;
+    head.textContent = `기준 Spine: ${lv.spine_name || "-"} · 진행 ${done}/${lv.leaves.length} (성공 ${okN})`;
+  }
+  btn.disabled = false;
+  head.textContent = `완료 · 성공 ${okN}/${lv.leaves.length} · ${new Date().toLocaleString()}`;
+  if (status) status.textContent = `측정 완료 · ${new Date().toLocaleString()}`;
+  loadThroughput();  // refresh the charts with the new samples
 }
 
 // ---- topology ------------------------------------------------------------

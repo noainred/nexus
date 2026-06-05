@@ -772,6 +772,24 @@ def test_throughput_test_unknown_spine(http_client):
     assert resp.status_code == 404
 
 
+def test_throughput_leaves(http_client, monkeypatch):
+    monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
+    deps.registry.set_throughput_config("test", "maven-central", "x.jar", "03:00", 30, 20, 50)
+    body = http_client.get("/api/throughput-leaves").json()
+    assert body["spine_id"] == "test"
+    assert body["spine_name"] == "Test Nexus"
+    # The only registered instance is the Spine itself -> no leaves.
+    assert body["leaves"] == []
+
+
+def test_throughput_run_one_rejects_non_leaf(http_client, monkeypatch):
+    monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
+    deps.registry.set_throughput_config("test", "maven-central", "x.jar", "03:00", 30, 20, 50)
+    # leaf_id == spine -> not a leaf, rejected before any network call.
+    resp = http_client.post("/api/throughput-run-one?leaf_id=test")
+    assert resp.status_code == 404
+
+
 @respx.mock
 def test_tasks_list_and_run(http_client):
     respx.get(f"{API}/tasks").mock(

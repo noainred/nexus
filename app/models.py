@@ -145,6 +145,21 @@ class ThroughputDiag(BaseModel):
     name: str
     ok: bool
     detail: str = ""
+    mbps: Optional[float] = None
+
+
+class ThroughputLeaf(BaseModel):
+    id: str
+    name: str
+    group: str = ""
+
+
+class ThroughputLeaves(BaseModel):
+    """The Leaf servers that one '지금 측정' run will measure (in order)."""
+
+    spine_id: str
+    spine_name: str = ""
+    leaves: List[ThroughputLeaf] = Field(default_factory=list)
 
 
 class ThroughputTestResult(BaseModel):

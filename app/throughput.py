@@ -269,6 +269,38 @@ async def test_connectivity(registry, cfg: dict) -> List[dict]:
     return results
 
 
+async def record_one(registry, settings: Settings, cfg: dict, leaf_id: str) -> Optional[dict]:
+    """Measure a single Leaf now, append to CSV, return its diagnostic."""
+    spine_id = cfg.get("spine_id") or ""
+    asset_path = cfg.get("path") or ""
+    spine_repo = cfg.get("spine_repo") or ""
+    if not spine_id or not asset_path:
+        return None
+    by_id = {i.id: i for i in registry.all()}
+    spine = by_id.get(spine_id)
+    leaf = by_id.get(leaf_id)
+    if spine is None or leaf is None or leaf.id == spine_id:
+        return None
+    cap_bytes = max(1, int(cfg.get("size_mb", 30))) * 1024 * 1024
+    out = _path(settings)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime(_TS_FMT)
+    res, detail = await measure(spine, leaf, spine_repo, asset_path, cap_bytes)
+    mbps: Optional[float] = None
+    if res is None:
+        line = f"{ts},{leaf.id},,\n"
+        ok = False
+    else:
+        line = f"{ts},{leaf.id},{res[0]},{res[1]}\n"
+        ok = True
+        secs = res[1] / 1000.0
+        if secs > 0:
+            mbps = round(res[0] * 8 / secs / 1_000_000, 2)
+    with out.open("a", encoding="utf-8") as fh:
+        fh.write(line)
+    return {"id": leaf.id, "name": leaf.name, "ok": ok, "detail": detail, "mbps": mbps}
+
+
 def _prune(settings: Settings) -> None:
     out = _path(settings)
     if not out.exists():

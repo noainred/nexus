@@ -1,7 +1,7 @@
 """Infrastructure ping + Spine→Leaf throughput history endpoints."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import pingmon, throughput
 from ..config import get_settings
@@ -11,7 +11,10 @@ from ..models import (
     ThroughputAsset,
     ThroughputAssets,
     ThroughputConfig,
+    ThroughputDiag,
     ThroughputHistory,
+    ThroughputLeaf,
+    ThroughputLeaves,
     ThroughputTestResult,
 )
 from ..nexus_client import NexusClient, NexusError
@@ -94,6 +97,42 @@ async def run_throughput(
     res = _attach_groups(res, registry)
     res["diagnostics"] = diagnostics
     return ThroughputHistory(**res)
+
+
+@router.get("/throughput-leaves", response_model=ThroughputLeaves)
+async def throughput_leaves(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> ThroughputLeaves:
+    """List the Leaf servers a '지금 측정' run will measure, in order."""
+    cfg = registry.throughput_config()
+    spine_id = cfg.get("spine_id") or ""
+    by_id = {i.id: i for i in registry.all()}
+    spine = by_id.get(spine_id)
+    leaves = [
+        ThroughputLeaf(id=i.id, name=i.name, group=i.group)
+        for i in registry.monitoring()
+        if i.id != spine_id
+    ]
+    return ThroughputLeaves(
+        spine_id=spine_id,
+        spine_name=(spine.name if spine else ""),
+        leaves=leaves,
+    )
+
+
+@router.post("/throughput-run-one", response_model=ThroughputDiag)
+async def run_throughput_one(
+    leaf_id: str = Query(..., description="Leaf instance id to measure now."),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> ThroughputDiag:
+    """Measure a single Leaf now (used by the live progress popup)."""
+    cfg = registry.throughput_config()
+    if not cfg.get("spine_id") or not cfg.get("path"):
+        raise HTTPException(status_code=400, detail="Spine·자산이 설정되지 않았습니다.")
+    diag = await throughput.record_one(registry, get_settings(), cfg, leaf_id)
+    if diag is None:
+        raise HTTPException(status_code=404, detail="측정 대상 Leaf가 아닙니다.")
+    return ThroughputDiag(**diag)
 
 
 @router.post("/throughput-test", response_model=ThroughputTestResult)

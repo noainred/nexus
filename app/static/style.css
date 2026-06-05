@@ -159,6 +159,10 @@ tr:hover td { background: var(--panel); }
 .tp-test-row .tp-test-icon { font-weight: 700; width: 14px; }
 .tp-test-row.ok .tp-test-icon { color: var(--accent); }
 .tp-test-row.err .tp-test-icon { color: var(--red); }
+.tp-test-row.wait .tp-test-icon { color: var(--muted); }
+.tp-test-row.run .tp-test-icon { color: var(--amber); animation: tp-pulse 1s ease-in-out infinite; }
+.tp-test-row.run .tp-test-detail { color: var(--text); }
+@keyframes tp-pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
 .tp-test-row .tp-test-name { font-weight: 600; min-width: 130px; }
 .tp-test-row .tp-test-detail { color: var(--muted); }
 .infra-svg .axis { stroke: var(--border); stroke-width: 1; }
