@@ -38,6 +38,7 @@ class InstanceRegistry:
         self._throughput_size_mb: int = document.throughput_size_mb
         self._throughput_warn_pct: float = document.throughput_warn_pct
         self._throughput_crit_pct: float = document.throughput_crit_pct
+        self._throughput_targets: List[str] = list(document.throughput_targets)
 
     def compare_fields(self) -> List[str]:
         return list(self._compare_fields)
@@ -72,7 +73,13 @@ class InstanceRegistry:
             "size_mb": self._throughput_size_mb,
             "warn_pct": self._throughput_warn_pct,
             "crit_pct": self._throughput_crit_pct,
+            "targets": list(self._throughput_targets),
         }
+
+    def set_throughput_targets(self, targets: List[str]) -> None:
+        valid = {i.id for i in self._instances.values()}
+        self._throughput_targets = [t for t in targets if t in valid]
+        self._persist()
 
     def set_throughput_config(
         self,
@@ -197,6 +204,7 @@ class InstanceRegistry:
         self._throughput_size_mb = doc.throughput_size_mb
         self._throughput_warn_pct = doc.throughput_warn_pct
         self._throughput_crit_pct = doc.throughput_crit_pct
+        self._throughput_targets = list(doc.throughput_targets)
 
 
 # Singleton registry, initialised at import time from the configured file.

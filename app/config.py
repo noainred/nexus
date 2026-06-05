@@ -88,6 +88,7 @@ class InstancesDocument(BaseModel):
     throughput_size_mb: int = 30
     throughput_warn_pct: float = 20.0
     throughput_crit_pct: float = 50.0
+    throughput_targets: List[str] = Field(default_factory=list)
 
 
 @lru_cache
@@ -176,6 +177,7 @@ def instances_to_dict(
         data["throughput_size_mb"] = throughput.get("size_mb", 30)
         data["throughput_warn_pct"] = throughput.get("warn_pct", 20.0)
         data["throughput_crit_pct"] = throughput.get("crit_pct", 50.0)
+        data["throughput_targets"] = list(throughput.get("targets", []))
     return data
 
 

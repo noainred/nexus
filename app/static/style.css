@@ -165,6 +165,8 @@ tr:hover td { background: var(--panel); }
 @keyframes tp-pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
 .tp-test-row .tp-test-name { font-weight: 600; min-width: 130px; }
 .tp-test-row .tp-test-detail { color: var(--muted); }
+.tp-test-row .tp-target-pick { width: 18px; display: inline-flex; }
+.tp-test-row .tp-target-pick input { cursor: pointer; }
 .infra-svg .axis { stroke: var(--border); stroke-width: 1; }
 .infra-svg .baseline { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 5 4; }
 .infra-svg .infra-line { stroke: var(--border); stroke-width: 1.2; }

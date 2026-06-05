@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.11",
+        "date": "2026-06-05",
+        "changes": [
+            {"type": "added", "text": "Spine 연결 테스트 결과에서 측정할 서버를 체크해 '측정 대상으로 저장' — 이후 '지금 측정'과 자동 측정이 선택한 서버만 실행(instances.yaml 저장)"},
+        ],
+    },
+    {
         "version": "0.8.10",
         "date": "2026-06-05",
         "changes": [

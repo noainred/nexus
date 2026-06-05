@@ -2008,6 +2008,7 @@ async function loadThroughputConfig() {
       insts.map((i) => `<option value="${i.id}">${i.name}</option>`).join("");
     spine.value = c.spine_id || "";
   }
+  state.tpTargets = c.targets || [];
   form.spine_repo.value = c.spine_repo || "";
   form.path.value = c.path || "";
   form.time.value = c.time || "03:00";
@@ -2041,19 +2042,57 @@ async function testThroughputConnection() {
       box.append(el("div", { class: "hint" }, "점검할 Leaf 서버가 없습니다."));
       return;
     }
+    const saved = state.tpTargets || [];
+    const hasSaved = saved.length > 0;
+    box.append(el("div", { class: "hint", style: "margin:6px 0 2px" },
+      "측정할 서버를 선택한 뒤 '측정 대상으로 저장'을 누르면, 이후 측정은 선택한 서버만 실행합니다."));
     const list = el("div", { class: "tp-test-list" });
     r.results.forEach((d) => {
-      list.append(
-        el("div", { class: `tp-test-row ${d.ok ? "ok" : "err"}` }, [
-          el("span", { class: "tp-test-icon" }, d.ok ? "✓" : "✗"),
-          el("span", { class: "tp-test-name" }, d.name),
-          el("span", { class: "tp-test-detail" }, d.detail),
-        ])
-      );
+      const isSpine = d.id === spineId;
+      const cells = [
+        el("span", { class: "tp-test-icon" }, d.ok ? "✓" : "✗"),
+        el("span", { class: "tp-test-name" }, d.name),
+        el("span", { class: "tp-test-detail" }, d.detail),
+      ];
+      if (!isSpine) {
+        // Default: saved targets if any, otherwise pre-check the OK ones.
+        const checked = hasSaved ? saved.includes(d.id) : d.ok;
+        const cb = el("input", { type: "checkbox", class: "tp-target-cb" });
+        cb.dataset.id = d.id;
+        if (checked) cb.checked = true;
+        cells.unshift(el("label", { class: "tp-target-pick" }, [cb]));
+      } else {
+        cells.unshift(el("span", { class: "tp-target-pick" }));  // align
+      }
+      list.append(el("div", { class: `tp-test-row ${d.ok ? "ok" : "err"}` }, cells));
     });
     box.append(list);
+    const actions = el("div", { class: "form-actions", style: "justify-content:flex-start;margin-top:8px" }, [
+      el("button", { type: "button", id: "tp-save-targets" }, "측정 대상으로 저장"),
+      el("span", { id: "tp-save-targets-status", class: "hint", style: "margin:0" }),
+    ]);
+    box.append(actions);
+    document.getElementById("tp-save-targets").addEventListener("click", saveThroughputTargets);
   } catch (e) {
     status.textContent = `점검 실패: ${e.message}`;
+  }
+}
+
+async function saveThroughputTargets() {
+  const ids = [...document.querySelectorAll(".tp-target-cb:checked")].map((c) => c.dataset.id);
+  const st = document.getElementById("tp-save-targets-status");
+  try {
+    const r = await api("/api/throughput-targets", {
+      method: "PUT",
+      body: JSON.stringify({ targets: ids }),
+    });
+    state.tpTargets = r.targets || [];
+    st.textContent = ids.length
+      ? `저장됨 · 측정 대상 ${ids.length}개`
+      : "저장됨 · 전체 서버 측정(선택 없음)";
+    toast("측정 대상 저장됨");
+  } catch (e) {
+    st.textContent = `저장 실패: ${e.message}`;
   }
 }
 

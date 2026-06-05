@@ -15,6 +15,7 @@ from ..models import (
     ThroughputHistory,
     ThroughputLeaf,
     ThroughputLeaves,
+    ThroughputTargets,
     ThroughputTestResult,
 )
 from ..nexus_client import NexusClient, NexusError
@@ -110,14 +111,29 @@ async def throughput_leaves(
     spine = by_id.get(spine_id)
     leaves = [
         ThroughputLeaf(id=i.id, name=i.name, group=i.group)
-        for i in registry.monitoring()
-        if i.id != spine_id
+        for i in throughput.select_leaves(registry, cfg)
     ]
     return ThroughputLeaves(
         spine_id=spine_id,
         spine_name=(spine.name if spine else ""),
         leaves=leaves,
     )
+
+
+@router.get("/throughput-targets", response_model=ThroughputTargets)
+async def get_throughput_targets(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> ThroughputTargets:
+    return ThroughputTargets(targets=registry.throughput_config().get("targets", []))
+
+
+@router.put("/throughput-targets", response_model=ThroughputTargets)
+async def set_throughput_targets(
+    body: ThroughputTargets,
+    registry: InstanceRegistry = Depends(get_registry),
+) -> ThroughputTargets:
+    registry.set_throughput_targets(body.targets)
+    return ThroughputTargets(targets=registry.throughput_config().get("targets", []))
 
 
 @router.post("/throughput-run-one", response_model=ThroughputDiag)

@@ -782,6 +782,15 @@ def test_throughput_leaves(http_client, monkeypatch):
     assert body["leaves"] == []
 
 
+def test_throughput_targets_roundtrip(http_client, monkeypatch):
+    monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
+    r = http_client.put("/api/throughput-targets", json={"targets": ["test", "bogus"]})
+    assert r.status_code == 200
+    # Unknown ids are filtered out; only registered instances remain.
+    assert r.json()["targets"] == ["test"]
+    assert deps.registry.throughput_config()["targets"] == ["test"]
+
+
 def test_throughput_run_one_rejects_non_leaf(http_client, monkeypatch):
     monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
     deps.registry.set_throughput_config("test", "maven-central", "x.jar", "03:00", 30, 20, 50)

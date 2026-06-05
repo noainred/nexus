@@ -151,6 +151,16 @@ async def measure(
     return (miss_bytes, round(spine_ms, 1)), detail
 
 
+def select_leaves(registry, cfg: dict) -> list:
+    """Leaves to measure: monitored, non-Spine, restricted to targets if set."""
+    spine_id = cfg.get("spine_id") or ""
+    targets = set(cfg.get("targets") or [])
+    leafs = [i for i in registry.monitoring() if i.id != spine_id]
+    if targets:
+        leafs = [i for i in leafs if i.id in targets]
+    return leafs
+
+
 async def record_once(registry, settings: Settings, cfg: dict) -> List[dict]:
     """Run one Spine→Leaf measurement round. Returns per-leaf diagnostics."""
     spine_id = cfg.get("spine_id") or ""
@@ -162,7 +172,7 @@ async def record_once(registry, settings: Settings, cfg: dict) -> List[dict]:
     spine = by_id.get(spine_id)
     if spine is None:
         return []
-    leafs = [i for i in registry.monitoring() if i.id != spine_id]
+    leafs = select_leaves(registry, cfg)
     if not leafs:
         return []
     cap_bytes = max(1, int(cfg.get("size_mb", 30))) * 1024 * 1024

@@ -105,6 +105,13 @@ class ThroughputConfig(BaseModel):
     size_mb: int = 30
     warn_pct: float = 20.0
     crit_pct: float = 50.0
+    targets: List[str] = Field(default_factory=list)
+
+
+class ThroughputTargets(BaseModel):
+    """Leaf ids selected for measurement (empty = all monitored leaves)."""
+
+    targets: List[str] = Field(default_factory=list)
 
 
 class ThroughputAsset(BaseModel):
