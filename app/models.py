@@ -138,11 +138,21 @@ class ThroughputSeries(BaseModel):
     points: List[ThroughputPoint] = Field(default_factory=list)
 
 
+class ThroughputDiag(BaseModel):
+    """Per-leaf outcome of one measurement round (for the UI to explain gaps)."""
+
+    id: str
+    name: str
+    ok: bool
+    detail: str = ""
+
+
 class ThroughputHistory(BaseModel):
     days: int
     warn_pct: float = 20.0
     crit_pct: float = 50.0
     series: List[ThroughputSeries] = Field(default_factory=list)
+    diagnostics: List[ThroughputDiag] = Field(default_factory=list)
 
 
 class InstanceTestRequest(BaseModel):

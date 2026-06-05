@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.8",
+        "date": "2026-06-05",
+        "changes": [
+            {"type": "added", "text": "네트워크 속도: 측정 실패한 Leaf에 사유 표시 (프록시 못 찾음/HTTP 404·401/연결 오류 등) — '지금 측정' 결과에 서버별 진단 포함"},
+        ],
+    },
+    {
         "version": "0.8.7",
         "date": "2026-06-05",
         "changes": [

@@ -85,11 +85,14 @@ async def run_throughput(
 ) -> ThroughputHistory:
     """Run one Spine→Leaf measurement now, then return refreshed history."""
     cfg = registry.throughput_config()
+    diagnostics: list = []
     if cfg.get("spine_id") and cfg.get("path"):
-        await throughput.record_once(registry, get_settings(), cfg)
+        diagnostics = await throughput.record_once(registry, get_settings(), cfg)
     names = {i.id: i.name for i in registry.all()}
     res = throughput.query(days, names, cfg["warn_pct"], cfg["crit_pct"])
-    return ThroughputHistory(**_attach_groups(res, registry))
+    res = _attach_groups(res, registry)
+    res["diagnostics"] = diagnostics
+    return ThroughputHistory(**res)
 
 
 @router.get("/throughput-assets", response_model=ThroughputAssets)

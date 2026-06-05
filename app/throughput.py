@@ -83,7 +83,8 @@ async def _find_proxy_repo(leaf, spine, spine_repo: str) -> Optional[str]:
     return host_match
 
 
-async def _timed_get(inst, url: str, cap_bytes: int) -> Optional[Tuple[int, float]]:
+async def _timed_get(inst, url: str, cap_bytes: int) -> Tuple[Optional[Tuple[int, float]], str]:
+    """Timed full GET. Returns ((bytes, ms), "") or (None, reason)."""
     verify = True if inst.verify_tls is None else inst.verify_tls
     total = 0
     start = time.perf_counter()
@@ -96,17 +97,17 @@ async def _timed_get(inst, url: str, cap_bytes: int) -> Optional[Tuple[int, floa
         ) as client:
             async with client.stream("GET", url) as resp:
                 if resp.status_code >= 400:
-                    return None
+                    return None, f"HTTP {resp.status_code}"
                 async for chunk in resp.aiter_bytes():
                     total += len(chunk)
                     if cap_bytes and total >= cap_bytes:
                         break
-    except httpx.HTTPError:
-        return None
+    except httpx.HTTPError as exc:
+        return None, f"연결 오류: {type(exc).__name__}"
     elapsed = (time.perf_counter() - start) * 1000
     if total <= 0 or elapsed <= 0:
-        return None
-    return total, elapsed
+        return None, "빈 응답"
+    return (total, elapsed), ""
 
 
 async def _delete_cached(inst, url: str) -> None:
@@ -126,52 +127,62 @@ async def _delete_cached(inst, url: str) -> None:
 
 async def measure(
     spine, leaf, spine_repo: str, asset_path: str, cap_bytes: int
-) -> Optional[Tuple[int, float]]:
-    """Measure the isolated Spine→Leaf transfer time for ``asset_path``."""
+) -> Tuple[Optional[Tuple[int, float]], str]:
+    """Measure the isolated Spine→Leaf transfer time for ``asset_path``.
+
+    Returns ((bytes, ms), detail) on success, or (None, reason) on failure.
+    """
     repo = await _find_proxy_repo(leaf, spine, spine_repo)
     if not repo:
-        return None
+        return None, "Spine을 가리키는 프록시 저장소를 찾지 못함 (다단 프록시 구조일 수 있음)"
     url = leaf.base_url.rstrip("/") + f"/repository/{repo}/" + asset_path.lstrip("/")
     await _delete_cached(leaf, url)            # force cache miss
-    miss = await _timed_get(leaf, url, cap_bytes)
+    miss, derr = await _timed_get(leaf, url, cap_bytes)
     if miss is None:
-        return None
-    hit = await _timed_get(leaf, url, cap_bytes)
+        return None, f"자산 다운로드 실패: {derr} (프록시 {repo}/{asset_path.lstrip('/')})"
+    hit, _ = await _timed_get(leaf, url, cap_bytes)
     miss_bytes, miss_ms = miss
     hit_ms = hit[1] if hit else 0.0
     spine_ms = miss_ms - hit_ms
     floor = max(miss_ms * 0.1, 1.0)            # guard against noise/streaming
     if spine_ms < floor:
         spine_ms = floor
-    return miss_bytes, round(spine_ms, 1)
+    detail = f"성공 · {repo} · miss {round(miss_ms)}ms / hit {round(hit_ms)}ms"
+    return (miss_bytes, round(spine_ms, 1)), detail
 
 
-async def record_once(registry, settings: Settings, cfg: dict) -> None:
+async def record_once(registry, settings: Settings, cfg: dict) -> List[dict]:
+    """Run one Spine→Leaf measurement round. Returns per-leaf diagnostics."""
     spine_id = cfg.get("spine_id") or ""
     asset_path = cfg.get("path") or ""
     spine_repo = cfg.get("spine_repo") or ""
     if not spine_id or not asset_path:
-        return
+        return []
     by_id = {i.id: i for i in registry.all()}
     spine = by_id.get(spine_id)
     if spine is None:
-        return
+        return []
     leafs = [i for i in registry.monitoring() if i.id != spine_id]
     if not leafs:
-        return
+        return []
     cap_bytes = max(1, int(cfg.get("size_mb", 30))) * 1024 * 1024
     out = _path(settings)
     out.parent.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime(_TS_FMT)
+    diagnostics: List[dict] = []
     # Sequential so the Spine→Leaf pulls don't contend with each other.
     for leaf in leafs:
-        res = await measure(spine, leaf, spine_repo, asset_path, cap_bytes)
+        res, detail = await measure(spine, leaf, spine_repo, asset_path, cap_bytes)
         if res is None:
             line = f"{ts},{leaf.id},,\n"
+            ok = False
         else:
             line = f"{ts},{leaf.id},{res[0]},{res[1]}\n"
+            ok = True
         with out.open("a", encoding="utf-8") as fh:
             fh.write(line)
+        diagnostics.append({"id": leaf.id, "name": leaf.name, "ok": ok, "detail": detail})
+    return diagnostics
 
 
 def _prune(settings: Settings) -> None:

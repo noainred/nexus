@@ -492,12 +492,15 @@ async function loadInfra() {
 function renderInfraChart(s, opts = {}) {
   const unit = opts.unit || "ms";
   const wrap = el("div", { class: "infra-chart" });
+  const headNote =
+    s.baseline != null ? `평소(중앙값) ${s.baseline} ${unit}` : (s.detail ? "측정 실패" : "데이터 없음");
   wrap.append(el("div", { class: "infra-chart-head" }, [
     el("span", { class: "infra-name" }, s.name),
-    el("span", { class: "url" }, s.baseline != null ? `평소(중앙값) ${s.baseline} ${unit}` : "데이터 없음"),
+    el("span", { class: "url" }, headNote),
   ]));
   if (!s.points.length) {
-    wrap.append(el("div", { class: "empty" }, "측정 데이터가 아직 없습니다."));
+    const msg = s.detail || "측정 데이터가 아직 없습니다.";
+    wrap.append(el("div", { class: s.detail ? "empty site-error" : "empty" }, msg));
     return wrap;
   }
   const W = 520, H = 200, padL = 44, padR = 10, padT = 12, padB = 26;
@@ -587,9 +590,17 @@ function renderThroughput(data) {
   const cl = document.getElementById("tp-crit-label");
   if (wl) wl.textContent = `-${data.warn_pct}% 이하`;
   if (cl) cl.textContent = `-${data.crit_pct}% 이하`;
+  // Carry the latest run's per-leaf failure reasons onto the series cards.
+  if (data.diagnostics && data.diagnostics.length) state.tpDiag = data.diagnostics;
+  const diagById = {};
+  (state.tpDiag || []).forEach((d) => { diagById[d.id] = d; });
+  data.series.forEach((s) => {
+    const d = diagById[s.id];
+    if (d && !d.ok) s.detail = d.detail;
+  });
   container.innerHTML = "";
   if (!data.series.length) {
-    container.append(el("div", { class: "empty" }, "측정 데이터가 아직 없습니다. 서버 설정에서 자산 경로를 지정하고 '지금 측정'을 눌러보세요."));
+    container.append(el("div", { class: "empty" }, "측정 데이터가 아직 없습니다. 서버 설정에서 Spine·자산을 지정하고 '지금 측정'을 눌러보세요."));
     return;
   }
   const order = state.groupOrder || [];
