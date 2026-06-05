@@ -1917,15 +1917,57 @@ async function loadPingConfig() {
 async function loadThroughputConfig() {
   const form = document.getElementById("tp-form");
   if (!form) return;
+  let c = {};
   try {
-    const c = await api("/api/throughput-config");
-    form.path.value = c.path;
-    form.time.value = c.time;
-    form.size_mb.value = c.size_mb;
-    form.warn_pct.value = c.warn_pct;
-    form.crit_pct.value = c.crit_pct;
+    c = await api("/api/throughput-config");
   } catch (e) {
     /* non-fatal */
+  }
+  // Populate the Spine dropdown from the known instances.
+  const spine = document.getElementById("tp-spine");
+  if (spine) {
+    const insts = [...(state.instances || [])].sort(byName);
+    spine.innerHTML =
+      '<option value="">— Spine 서버 선택 —</option>' +
+      insts.map((i) => `<option value="${i.id}">${i.name}</option>`).join("");
+    spine.value = c.spine_id || "";
+  }
+  form.spine_repo.value = c.spine_repo || "";
+  form.path.value = c.path || "";
+  form.time.value = c.time || "03:00";
+  form.size_mb.value = c.size_mb != null ? c.size_mb : 30;
+  form.warn_pct.value = c.warn_pct != null ? c.warn_pct : 20;
+  form.crit_pct.value = c.crit_pct != null ? c.crit_pct : 50;
+}
+
+async function findThroughputAssets() {
+  const spineId = document.getElementById("tp-spine").value;
+  const status = document.getElementById("tp-find-status");
+  const sel = document.getElementById("tp-asset");
+  if (!spineId) {
+    toast("먼저 Spine 서버를 선택하세요.", "err");
+    return;
+  }
+  status.textContent = "Spine에서 30~50MB 파일을 찾는 중…";
+  try {
+    const r = await api(`/api/throughput-assets?spine_id=${encodeURIComponent(spineId)}&min_mb=30&max_mb=50`);
+    if (!r.assets.length) {
+      sel.innerHTML = '<option value="">— 후보 없음 (저장소를 더 스캔하거나 직접 입력) —</option>';
+      status.textContent = `후보 없음 (저장소 ${r.scanned_repositories}개 스캔). 경로를 직접 입력하세요.`;
+      return;
+    }
+    sel.innerHTML =
+      '<option value="">— 측정에 쓸 파일 선택 —</option>' +
+      r.assets
+        .map(
+          (a, idx) =>
+            `<option value="${idx}" data-repo="${a.repository}" data-path="${a.path.replace(/"/g, "&quot;")}">` +
+            `${a.repository} · ${a.path.split("/").pop()} (${fmtBytes(a.size_bytes)})</option>`
+        )
+        .join("");
+    status.textContent = `후보 ${r.assets.length}개${r.truncated ? "+" : ""} (저장소 ${r.scanned_repositories}개 스캔). 하나를 고르면 저장소·경로가 자동 입력됩니다.`;
+  } catch (e) {
+    status.textContent = `검색 실패: ${e.message}`;
   }
 }
 
@@ -2011,6 +2053,8 @@ function setupSettings() {
       await api("/api/throughput-config", {
         method: "PUT",
         body: JSON.stringify({
+          spine_id: String(fd.get("spine_id") || "").trim(),
+          spine_repo: String(fd.get("spine_repo") || "").trim(),
           path: String(fd.get("path") || "").trim(),
           time: String(fd.get("time") || "03:00").trim(),
           size_mb: Number(fd.get("size_mb")),
@@ -2022,6 +2066,14 @@ function setupSettings() {
       loadThroughputConfig();
     } catch (e) {
       toast(e.message, "err");
+    }
+  });
+  document.getElementById("tp-find-assets").addEventListener("click", findThroughputAssets);
+  document.getElementById("tp-asset").addEventListener("change", (ev) => {
+    const opt = ev.target.selectedOptions[0];
+    if (opt && opt.dataset.repo) {
+      document.getElementById("tp-spine-repo").value = opt.dataset.repo;
+      document.getElementById("tp-path").value = opt.dataset.path;
     }
   });
   // "새 서버 추가" button reveals the form (add mode); 취소 hides it.

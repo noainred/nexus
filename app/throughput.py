@@ -1,12 +1,21 @@
-"""Network throughput monitoring.
+"""Spine→Leaf network throughput monitoring.
 
-Only port 8081 is open, so throughput is measured by downloading a common
-Nexus asset over HTTP and timing it. A Range request fetches just the first
-N MB so every sample is the same size regardless of the file. Servers are
-measured sequentially so concurrent downloads don't skew each other.
+Only port 8081 is open and there is no agent on the servers, so a direct
+server-to-server copy cannot be triggered from the manager. Instead we use
+the existing Nexus proxy topology: every Leaf has a proxy repository whose
+remote is the Spine. Requesting an *uncached* asset on a Leaf makes the Leaf
+pull it from the Spine over the real (often cross-continent) link — that pull
+is the Spine→Leaf transfer we want to time.
 
-Stored/charted like ping history, but lower throughput is worse: a point is
-coloured warn/crit when it drops >=warn%/>=crit% BELOW the window median.
+For each Leaf we:
+  1. find its proxy repo pointing at the Spine (host + repo match),
+  2. DELETE the cached asset on the Leaf to force a cache miss,
+  3. time a full GET (t_miss = Spine→Leaf + Leaf→manager),
+  4. time a second GET (t_hit ≈ Leaf→manager, now cached),
+  5. take t_miss − t_hit as the isolated Spine→Leaf time (clamped).
+
+Stored/charted like ping history, but lower throughput (Mbps) is worse: a
+point is coloured warn/crit when it drops >=warn%/>=crit% BELOW the median.
 """
 from __future__ import annotations
 
@@ -16,15 +25,18 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 import httpx
 
 from .config import Settings, get_settings
+from .nexus_client import NexusClient, NexusError
 
 _TS_FMT = "%Y-%m-%dT%H:%M:%SZ"
 _BUCKETS = 200
 _RETENTION_DAYS = 366
-_DL_TIMEOUT = 120.0
+_DL_TIMEOUT = 300.0
+_DEL_TIMEOUT = 30.0
 
 
 def _path(settings: Settings) -> Path:
@@ -34,48 +46,130 @@ def _path(settings: Settings) -> Path:
     return p
 
 
-async def measure(instance, url_path: str, size_bytes: int) -> Optional[Tuple[int, float]]:
-    """Download up to ``size_bytes`` of an asset; return (bytes, elapsed_ms)."""
-    url = instance.base_url.rstrip("/") + "/" + url_path.lstrip("/")
-    verify = True if instance.verify_tls is None else instance.verify_tls
-    headers = {"Range": f"bytes=0-{size_bytes - 1}"}
+def _host_key(url: str) -> Tuple[str, Optional[int]]:
+    parsed = urlparse(url if "://" in url else f"http://{url}")
+    return (parsed.hostname or "").lower(), parsed.port
+
+
+def _repo_segment(url: str) -> str:
+    """Extract the repository name from a remote URL like .../repository/<name>/."""
+    parts = [p for p in urlparse(url).path.split("/") if p]
+    if "repository" in parts:
+        i = parts.index("repository")
+        if i + 1 < len(parts):
+            return parts[i + 1]
+    return ""
+
+
+async def _find_proxy_repo(leaf, spine, spine_repo: str) -> Optional[str]:
+    """Return the Leaf proxy repo whose remote points at the Spine (+repo)."""
+    client = NexusClient(leaf, timeout=get_settings().request_timeout)
+    try:
+        repos = await client.list_repositories()
+    except NexusError:
+        return None
+    skey = _host_key(spine.base_url)
+    host_match: Optional[str] = None
+    for r in repos:
+        attrs = r.attributes if isinstance(r.attributes, dict) else {}
+        proxy = attrs.get("proxy") if isinstance(attrs, dict) else None
+        remote = proxy.get("remoteUrl") if isinstance(proxy, dict) else None
+        if not remote or _host_key(remote) != skey:
+            continue
+        if spine_repo and _repo_segment(remote) == spine_repo:
+            return r.name  # exact host+repo match — best
+        if host_match is None:
+            host_match = r.name
+    return host_match
+
+
+async def _timed_get(inst, url: str, cap_bytes: int) -> Optional[Tuple[int, float]]:
+    verify = True if inst.verify_tls is None else inst.verify_tls
     total = 0
     start = time.perf_counter()
     try:
         async with httpx.AsyncClient(
             timeout=_DL_TIMEOUT,
             verify=verify,
-            auth=(instance.username, instance.password),
+            auth=(inst.username, inst.password),
+            follow_redirects=True,
         ) as client:
-            async with client.stream("GET", url, headers=headers) as resp:
+            async with client.stream("GET", url) as resp:
                 if resp.status_code >= 400:
                     return None
                 async for chunk in resp.aiter_bytes():
                     total += len(chunk)
-                    if total >= size_bytes:
+                    if cap_bytes and total >= cap_bytes:
                         break
     except httpx.HTTPError:
         return None
     elapsed = (time.perf_counter() - start) * 1000
     if total <= 0 or elapsed <= 0:
         return None
-    return total, round(elapsed, 1)
+    return total, elapsed
 
 
-async def record_once(registry, settings: Settings, path: str, size_bytes: int) -> None:
-    instances = registry.monitoring()
-    if not instances or not path:
+async def _delete_cached(inst, url: str) -> None:
+    """Best-effort delete of a cached asset on a proxy (forces a re-fetch)."""
+    verify = True if inst.verify_tls is None else inst.verify_tls
+    try:
+        async with httpx.AsyncClient(
+            timeout=_DEL_TIMEOUT,
+            verify=verify,
+            auth=(inst.username, inst.password),
+            follow_redirects=True,
+        ) as client:
+            await client.delete(url)
+    except httpx.HTTPError:
+        pass
+
+
+async def measure(
+    spine, leaf, spine_repo: str, asset_path: str, cap_bytes: int
+) -> Optional[Tuple[int, float]]:
+    """Measure the isolated Spine→Leaf transfer time for ``asset_path``."""
+    repo = await _find_proxy_repo(leaf, spine, spine_repo)
+    if not repo:
+        return None
+    url = leaf.base_url.rstrip("/") + f"/repository/{repo}/" + asset_path.lstrip("/")
+    await _delete_cached(leaf, url)            # force cache miss
+    miss = await _timed_get(leaf, url, cap_bytes)
+    if miss is None:
+        return None
+    hit = await _timed_get(leaf, url, cap_bytes)
+    miss_bytes, miss_ms = miss
+    hit_ms = hit[1] if hit else 0.0
+    spine_ms = miss_ms - hit_ms
+    floor = max(miss_ms * 0.1, 1.0)            # guard against noise/streaming
+    if spine_ms < floor:
+        spine_ms = floor
+    return miss_bytes, round(spine_ms, 1)
+
+
+async def record_once(registry, settings: Settings, cfg: dict) -> None:
+    spine_id = cfg.get("spine_id") or ""
+    asset_path = cfg.get("path") or ""
+    spine_repo = cfg.get("spine_repo") or ""
+    if not spine_id or not asset_path:
         return
+    by_id = {i.id: i for i in registry.all()}
+    spine = by_id.get(spine_id)
+    if spine is None:
+        return
+    leafs = [i for i in registry.monitoring() if i.id != spine_id]
+    if not leafs:
+        return
+    cap_bytes = max(1, int(cfg.get("size_mb", 30))) * 1024 * 1024
     out = _path(settings)
     out.parent.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime(_TS_FMT)
-    # Sequential so downloads don't share/contend bandwidth.
-    for inst in instances:
-        res = await measure(inst, path, size_bytes)
+    # Sequential so the Spine→Leaf pulls don't contend with each other.
+    for leaf in leafs:
+        res = await measure(spine, leaf, spine_repo, asset_path, cap_bytes)
         if res is None:
-            line = f"{ts},{inst.id},,\n"
+            line = f"{ts},{leaf.id},,\n"
         else:
-            line = f"{ts},{inst.id},{res[0]},{res[1]}\n"
+            line = f"{ts},{leaf.id},{res[0]},{res[1]}\n"
         with out.open("a", encoding="utf-8") as fh:
             fh.write(line)
 
@@ -165,14 +259,14 @@ def query(
 
 
 async def run_loop() -> None:
-    """Daily scheduled throughput test at the configured HH:MM (local time)."""
+    """Daily scheduled Spine→Leaf test at the configured HH:MM (local time)."""
     from .deps import registry
 
     last_date: Optional[str] = None
     while True:
         try:
             cfg = registry.throughput_config()
-            if cfg["path"] and cfg["time"]:
+            if cfg.get("spine_id") and cfg.get("path") and cfg.get("time"):
                 now = datetime.now()
                 try:
                     hh, mm = (int(x) for x in cfg["time"].split(":"))
@@ -181,8 +275,7 @@ async def run_loop() -> None:
                 today = now.date().isoformat()
                 if now.hour == hh and now.minute == mm and last_date != today:
                     last_date = today
-                    size = max(1, int(cfg["size_mb"])) * 1024 * 1024
-                    await record_once(registry, get_settings(), cfg["path"], size)
+                    await record_once(registry, get_settings(), cfg)
                     _prune(get_settings())
         except Exception:  # pragma: no cover - defensive
             pass

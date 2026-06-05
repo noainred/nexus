@@ -81,6 +81,8 @@ class InstancesDocument(BaseModel):
     ping_interval: float = 60.0
     ping_warn_pct: float = 20.0
     ping_crit_pct: float = 50.0
+    throughput_spine_id: str = ""
+    throughput_spine_repo: str = ""
     throughput_path: str = ""
     throughput_time: str = "03:00"
     throughput_size_mb: int = 30
@@ -167,6 +169,8 @@ def instances_to_dict(
         data["ping_warn_pct"] = ping.get("warn_pct", 20.0)
         data["ping_crit_pct"] = ping.get("crit_pct", 50.0)
     if throughput:
+        data["throughput_spine_id"] = throughput.get("spine_id", "")
+        data["throughput_spine_repo"] = throughput.get("spine_repo", "")
         data["throughput_path"] = throughput.get("path", "")
         data["throughput_time"] = throughput.get("time", "03:00")
         data["throughput_size_mb"] = throughput.get("size_mb", 30)

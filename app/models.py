@@ -90,17 +90,39 @@ class PingHistory(BaseModel):
 
 
 class ThroughputConfig(BaseModel):
-    """Network throughput test settings.
+    """Spine→Leaf network throughput test settings.
 
-    ``path`` is the asset path (relative to each instance base URL) downloaded
-    over port 8081 to measure speed; ``time`` is the daily HH:MM run time.
+    The Spine instance hosts a common asset; each Leaf proxies the Spine, so
+    requesting the asset on a Leaf (after a cache invalidation) pulls it from
+    the Spine over the real link. ``spine_repo`` + ``path`` identify the asset
+    on the Spine; ``time`` is the daily HH:MM run time.
     """
 
+    spine_id: str = ""
+    spine_repo: str = ""
     path: str = ""
     time: str = "03:00"
     size_mb: int = 30
     warn_pct: float = 20.0
     crit_pct: float = 50.0
+
+
+class ThroughputAsset(BaseModel):
+    """A candidate asset on the Spine that can be used for the speed test."""
+
+    repository: str
+    path: str
+    size_bytes: int
+    format: Optional[str] = None
+
+
+class ThroughputAssets(BaseModel):
+    spine_id: str
+    min_mb: float
+    max_mb: float
+    assets: List[ThroughputAsset] = Field(default_factory=list)
+    scanned_repositories: int = 0
+    truncated: bool = False
 
 
 class ThroughputPoint(BaseModel):

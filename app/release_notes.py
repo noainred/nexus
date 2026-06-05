@@ -7,6 +7,15 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.6",
+        "date": "2026-06-05",
+        "changes": [
+            {"type": "changed", "text": "네트워크 속도를 Spine→Leaf 방식으로 재구성 — Spine 1대를 기준으로, 각 Leaf 프록시가 Spine에서 자산을 끌어오는 시간(캐시미스−캐시히트 차분)으로 순수 Spine→Leaf 전송 속도 측정"},
+            {"type": "added", "text": "서버 설정에서 Spine 서버를 고르면 Spine의 30~50MB 파일을 자동 탐색해 목록에서 선택(저장소·경로 자동 입력)"},
+            {"type": "changed", "text": "측정 시 Leaf 캐시 자산을 삭제해 매번 강제 재전송(반복 측정 정확도 확보)"},
+        ],
+    },
+    {
         "version": "0.8.5",
         "date": "2026-06-05",
         "changes": [

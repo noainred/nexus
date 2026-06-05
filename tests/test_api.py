@@ -694,6 +694,64 @@ def test_throughput_query_colors(tmp_path):
     assert colors[slowest] == "crit"   # far below baseline (>50% drop)
 
 
+def test_throughput_config_roundtrip(http_client, monkeypatch):
+    monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
+    r = http_client.put(
+        "/api/throughput-config",
+        json={
+            "spine_id": "test",
+            "spine_repo": "maven-central",
+            "path": "org/foo/bar.jar",
+            "time": "02:30",
+            "size_mb": 40,
+            "warn_pct": 25,
+            "crit_pct": 10,
+        },
+    )
+    assert r.status_code == 200
+    cfg = r.json()
+    assert cfg["spine_id"] == "test"
+    assert cfg["spine_repo"] == "maven-central"
+    assert cfg["path"] == "org/foo/bar.jar"
+    assert cfg["size_mb"] == 40
+    assert cfg["crit_pct"] == 25.0          # raised to >= warn
+    assert deps.registry.throughput_config()["spine_id"] == "test"
+
+
+@respx.mock
+def test_throughput_assets_filters_by_size(http_client):
+    respx.get(f"{API}/repositories").mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {"name": "maven-central", "format": "maven2", "type": "hosted"},
+                {"name": "maven-public", "format": "maven2", "type": "group"},
+            ],
+        )
+    )
+    mb = 1024 * 1024
+    respx.get(f"{API}/assets", params={"repository": "maven-central"}).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "items": [
+                    {"id": "a1", "path": "small.jar", "fileSize": 5 * mb, "format": "maven2"},
+                    {"id": "a2", "path": "good.jar", "fileSize": 35 * mb, "format": "maven2"},
+                    {"id": "a3", "path": "huge.jar", "fileSize": 80 * mb, "format": "maven2"},
+                ],
+                "continuationToken": None,
+            },
+        )
+    )
+    resp = http_client.get("/api/throughput-assets?spine_id=test&min_mb=30&max_mb=50")
+    assert resp.status_code == 200
+    body = resp.json()
+    # Group repo skipped; only the 35MB asset is within [30,50].
+    assert body["scanned_repositories"] == 1
+    assert [a["path"] for a in body["assets"]] == ["good.jar"]
+    assert body["assets"][0]["repository"] == "maven-central"
+
+
 @respx.mock
 def test_tasks_list_and_run(http_client):
     respx.get(f"{API}/tasks").mock(

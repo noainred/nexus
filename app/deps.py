@@ -31,6 +31,8 @@ class InstanceRegistry:
         self._ping_interval: float = document.ping_interval
         self._ping_warn_pct: float = document.ping_warn_pct
         self._ping_crit_pct: float = document.ping_crit_pct
+        self._throughput_spine_id: str = document.throughput_spine_id
+        self._throughput_spine_repo: str = document.throughput_spine_repo
         self._throughput_path: str = document.throughput_path
         self._throughput_time: str = document.throughput_time
         self._throughput_size_mb: int = document.throughput_size_mb
@@ -63,6 +65,8 @@ class InstanceRegistry:
 
     def throughput_config(self) -> dict:
         return {
+            "spine_id": self._throughput_spine_id,
+            "spine_repo": self._throughput_spine_repo,
             "path": self._throughput_path,
             "time": self._throughput_time,
             "size_mb": self._throughput_size_mb,
@@ -72,12 +76,16 @@ class InstanceRegistry:
 
     def set_throughput_config(
         self,
+        spine_id: str,
+        spine_repo: str,
         path: str,
         time: str,
         size_mb: int,
         warn_pct: float,
         crit_pct: float,
     ) -> None:
+        self._throughput_spine_id = (spine_id or "").strip()
+        self._throughput_spine_repo = (spine_repo or "").strip()
         self._throughput_path = (path or "").strip()
         self._throughput_time = (time or "03:00").strip()
         self._throughput_size_mb = max(1, int(size_mb))
@@ -182,6 +190,8 @@ class InstanceRegistry:
         self._ping_interval = doc.ping_interval
         self._ping_warn_pct = doc.ping_warn_pct
         self._ping_crit_pct = doc.ping_crit_pct
+        self._throughput_spine_id = doc.throughput_spine_id
+        self._throughput_spine_repo = doc.throughput_spine_repo
         self._throughput_path = doc.throughput_path
         self._throughput_time = doc.throughput_time
         self._throughput_size_mb = doc.throughput_size_mb
