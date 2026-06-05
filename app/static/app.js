@@ -1951,6 +1951,47 @@ async function loadThroughputConfig() {
   form.crit_pct.value = c.crit_pct != null ? c.crit_pct : 50;
 }
 
+async function testThroughputConnection() {
+  const form = document.getElementById("tp-form");
+  const spineId = document.getElementById("tp-spine").value;
+  const status = document.getElementById("tp-test-status");
+  const box = document.getElementById("tp-test-result");
+  if (!spineId) {
+    toast("먼저 Spine 서버를 선택하세요.", "err");
+    return;
+  }
+  status.textContent = "Spine 연결 점검 중…";
+  box.innerHTML = "";
+  try {
+    const r = await api("/api/throughput-test", {
+      method: "POST",
+      body: JSON.stringify({
+        spine_id: spineId,
+        spine_repo: form.spine_repo.value.trim(),
+        path: form.path.value.trim(),
+      }),
+    });
+    status.textContent = "";
+    if (!r.results.length) {
+      box.append(el("div", { class: "hint" }, "점검할 Leaf 서버가 없습니다."));
+      return;
+    }
+    const list = el("div", { class: "tp-test-list" });
+    r.results.forEach((d) => {
+      list.append(
+        el("div", { class: `tp-test-row ${d.ok ? "ok" : "err"}` }, [
+          el("span", { class: "tp-test-icon" }, d.ok ? "✓" : "✗"),
+          el("span", { class: "tp-test-name" }, d.name),
+          el("span", { class: "tp-test-detail" }, d.detail),
+        ])
+      );
+    });
+    box.append(list);
+  } catch (e) {
+    status.textContent = `점검 실패: ${e.message}`;
+  }
+}
+
 async function findThroughputAssets() {
   const spineId = document.getElementById("tp-spine").value;
   const status = document.getElementById("tp-find-status");
@@ -2081,6 +2122,7 @@ function setupSettings() {
     }
   });
   document.getElementById("tp-find-assets").addEventListener("click", findThroughputAssets);
+  document.getElementById("tp-test").addEventListener("click", testThroughputConnection);
   document.getElementById("tp-asset").addEventListener("change", (ev) => {
     const opt = ev.target.selectedOptions[0];
     if (opt && opt.dataset.repo) {

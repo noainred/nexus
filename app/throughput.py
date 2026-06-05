@@ -185,6 +185,90 @@ async def record_once(registry, settings: Settings, cfg: dict) -> List[dict]:
     return diagnostics
 
 
+async def _probe_get(inst, url: str) -> Tuple[bool, str]:
+    """Tiny ranged GET just to confirm the asset is reachable (no full DL)."""
+    verify = True if inst.verify_tls is None else inst.verify_tls
+    try:
+        async with httpx.AsyncClient(
+            timeout=_DEL_TIMEOUT,
+            verify=verify,
+            auth=(inst.username, inst.password),
+            follow_redirects=True,
+        ) as client:
+            resp = await client.get(url, headers={"Range": "bytes=0-0"})
+    except httpx.HTTPError as exc:
+        return False, f"연결 오류: {type(exc).__name__}"
+    if resp.status_code >= 400:
+        return False, f"HTTP {resp.status_code}"
+    return True, f"HTTP {resp.status_code}"
+
+
+async def test_connectivity(registry, cfg: dict) -> List[dict]:
+    """Pre-check Spine reachability and each Leaf's proxy path to the Spine.
+
+    Returns a list of per-server diagnostics (Spine first, then Leaves).
+    Nothing is measured or written — this only verifies connectivity.
+    """
+    spine_id = cfg.get("spine_id") or ""
+    spine_repo = cfg.get("spine_repo") or ""
+    asset_path = cfg.get("path") or ""
+    by_id = {i.id: i for i in registry.all()}
+    spine = by_id.get(spine_id)
+    results: List[dict] = []
+    if spine is None:
+        return results
+
+    # 1) Manager → Spine itself.
+    client = NexusClient(spine, timeout=get_settings().request_timeout)
+    try:
+        info = await client.ping()
+        results.append({
+            "id": spine.id,
+            "name": f"{spine.name} (Spine)",
+            "ok": True,
+            "detail": f"Spine 연결 OK · 응답 {info.get('response_ms')}ms",
+        })
+    except NexusError as exc:
+        results.append({
+            "id": spine.id,
+            "name": f"{spine.name} (Spine)",
+            "ok": False,
+            "detail": f"Spine 연결 실패: {exc.message}",
+        })
+        return results  # no point probing leaves if the Spine is down
+
+    # 2) Each Leaf → can it reach the Spine through a proxy repo?
+    leafs = [i for i in registry.monitoring() if i.id != spine_id]
+    for leaf in leafs:
+        repo = await _find_proxy_repo(leaf, spine, spine_repo)
+        if not repo:
+            results.append({
+                "id": leaf.id,
+                "name": leaf.name,
+                "ok": False,
+                "detail": "Spine을 가리키는 프록시 저장소를 찾지 못함",
+            })
+            continue
+        if not asset_path:
+            results.append({
+                "id": leaf.id,
+                "name": leaf.name,
+                "ok": True,
+                "detail": f"프록시 OK ({repo}) · 자산 경로 미지정",
+            })
+            continue
+        url = leaf.base_url.rstrip("/") + f"/repository/{repo}/" + asset_path.lstrip("/")
+        ok, detail = await _probe_get(leaf, url)
+        results.append({
+            "id": leaf.id,
+            "name": leaf.name,
+            "ok": ok,
+            "detail": (f"프록시 {repo} · 자산 접근 OK ({detail})" if ok
+                       else f"프록시 {repo} · 자산 접근 실패: {detail}"),
+        })
+    return results
+
+
 def _prune(settings: Settings) -> None:
     out = _path(settings)
     if not out.exists():

@@ -12,6 +12,7 @@ from ..models import (
     ThroughputAssets,
     ThroughputConfig,
     ThroughputHistory,
+    ThroughputTestResult,
 )
 from ..nexus_client import NexusClient, NexusError
 
@@ -93,6 +94,24 @@ async def run_throughput(
     res = _attach_groups(res, registry)
     res["diagnostics"] = diagnostics
     return ThroughputHistory(**res)
+
+
+@router.post("/throughput-test", response_model=ThroughputTestResult)
+async def test_throughput(
+    cfg: ThroughputConfig,
+    registry: InstanceRegistry = Depends(get_registry),
+) -> ThroughputTestResult:
+    """Pre-check connectivity to the Spine without recording anything.
+
+    Uses the values posted from the form (not the saved config) so the
+    operator can verify before saving.
+    """
+    spine = registry.get(cfg.spine_id)  # 404 if unknown / empty
+    results = await throughput.test_connectivity(
+        registry,
+        {"spine_id": spine.id, "spine_repo": cfg.spine_repo, "path": cfg.path},
+    )
+    return ThroughputTestResult(spine_id=spine.id, results=results)
 
 
 @router.get("/throughput-assets", response_model=ThroughputAssets)

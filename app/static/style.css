@@ -152,6 +152,15 @@ tr:hover td { background: var(--panel); }
 .infra-chart-head .infra-name { font-weight: 600; }
 .infra-chart-head .url { color: var(--muted); font-size: 12px; }
 .infra-svg { width: 100%; height: auto; display: block; }
+
+/* Spine connectivity pre-check results */
+.tp-test-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.tp-test-row { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }
+.tp-test-row .tp-test-icon { font-weight: 700; width: 14px; }
+.tp-test-row.ok .tp-test-icon { color: var(--accent); }
+.tp-test-row.err .tp-test-icon { color: var(--red); }
+.tp-test-row .tp-test-name { font-weight: 600; min-width: 130px; }
+.tp-test-row .tp-test-detail { color: var(--muted); }
 .infra-svg .axis { stroke: var(--border); stroke-width: 1; }
 .infra-svg .baseline { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 5 4; }
 .infra-svg .infra-line { stroke: var(--border); stroke-width: 1.2; }

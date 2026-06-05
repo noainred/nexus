@@ -353,6 +353,11 @@
             </label>
             <label>Spine 저장소 <input name="spine_repo" id="tp-spine-repo" type="text" placeholder="maven-central" /></label>
             <label>자산 경로 (저장소 내 경로) <input name="path" id="tp-path" type="text" placeholder="org/.../artifact.jar" /></label>
+            <div class="form-actions" style="justify-content:flex-start">
+              <button type="button" id="tp-test">Spine 연결 테스트</button>
+              <span id="tp-test-status" class="hint" style="margin:0"></span>
+            </div>
+            <div id="tp-test-result"></div>
             <label>측정 시각 (HH:MM) <input name="time" type="text" placeholder="03:00" /></label>
             <label>노랑 임계치 (평소 대비 -%) <input name="warn_pct" type="number" min="0" step="1" /></label>
             <label>빨강 임계치 (평소 대비 -%) <input name="crit_pct" type="number" min="0" step="1" /></label>

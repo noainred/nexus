@@ -147,6 +147,13 @@ class ThroughputDiag(BaseModel):
     detail: str = ""
 
 
+class ThroughputTestResult(BaseModel):
+    """Result of the Spine connectivity pre-check (no data is recorded)."""
+
+    spine_id: str
+    results: List[ThroughputDiag] = Field(default_factory=list)
+
+
 class ThroughputHistory(BaseModel):
     days: int
     warn_pct: float = 20.0

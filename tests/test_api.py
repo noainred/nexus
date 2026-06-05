@@ -753,6 +753,26 @@ def test_throughput_assets_filters_by_size(http_client):
 
 
 @respx.mock
+def test_throughput_test_checks_spine(http_client):
+    # Spine reachability is verified via /status (+/status/check).
+    respx.get(f"{API}/status").mock(return_value=httpx.Response(200, text=""))
+    respx.get(f"{API}/status/check").mock(return_value=httpx.Response(200, json={}))
+    resp = http_client.post("/api/throughput-test", json={"spine_id": "test"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["spine_id"] == "test"
+    # Only the Spine row (no other instances registered = no leaves).
+    assert len(body["results"]) == 1
+    assert body["results"][0]["ok"] is True
+    assert "Spine" in body["results"][0]["name"]
+
+
+def test_throughput_test_unknown_spine(http_client):
+    resp = http_client.post("/api/throughput-test", json={"spine_id": "nope"})
+    assert resp.status_code == 404
+
+
+@respx.mock
 def test_tasks_list_and_run(http_client):
     respx.get(f"{API}/tasks").mock(
         return_value=httpx.Response(
