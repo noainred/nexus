@@ -736,19 +736,19 @@ def test_throughput_assets_filters_by_size(http_client):
             json={
                 "items": [
                     {"id": "a1", "path": "small.jar", "fileSize": 5 * mb, "format": "maven2"},
-                    {"id": "a2", "path": "good.jar", "fileSize": 35 * mb, "format": "maven2"},
-                    {"id": "a3", "path": "huge.jar", "fileSize": 80 * mb, "format": "maven2"},
+                    {"id": "a2", "path": "huge.jar", "fileSize": 80 * mb, "format": "maven2"},
+                    {"id": "a3", "path": "good.jar", "fileSize": 35 * mb, "format": "maven2"},
                 ],
                 "continuationToken": None,
             },
         )
     )
-    resp = http_client.get("/api/throughput-assets?spine_id=test&min_mb=30&max_mb=50")
+    resp = http_client.get("/api/throughput-assets?spine_id=test&min_mb=30")
     assert resp.status_code == 200
     body = resp.json()
-    # Group repo skipped; only the 35MB asset is within [30,50].
+    # Group repo skipped; assets >= 30MB returned smallest-first (5MB dropped).
     assert body["scanned_repositories"] == 1
-    assert [a["path"] for a in body["assets"]] == ["good.jar"]
+    assert [a["path"] for a in body["assets"]] == ["good.jar", "huge.jar"]
     assert body["assets"][0]["repository"] == "maven-central"
 
 

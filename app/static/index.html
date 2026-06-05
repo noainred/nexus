@@ -337,13 +337,15 @@
 
         <div class="settings-card">
           <h3>네트워크 속도 측정 설정 (Spine→Leaf)</h3>
-          <p class="hint"><b>Spine 서버 1대</b>를 기준으로 정하면 나머지는 모두 <b>Leaf</b>가 됩니다. 각 Leaf의 프록시 저장소가 Spine에서 자산을 끌어오는 시간을 재 <b>Spine→Leaf</b> 전송 속도를 측정합니다(8081만 사용). Spine을 고른 뒤 <b>후보 파일 찾기</b>를 누르면 Spine에 있는 30~50MB 파일 목록을 만들어 드립니다.</p>
+          <p class="hint"><b>Spine 서버 1대</b>를 기준으로 정하면 나머지는 모두 <b>Leaf</b>가 됩니다. 각 Leaf의 프록시 저장소가 Spine에서 자산을 끌어오는 시간을 재 <b>Spine→Leaf</b> 전송 속도를 측정합니다(8081만 사용).</p>
+          <p class="hint">순서: <b>① Spine 서버 선택 → ② 측정 크기 입력 → ③ 후보 파일 찾기</b>. 지정한 크기 <b>이상</b>의 파일을 Spine에서 찾아 목록으로 보여주며, 측정 시 그 크기만큼 전송합니다.</p>
           <form id="tp-form" class="form">
-            <label>Spine 서버 (기준)
+            <label>① Spine 서버 (기준)
               <select name="spine_id" id="tp-spine"></select>
             </label>
+            <label>② 측정 크기 (MB, 이 크기 이상 파일 탐색) <input name="size_mb" id="tp-size-mb" type="number" min="1" step="1" /></label>
             <div class="form-actions" style="justify-content:flex-start">
-              <button type="button" id="tp-find-assets">후보 파일 찾기 (30~50MB)</button>
+              <button type="button" id="tp-find-assets">③ 후보 파일 찾기</button>
               <span id="tp-find-status" class="hint" style="margin:0"></span>
             </div>
             <label>측정 자산 (Spine의 공통 모듈)
@@ -352,7 +354,6 @@
             <label>Spine 저장소 <input name="spine_repo" id="tp-spine-repo" type="text" placeholder="maven-central" /></label>
             <label>자산 경로 (저장소 내 경로) <input name="path" id="tp-path" type="text" placeholder="org/.../artifact.jar" /></label>
             <label>측정 시각 (HH:MM) <input name="time" type="text" placeholder="03:00" /></label>
-            <label>최대 측정 크기 (MB) <input name="size_mb" type="number" min="1" step="1" /></label>
             <label>노랑 임계치 (평소 대비 -%) <input name="warn_pct" type="number" min="0" step="1" /></label>
             <label>빨강 임계치 (평소 대비 -%) <input name="crit_pct" type="number" min="0" step="1" /></label>
             <div class="form-actions"><button type="submit">저장</button></div>

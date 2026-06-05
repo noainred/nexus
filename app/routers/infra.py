@@ -96,10 +96,9 @@ async def run_throughput(
 async def throughput_assets(
     spine_id: str = Query(..., description="Instance id to scan for candidates."),
     min_mb: float = Query(30.0, ge=0),
-    max_mb: float = Query(50.0, ge=0),
     registry: InstanceRegistry = Depends(get_registry),
 ) -> ThroughputAssets:
-    """Find assets on the Spine sized between ``min_mb`` and ``max_mb``.
+    """Find assets on the Spine that are at least ``min_mb`` in size.
 
     These become a convenient pick-list for the speed test so the operator
     doesn't have to type an asset path by hand.
@@ -107,7 +106,6 @@ async def throughput_assets(
     spine = registry.get(spine_id)  # 404 if unknown
     client = NexusClient(spine, timeout=get_settings().request_timeout)
     lo = int(min_mb * 1024 * 1024)
-    hi = int(max_mb * 1024 * 1024)
 
     try:
         repos = await client.list_repositories()
@@ -128,7 +126,7 @@ async def throughput_assets(
                 page = await client.list_assets(repo.name, token)
                 for a in page.items:
                     size = a.file_size or 0
-                    if lo <= size <= hi and a.path:
+                    if size >= lo and a.path:
                         candidates.append(
                             ThroughputAsset(
                                 repository=repo.name,
@@ -151,12 +149,11 @@ async def throughput_assets(
         if len(candidates) >= _MAX_CANDIDATES:
             break
 
-    # Largest first so the most representative samples surface at the top.
-    candidates.sort(key=lambda c: c.size_bytes, reverse=True)
+    # Smallest-first so the candidates closest to the requested size lead.
+    candidates.sort(key=lambda c: c.size_bytes)
     return ThroughputAssets(
         spine_id=spine_id,
         min_mb=min_mb,
-        max_mb=max_mb,
         assets=candidates,
         scanned_repositories=scanned,
         truncated=truncated,

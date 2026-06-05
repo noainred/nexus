@@ -1948,12 +1948,13 @@ async function findThroughputAssets() {
     toast("먼저 Spine 서버를 선택하세요.", "err");
     return;
   }
-  status.textContent = "Spine에서 30~50MB 파일을 찾는 중…";
+  const minMb = Math.max(1, Number(document.getElementById("tp-size-mb").value) || 30);
+  status.textContent = `Spine에서 ${minMb}MB 이상 파일을 찾는 중…`;
   try {
-    const r = await api(`/api/throughput-assets?spine_id=${encodeURIComponent(spineId)}&min_mb=30&max_mb=50`);
+    const r = await api(`/api/throughput-assets?spine_id=${encodeURIComponent(spineId)}&min_mb=${minMb}`);
     if (!r.assets.length) {
-      sel.innerHTML = '<option value="">— 후보 없음 (저장소를 더 스캔하거나 직접 입력) —</option>';
-      status.textContent = `후보 없음 (저장소 ${r.scanned_repositories}개 스캔). 경로를 직접 입력하세요.`;
+      sel.innerHTML = '<option value="">— 후보 없음 (크기를 낮추거나 직접 입력) —</option>';
+      status.textContent = `${minMb}MB 이상 후보 없음 (저장소 ${r.scanned_repositories}개 스캔). 크기를 낮추거나 경로를 직접 입력하세요.`;
       return;
     }
     sel.innerHTML =
