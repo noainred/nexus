@@ -457,6 +457,18 @@ async def _repo_exists(client, name: str) -> bool:
     return any(r.name == name for r in repos)
 
 
+async def _repo_type(client, name: str) -> Optional[str]:
+    """Return the type ('hosted'/'proxy'/'group') of a repo, or None if absent."""
+    try:
+        repos = await client.list_repositories()
+    except NexusError:
+        return None
+    for r in repos:
+        if r.name == name:
+            return (r.type or "").lower()
+    return None
+
+
 async def provision(
     registry,
     settings: Settings,
@@ -487,18 +499,37 @@ async def provision(
     sc = NexusClient(spine, timeout=get_settings().request_timeout)
     spine_bs = await _first_blob_store(sc)
 
-    # 1) raw(hosted) on the Spine (skip create if it already exists).
-    if await _repo_exists(sc, repo_name):
+    # 1) raw(hosted) on the Spine. Reuse only if it is actually a hosted repo;
+    #    a leftover proxy with the same name can't accept the dummy upload
+    #    (PUT → 405), so delete and recreate it as hosted.
+    existing_type = await _repo_type(sc, repo_name)
+    if existing_type == "hosted":
         steps.append({"target": spine.name, "action": f"raw 저장소 '{repo_name}'",
-                      "ok": True, "detail": "이미 존재 — 재사용"})
+                      "ok": True, "detail": "이미 존재(hosted) — 재사용"})
     else:
+        if existing_type is not None:
+            try:
+                await sc.delete_repository(repo_name)
+            except NexusError as exc:
+                steps.append({"target": spine.name,
+                              "action": f"raw 저장소 '{repo_name}' 재생성",
+                              "ok": False,
+                              "detail": f"기존 {existing_type} 저장소 삭제 실패: {exc.message}"})
+                return {"ok": False, "spine_repo": repo_name, "path": asset_path,
+                        "steps": steps}
         try:
             await sc.create_raw_hosted(repo_name, spine_bs)
-            steps.append({"target": spine.name, "action": f"raw 저장소 '{repo_name}' 생성",
-                          "ok": True, "detail": f"blob: {spine_bs}"})
+            verb = "재생성" if existing_type else "생성"
+            detail = (f"기존 {existing_type} 저장소를 hosted로 교체 · blob: {spine_bs}"
+                      if existing_type else f"blob: {spine_bs}")
+            steps.append({"target": spine.name,
+                          "action": f"raw 저장소 '{repo_name}' {verb}",
+                          "ok": True, "detail": detail})
         except NexusError as exc:
             steps.append({"target": spine.name, "action": f"raw 저장소 '{repo_name}' 생성",
                           "ok": False, "detail": exc.message})
+            return {"ok": False, "spine_repo": repo_name, "path": asset_path,
+                    "steps": steps}
 
     # 2) upload the dummy file (random so proxies can't compress it away).
     try:

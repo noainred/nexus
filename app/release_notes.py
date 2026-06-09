@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.22",
+        "date": "2026-06-09",
+        "changes": [
+            {"type": "changed", "text": "측정 저장소 자동 구성: Spine의 'speedtest'가 hosted가 아니면(옛 proxy 잔재 등) 삭제 후 hosted로 재생성 — 더미 파일 업로드가 405(Method Not Allowed)로 실패하던 문제 해결"},
+        ],
+    },
+    {
         "version": "0.8.21",
         "date": "2026-06-09",
         "changes": [
