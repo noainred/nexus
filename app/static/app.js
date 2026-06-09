@@ -690,9 +690,10 @@ async function runThroughput() {
     const r = rows[lf.id];
     r.row.className = "tp-test-row run";
     r.icon.textContent = "⟳";
-    r.detail.textContent = "측정 중…";
+    const stopRow = startProgressTicker(r.detail, "측정 중");
     try {
       const d = await api(`/api/throughput-run-one?leaf_id=${encodeURIComponent(lf.id)}`, { method: "POST" });
+      stopRow();
       if (d.ok) {
         okN += 1;
         r.row.className = "tp-test-row ok";
@@ -704,6 +705,7 @@ async function runThroughput() {
         r.detail.textContent = d.detail;
       }
     } catch (e) {
+      stopRow();
       r.row.className = "tp-test-row err";
       r.icon.textContent = "✗";
       r.detail.textContent = `오류: ${e.message}`;
@@ -2026,8 +2028,8 @@ async function testThroughputConnection() {
     toast("먼저 Spine 서버를 선택하세요.", "err");
     return;
   }
-  status.textContent = "Spine 연결 점검 중…";
   box.innerHTML = "";
+  const stop = startProgressTicker(status, "Spine 연결 점검 중 (각 서버 확인)");
   try {
     const r = await api("/api/throughput-test", {
       method: "POST",
@@ -2037,6 +2039,7 @@ async function testThroughputConnection() {
         path: form.path.value.trim(),
       }),
     });
+    stop();
     status.textContent = "";
     if (!r.results.length) {
       box.append(el("div", { class: "hint" }, "점검할 Leaf 서버가 없습니다."));
@@ -2074,6 +2077,7 @@ async function testThroughputConnection() {
     box.append(actions);
     document.getElementById("tp-save-targets").addEventListener("click", saveThroughputTargets);
   } catch (e) {
+    stop();
     status.textContent = `점검 실패: ${e.message}`;
   }
 }
@@ -2096,6 +2100,58 @@ async function saveThroughputTargets() {
   }
 }
 
+// Updates an element every 5s with elapsed time so long-running calls
+// (big asset DB, slow cross-continent fetch) don't look frozen.
+function startProgressTicker(elem, label) {
+  const t0 = Date.now();
+  const tick = () => {
+    const s = Math.round((Date.now() - t0) / 1000);
+    if (elem) elem.textContent = `${label}… (${s}초 경과 · 진행 중, 잠시만 기다려 주세요)`;
+  };
+  tick();
+  const id = setInterval(tick, 5000);
+  return () => clearInterval(id);
+}
+
+async function autoConfigThroughput() {
+  const spineId = document.getElementById("tp-spine").value;
+  const status = document.getElementById("tp-find-status");
+  if (!spineId) {
+    toast("먼저 Spine 서버를 선택하세요.", "err");
+    return;
+  }
+  const minMb = Math.max(1, Number(document.getElementById("tp-size-mb").value) || 30);
+  const stop = startProgressTicker(status, "공통 자산을 분석하는 중 (각 Leaf의 프록시 조사)");
+  try {
+    const r = await api(`/api/throughput-autoconfig?spine_id=${encodeURIComponent(spineId)}&min_mb=${minMb}`);
+    stop();
+    if (!r.found) {
+      status.textContent = `자동 설정 실패: ${r.reason}`;
+      toast("공통 자산을 찾지 못했습니다.", "err");
+      return;
+    }
+    const msg =
+      `공통 자산을 찾았습니다.\n\n` +
+      `저장소: ${r.spine_repo}\n` +
+      `파일: ${r.path}\n` +
+      `크기: ${fmtBytes(r.size_bytes)}\n` +
+      `측정 가능 서버: ${r.covered}/${r.total}\n\n` +
+      `이 자산으로 설정할까요?`;
+    if (window.confirm(msg)) {
+      document.getElementById("tp-spine-repo").value = r.spine_repo;
+      document.getElementById("tp-path").value = r.path;
+      status.textContent =
+        `자동 설정 적용됨 · ${r.spine_repo} · ${r.covered}/${r.total} 서버 측정 가능. '저장'을 눌러 반영하세요.`;
+      toast("자동 설정 적용됨 (저장 필요)");
+    } else {
+      status.textContent = "자동 설정 취소됨";
+    }
+  } catch (e) {
+    stop();
+    status.textContent = `자동 설정 실패: ${e.message}`;
+  }
+}
+
 async function findThroughputAssets(more = false) {
   const spineId = document.getElementById("tp-spine").value;
   const status = document.getElementById("tp-find-status");
@@ -2113,12 +2169,13 @@ async function findThroughputAssets(more = false) {
   }
   const sc = state.tpScan;
   moreBtn.disabled = true;
-  status.textContent = `Spine에서 ${minMb}MB 이상 파일을 찾는 중…`;
+  const stop = startProgressTicker(status, `Spine에서 ${minMb}MB 이상 파일을 찾는 중`);
   try {
     const params =
       `spine_id=${encodeURIComponent(spineId)}&min_mb=${minMb}&limit=5` +
       `&repo_index=${sc.repoIndex}&token=${encodeURIComponent(sc.token || "")}`;
     const r = await api(`/api/throughput-assets?${params}`);
+    stop();
     r.assets.forEach((a) => {
       const o = document.createElement("option");
       o.value = String(sc.count++);
@@ -2142,6 +2199,7 @@ async function findThroughputAssets(more = false) {
         : `후보 ${sc.count}개 · '더 찾기'로 더 볼 수 있습니다. 하나를 고르면 자동 입력됩니다.`;
     }
   } catch (e) {
+    stop();
     status.textContent = `검색 실패: ${e.message}`;
     moreBtn.disabled = false;
   }
@@ -2244,6 +2302,7 @@ function setupSettings() {
       toast(e.message, "err");
     }
   });
+  document.getElementById("tp-autoconfig").addEventListener("click", autoConfigThroughput);
   document.getElementById("tp-find-assets").addEventListener("click", () => findThroughputAssets(false));
   document.getElementById("tp-find-more").addEventListener("click", () => findThroughputAssets(true));
   document.getElementById("tp-test").addEventListener("click", testThroughputConnection);

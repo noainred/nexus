@@ -10,6 +10,7 @@ from ..models import (
     PingHistory,
     ThroughputAsset,
     ThroughputAssets,
+    ThroughputAutoConfig,
     ThroughputConfig,
     ThroughputDiag,
     ThroughputHistory,
@@ -167,6 +168,80 @@ async def test_throughput(
         {"spine_id": spine.id, "spine_repo": cfg.spine_repo, "path": cfg.path},
     )
     return ThroughputTestResult(spine_id=spine.id, results=results)
+
+
+async def _first_asset_over(client, repo: str, lo: int, max_pages: int = 6):
+    """First asset in ``repo`` whose size >= ``lo`` (scans a few pages)."""
+    tok = None
+    for _ in range(max_pages):
+        try:
+            page = await client.list_assets(repo, tok)
+        except NexusError:
+            return None
+        for a in page.items:
+            if (a.file_size or 0) >= lo and a.path:
+                return a
+        tok = page.continuation_token
+        if not tok:
+            break
+    return None
+
+
+@router.get("/throughput-autoconfig", response_model=ThroughputAutoConfig)
+async def throughput_autoconfig(
+    spine_id: str = Query(..., description="Spine instance id."),
+    min_mb: float = Query(30.0, ge=0),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> ThroughputAutoConfig:
+    """Recommend a Spine asset that the most Leaves can measure.
+
+    Looks at which Spine repository each Leaf proxies, picks the repo proxied
+    by the most Leaves, and finds an asset >= min_mb in it. The frontend asks
+    the user to confirm before applying it.
+    """
+    from collections import Counter
+
+    spine = registry.get(spine_id)  # 404 if unknown
+    leafs = [i for i in registry.monitoring() if i.id != spine_id]
+    if not leafs:
+        return ThroughputAutoConfig(found=False, reason="측정할 Leaf 서버가 없습니다.")
+
+    # Which Spine repos does each Leaf proxy?
+    cover: Counter = Counter()
+    for leaf in leafs:
+        for seg in await throughput.leaf_spine_repos(leaf, spine):
+            cover[seg] += 1
+    if not cover:
+        return ThroughputAutoConfig(
+            found=False, total=len(leafs),
+            reason="Spine을 가리키는 프록시 저장소를 가진 Leaf가 없습니다 (다단 구조일 수 있음).",
+        )
+
+    client = NexusClient(spine, timeout=get_settings().request_timeout)
+    try:
+        spine_repo_names = {r.name for r in await client.list_repositories()}
+    except NexusError:
+        spine_repo_names = set()
+    lo = int(min_mb * 1024 * 1024)
+
+    # Try repos most-proxied first; require the repo to exist on the Spine.
+    ordered = [r for r, _ in cover.most_common() if not spine_repo_names or r in spine_repo_names]
+    for repo in ordered:
+        asset = await _first_asset_over(client, repo, lo)
+        if asset is not None:
+            return ThroughputAutoConfig(
+                found=True,
+                spine_repo=repo,
+                path=asset.path,
+                size_bytes=asset.file_size or 0,
+                format=asset.format,
+                covered=cover[repo],
+                total=len(leafs),
+            )
+    return ThroughputAutoConfig(
+        found=False, total=len(leafs),
+        reason=f"공통 저장소에서 {min_mb:.0f}MB 이상 측정용 자산을 찾지 못했습니다.",
+    )
 
 
 @router.get("/throughput-assets", response_model=ThroughputAssets)

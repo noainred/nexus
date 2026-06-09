@@ -132,6 +132,19 @@ class ThroughputAssets(BaseModel):
     done: bool = False
 
 
+class ThroughputAutoConfig(BaseModel):
+    """Auto-recommended Spine asset that the most Leaves can measure."""
+
+    found: bool = False
+    spine_repo: str = ""
+    path: str = ""
+    size_bytes: int = 0
+    format: Optional[str] = None
+    covered: int = 0          # leaves that proxy this Spine repo
+    total: int = 0            # total monitored leaves
+    reason: str = ""
+
+
 class ThroughputPoint(BaseModel):
     t: int            # epoch seconds
     v: float          # throughput Mbps

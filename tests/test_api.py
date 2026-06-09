@@ -773,6 +773,15 @@ def test_throughput_test_unknown_spine(http_client):
     assert resp.status_code == 404
 
 
+def test_throughput_autoconfig_no_leaves(http_client):
+    # Only the Spine is registered -> no leaves -> not found, no network call.
+    resp = http_client.get("/api/throughput-autoconfig?spine_id=test&min_mb=30")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["found"] is False
+    assert body["total"] == 0
+
+
 def test_throughput_leaves(http_client, monkeypatch):
     monkeypatch.setattr(deps, "save_instances", lambda *a, **k: None)
     deps.registry.set_throughput_config("test", "maven-central", "x.jar", "03:00", 30, 20, 50)

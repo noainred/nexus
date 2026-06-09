@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.14",
+        "date": "2026-06-09",
+        "changes": [
+            {"type": "added", "text": "네트워크 속도 설정에 '자동 설정' 버튼 — Spine 지정 후 누르면 가장 많은 Leaf가 공통으로 프록시하는 자산을 찾아 '이 자산으로 설정할까요?' 확인 후 저장소·경로 자동 입력"},
+            {"type": "added", "text": "후보 찾기·자동 설정·연결 테스트·측정 진행 중 메시지에 경과 시간을 5초마다 표시(멈춘 게 아님을 안내)"},
+        ],
+    },
+    {
         "version": "0.8.13",
         "date": "2026-06-09",
         "changes": [

@@ -88,6 +88,26 @@ async def _find_proxy_repo(leaf, spine, spine_repo: str) -> Optional[str]:
     return host_match
 
 
+async def leaf_spine_repos(leaf, spine) -> set:
+    """The set of Spine repo names that ``leaf`` proxies (host match)."""
+    client = NexusClient(leaf, timeout=get_settings().request_timeout)
+    try:
+        repos = await client.list_repositories()
+    except NexusError:
+        return set()
+    skey = _host_key(spine.base_url)
+    segs: set = set()
+    for r in repos:
+        attrs = r.attributes if isinstance(r.attributes, dict) else {}
+        proxy = attrs.get("proxy") if isinstance(attrs, dict) else None
+        remote = proxy.get("remoteUrl") if isinstance(proxy, dict) else None
+        if remote and _host_key(remote) == skey:
+            seg = _repo_segment(remote)
+            if seg:
+                segs.add(seg)
+    return segs
+
+
 async def _timed_get(inst, url: str, cap_bytes: int) -> Tuple[Optional[Tuple[int, float]], str]:
     """Timed full GET. Returns ((bytes, ms), "") or (None, reason)."""
     verify = True if inst.verify_tls is None else inst.verify_tls
