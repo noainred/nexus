@@ -23,6 +23,7 @@ throughput-history.csv
 # Offline deployment artifacts
 wheelhouse/
 *.tar.gz
+*.zip
 ver_*.md
 
 # Editor / OS

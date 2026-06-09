@@ -44,6 +44,20 @@ tar --exclude='.git' --exclude='.venv' --exclude='__pycache__' \
     app requirements.txt instances.example.yaml .env.example \
     README.md pytest.ini deploy wheelhouse "$VERFILE"
 
+# Also produce a .zip alongside the .tar.gz (best-effort; needs `zip`).
+ZIPOUT="${OUT%.tar.gz}.zip"
+if [ "$ZIPOUT" != "$OUT" ] && command -v zip >/dev/null 2>&1; then
+  echo "==> Packaging .zip: ${ZIPOUT} ..."
+  rm -f "$ZIPOUT"
+  zip -rq "$ZIPOUT" \
+    app requirements.txt instances.example.yaml .env.example \
+    README.md pytest.ini deploy wheelhouse "$VERFILE" \
+    -x '*/__pycache__/*' '*.pyc'
+  echo "    Done: ${ZIPOUT}  ($(du -h "$ZIPOUT" | cut -f1))"
+elif [ "$ZIPOUT" != "$OUT" ]; then
+  echo "==> 'zip' 명령이 없어 .zip 생성을 건너뜀 (tar.gz만 생성)."
+fi
+
 echo ""
 echo "==> Done: ${OUT}  ($(du -h "$OUT" | cut -f1))"
 echo "    1) Copy ${OUT} to the air-gapped server (USB / internal transfer)."

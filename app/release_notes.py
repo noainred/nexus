@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.12",
+        "date": "2026-06-05",
+        "changes": [
+            {"type": "added", "text": "릴리스에 zip 압축본 추가 — 오프라인 번들(nexus-manager-offline.zip)과 소스(nexus-manager-src.zip)를 tar.gz와 함께 자동 생성·게시"},
+        ],
+    },
+    {
         "version": "0.8.11",
         "date": "2026-06-05",
         "changes": [
