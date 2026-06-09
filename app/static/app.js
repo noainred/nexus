@@ -2015,27 +2015,30 @@ async function applyRestoreFile(file) {
     return;
   }
   const includeSec = document.getElementById("restore-include-security")?.checked;
+  const mode = document.getElementById("restore-mode")?.value || "merge";
   const base = ["blobStores", "cleanupPolicies", "routingRules", "repositories"];
   const sec = ["contentSelectors", "privileges", "roles", "users", "anonymous"];
   const sections = includeSec ? base.concat(sec) : base;
   const srcName = (snapshot.instance && snapshot.instance.name) || "(알 수 없음)";
   const repoCount = ((snapshot.sections || {}).repositories || []).length;
+  const modeLabel = mode === "overwrite" ? "덮어쓰기 — 기존 항목도 갱신됩니다" : "병합 — 기존 항목은 그대로 둡니다";
   if (
     !confirm(
-      `'${inst.name}' 서버에 구성을 복구합니다.\n` +
+      `'${inst.name}' 서버에 구성을 가져옵니다(import).\n` +
         `원본 스냅샷: ${srcName} (저장소 ${repoCount}개)\n` +
+        `방식: ${modeLabel}\n` +
         `대상: ${sections.join(", ")}\n` +
-        (includeSec ? "보안 포함 — 사용자는 임시 비밀번호로 생성됩니다.\n" : "") +
-        `\n이미 존재하는 항목은 건너뜁니다. 진행할까요?`
+        (includeSec ? "보안 포함 — 신규 사용자는 임시 비밀번호로 생성됩니다.\n" : "") +
+        `\n진행할까요?`
     )
   )
     return;
   const box = document.getElementById("restore-result");
   box.innerHTML = "";
-  toast(`${inst.name} 구성 복구 중…`);
+  toast(`${inst.name} 구성 가져오는 중… (${mode})`);
   try {
     const r = await api(
-      `/api/instances/${encodeURIComponent(inst.id)}/config-restore?sections=${sections.join(",")}`,
+      `/api/instances/${encodeURIComponent(inst.id)}/config-restore?mode=${mode}&sections=${sections.join(",")}`,
       { method: "POST", body: JSON.stringify(snapshot) }
     );
     renderRestoreReport(inst, srcName, r);
@@ -2050,8 +2053,9 @@ function renderRestoreReport(inst, srcName, r) {
   box.innerHTML = "";
   const s = r.summary || { ok: 0, skip: 0, fail: 0 };
   const head = el("div", { class: "settings-card" }, [
-    el("h3", {}, `복구 결과 — ${srcName} → ${inst.name}`),
-    el("p", { class: "hint" }, `성공 ${s.ok} · 건너뜀 ${s.skip} · 실패 ${s.fail}`),
+    el("h3", {}, `가져오기 결과 (${r.mode || "merge"}) — ${srcName} → ${inst.name}`),
+    el("p", { class: "hint" },
+      `생성 ${s.ok || 0} · 갱신 ${s.update || 0} · 건너뜀 ${s.skip || 0} · 실패 ${s.fail || 0}`),
   ]);
   if (r.tempPassword) {
     head.append(
@@ -2063,13 +2067,16 @@ function renderRestoreReport(inst, srcName, r) {
     el("tr", { class: it.status === "fail" ? "row-err" : "" }, [
       el("td", {}, it.section),
       el("td", {}, it.item),
-      el("td", {}, { ok: "✓ 생성", skip: "· 건너뜀", fail: "✗ 실패" }[it.status] || it.status),
+      el("td", {}, { ok: "✓ 생성", update: "↻ 갱신", skip: "· 건너뜀", fail: "✗ 실패" }[it.status] || it.status),
       el("td", {}, it.detail || ""),
     ])
   );
   head.append(buildTable(["섹션", "항목", "결과", "상세"], rows));
   box.append(head);
-  toast(`복구 완료 — 생성 ${s.ok} / 건너뜀 ${s.skip} / 실패 ${s.fail}`, s.fail ? "err" : "ok");
+  toast(
+    `가져오기 완료 — 생성 ${s.ok || 0} / 갱신 ${s.update || 0} / 건너뜀 ${s.skip || 0} / 실패 ${s.fail || 0}`,
+    s.fail ? "err" : "ok"
+  );
   loadSettings();
 }
 

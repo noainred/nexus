@@ -273,12 +273,14 @@ async def restore_instance_config(
     instance_id: str,
     request: Request,
     sections: str = Query("", description="Comma-separated sections to restore; empty = repositories + dependencies."),
+    mode: str = Query("merge", pattern="^(merge|overwrite)$"),
     registry: InstanceRegistry = Depends(get_registry),
 ) -> dict:
     """Recreate configuration on a target server from an uploaded snapshot.
 
-    The request body is the JSON produced by ``/config-export``. Idempotent and
-    best-effort: existing items are skipped, failures are reported per item.
+    The request body is the JSON produced by ``/config-export``. Best-effort,
+    reporting per item. ``mode=merge`` keeps existing items (creates only what
+    is missing); ``mode=overwrite`` also updates existing items to match.
     """
     inst = registry.get(instance_id)  # 404 if unknown
     raw = (await request.body()).decode("utf-8")
@@ -288,7 +290,7 @@ async def restore_instance_config(
         raise HTTPException(status_code=400, detail=f"유효하지 않은 스냅샷 JSON: {exc}")
     sel = {s.strip() for s in sections.split(",") if s.strip()} or None
     client = NexusClient(inst, timeout=get_settings().request_timeout)
-    return await restore_mod.apply(client, snapshot, sel)
+    return await restore_mod.apply(client, snapshot, sel, mode)
 
 
 @router.delete("/{instance_id}", status_code=204, response_class=Response)

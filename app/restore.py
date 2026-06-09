@@ -66,17 +66,25 @@ async def apply(
     client: NexusClient,
     snapshot: Dict[str, Any],
     sections: Optional[Set[str]] = None,
+    mode: str = "merge",
 ) -> Dict[str, Any]:
     """Apply ``snapshot`` to the server behind ``client``.
 
     ``sections`` optionally restricts which sections are restored; ``None``
     means every supported section present in the snapshot.
+
+    ``mode`` controls how existing items are handled:
+      * ``"merge"`` (default) — keep existing items, only create missing ones;
+      * ``"overwrite"`` — update existing items (PUT) to match the snapshot and
+        create missing ones. Blob stores are never overwritten (path changes
+        could detach stored data), only created when missing.
     """
     data = snapshot.get("sections") if isinstance(snapshot, dict) else None
     if not isinstance(data, dict):
         return {"items": [], "summary": {"ok": 0, "skip": 0, "fail": 0},
                 "error": "스냅샷 형식이 올바르지 않습니다 (sections 없음)."}
 
+    overwrite = mode == "overwrite"
     want = set(sections) if sections else set(ALL_SECTIONS)
     rep = _Report()
     temp_password: Optional[str] = None
@@ -86,21 +94,21 @@ async def apply(
     if "cleanupPolicies" in want:
         await _restore_cleanup(client, data.get("cleanupPolicies"), rep)
     if "routingRules" in want:
-        await _restore_routing(client, data.get("routingRules"), rep)
+        await _restore_routing(client, data.get("routingRules"), rep, overwrite)
     if "contentSelectors" in want:
-        await _restore_content_selectors(client, data.get("contentSelectors"), rep)
+        await _restore_content_selectors(client, data.get("contentSelectors"), rep, overwrite)
     if "privileges" in want:
-        await _restore_privileges(client, data.get("privileges"), rep)
+        await _restore_privileges(client, data.get("privileges"), rep, overwrite)
     if "roles" in want:
-        await _restore_roles(client, data.get("roles"), rep)
+        await _restore_roles(client, data.get("roles"), rep, overwrite)
     if "users" in want:
-        temp_password = await _restore_users(client, data.get("users"), rep)
+        temp_password = await _restore_users(client, data.get("users"), rep, overwrite)
     if "repositories" in want:
-        await _restore_repositories(client, data.get("repositories"), rep)
+        await _restore_repositories(client, data.get("repositories"), rep, overwrite)
     if "anonymous" in want:
         await _restore_anonymous(client, data.get("anonymous"), rep)
 
-    out: Dict[str, Any] = {"items": rep.items, "summary": rep.summary()}
+    out: Dict[str, Any] = {"items": rep.items, "summary": rep.summary(), "mode": mode}
     if temp_password:
         out["tempPassword"] = temp_password
     return out
@@ -157,7 +165,7 @@ async def _restore_cleanup(client, items, rep: _Report) -> None:
             rep.add("cleanupPolicies", str(name), "fail", exc.message)
 
 
-async def _restore_routing(client, items, rep: _Report) -> None:
+async def _restore_routing(client, items, rep: _Report, overwrite: bool = False) -> None:
     if not isinstance(items, list):
         return
     existing = await client.existing_names("/routing-rules")
@@ -165,11 +173,18 @@ async def _restore_routing(client, items, rep: _Report) -> None:
         if not isinstance(rule, dict):
             continue
         name = rule.get("name")
-        if name in existing:
-            rep.add("routingRules", str(name), "skip", "이미 존재")
-            continue
         payload = {k: rule.get(k) for k in ("name", "description", "mode", "matchers")
                    if rule.get(k) is not None}
+        if name in existing:
+            if not overwrite:
+                rep.add("routingRules", str(name), "skip", "이미 존재")
+                continue
+            try:
+                await client.update_routing_rule(name, payload)
+                rep.add("routingRules", str(name), "update", "덮어씀")
+            except NexusError as exc:
+                rep.add("routingRules", str(name), "fail", exc.message)
+            continue
         try:
             await client.create_routing_rule(payload)
             rep.add("routingRules", str(name), "ok")
@@ -177,7 +192,7 @@ async def _restore_routing(client, items, rep: _Report) -> None:
             rep.add("routingRules", str(name), "fail", exc.message)
 
 
-async def _restore_content_selectors(client, items, rep: _Report) -> None:
+async def _restore_content_selectors(client, items, rep: _Report, overwrite: bool = False) -> None:
     if not isinstance(items, list):
         return
     existing = await client.existing_names("/security/content-selectors")
@@ -185,14 +200,21 @@ async def _restore_content_selectors(client, items, rep: _Report) -> None:
         if not isinstance(cs, dict):
             continue
         name = cs.get("name")
-        if name in existing:
-            rep.add("contentSelectors", str(name), "skip", "이미 존재")
-            continue
         payload = {
             "name": name,
             "description": cs.get("description", ""),
             "expression": cs.get("expression", ""),
         }
+        if name in existing:
+            if not overwrite:
+                rep.add("contentSelectors", str(name), "skip", "이미 존재")
+                continue
+            try:
+                await client.update_content_selector(name, payload)
+                rep.add("contentSelectors", str(name), "update", "덮어씀")
+            except NexusError as exc:
+                rep.add("contentSelectors", str(name), "fail", exc.message)
+            continue
         try:
             await client.create_content_selector(payload)
             rep.add("contentSelectors", str(name), "ok")
@@ -200,7 +222,7 @@ async def _restore_content_selectors(client, items, rep: _Report) -> None:
             rep.add("contentSelectors", str(name), "fail", exc.message)
 
 
-async def _restore_privileges(client, items, rep: _Report) -> None:
+async def _restore_privileges(client, items, rep: _Report, overwrite: bool = False) -> None:
     if not isinstance(items, list):
         return
     existing = await client.existing_names("/security/privileges")
@@ -214,10 +236,17 @@ async def _restore_privileges(client, items, rep: _Report) -> None:
         if not ptype:
             rep.add("privileges", str(name), "skip", "type 정보 없음")
             continue
-        if name in existing:
-            rep.add("privileges", str(name), "skip", "이미 존재")
-            continue
         payload = {k: v for k, v in pv.items() if k not in ("type", "readOnly")}
+        if name in existing:
+            if not overwrite:
+                rep.add("privileges", str(name), "skip", "이미 존재")
+                continue
+            try:
+                await client.update_privilege(ptype, name, payload)
+                rep.add("privileges", str(name), "update", f"덮어씀 · type={ptype}")
+            except NexusError as exc:
+                rep.add("privileges", str(name), "fail", exc.message)
+            continue
         try:
             await client.create_privilege(ptype, payload)
             rep.add("privileges", str(name), "ok", f"type={ptype}")
@@ -225,7 +254,7 @@ async def _restore_privileges(client, items, rep: _Report) -> None:
             rep.add("privileges", str(name), "fail", exc.message)
 
 
-async def _restore_roles(client, items, rep: _Report) -> None:
+async def _restore_roles(client, items, rep: _Report, overwrite: bool = False) -> None:
     if not isinstance(items, list):
         return
     existing = await client.existing_names("/security/roles", key="id")
@@ -235,9 +264,6 @@ async def _restore_roles(client, items, rep: _Report) -> None:
         rid = role.get("id")
         if role.get("readOnly"):
             continue  # built-in role
-        if rid in existing:
-            rep.add("roles", str(rid), "skip", "이미 존재")
-            continue
         payload = {
             "id": rid,
             "name": role.get("name", rid),
@@ -245,6 +271,16 @@ async def _restore_roles(client, items, rep: _Report) -> None:
             "privileges": role.get("privileges", []),
             "roles": role.get("roles", []),
         }
+        if rid in existing:
+            if not overwrite:
+                rep.add("roles", str(rid), "skip", "이미 존재")
+                continue
+            try:
+                await client.update_role(rid, payload)
+                rep.add("roles", str(rid), "update", "덮어씀")
+            except NexusError as exc:
+                rep.add("roles", str(rid), "fail", exc.message)
+            continue
         try:
             await client.create_role(payload)
             rep.add("roles", str(rid), "ok")
@@ -252,7 +288,7 @@ async def _restore_roles(client, items, rep: _Report) -> None:
             rep.add("roles", str(rid), "fail", exc.message)
 
 
-async def _restore_users(client, items, rep: _Report) -> Optional[str]:
+async def _restore_users(client, items, rep: _Report, overwrite: bool = False) -> Optional[str]:
     if not isinstance(items, list):
         return None
     try:
@@ -269,20 +305,28 @@ async def _restore_users(client, items, rep: _Report) -> Optional[str]:
         if source not in ("default", "local"):
             rep.add("users", str(uid), "skip", f"외부 소스({user.get('source')})는 복구 제외")
             continue
-        if uid in existing:
-            rep.add("users", str(uid), "skip", "이미 존재")
-            continue
-        payload = {
+        base = {
             "userId": uid,
             "firstName": user.get("firstName", ""),
             "lastName": user.get("lastName", ""),
             "emailAddress": user.get("emailAddress", ""),
             "status": user.get("status", "active"),
             "roles": user.get("roles", []),
-            "password": temp,
         }
+        if uid in existing:
+            if not overwrite:
+                rep.add("users", str(uid), "skip", "이미 존재")
+                continue
+            # Update keeps the existing password (not in the snapshot).
+            update_payload = dict(base, source=user.get("source", "default"))
+            try:
+                await client.update_user(uid, update_payload)
+                rep.add("users", str(uid), "update", "덮어씀(비밀번호 유지)")
+            except NexusError as exc:
+                rep.add("users", str(uid), "fail", exc.message)
+            continue
         try:
-            await client.create_user(payload)
+            await client.create_user(dict(base, password=temp))
             created_any = True
             rep.add("users", str(uid), "ok", "임시 비밀번호로 생성됨")
         except NexusError as exc:
@@ -294,7 +338,7 @@ def _repo_sort_key(entry: Dict[str, Any]):
     return _TYPE_RANK.get((entry.get("type") or "").lower(), 1)
 
 
-async def _restore_repositories(client, items, rep: _Report) -> None:
+async def _restore_repositories(client, items, rep: _Report, overwrite: bool = False) -> None:
     if not isinstance(items, list):
         return
     try:
@@ -306,20 +350,31 @@ async def _restore_repositories(client, items, rep: _Report) -> None:
         fmt = (entry.get("format") or "").strip()
         type_ = (entry.get("type") or "").strip()
         config = entry.get("config")
-        if name in existing:
-            rep.add("repositories", str(name), "skip", "이미 존재")
-            continue
         if not (fmt and type_ and isinstance(config, dict)):
-            rep.add("repositories", str(name), "fail",
-                    "전체 설정(config) 누락 — 복구 불가")
+            if name in existing and not overwrite:
+                rep.add("repositories", str(name), "skip", "이미 존재")
+            else:
+                rep.add("repositories", str(name), "fail",
+                        "전체 설정(config) 누락 — 복구 불가")
             continue
-        # The POST body is the GET config minus read-only/derived fields.
+        # The POST/PUT body is the GET config minus read-only/derived fields.
         payload = {k: v for k, v in config.items()
                    if k not in ("format", "type", "url")}
         note = ""
         if (payload.get("proxy") or {}).get("remoteUrl") and \
                 not (payload.get("httpClient") or {}).get("authentication"):
             note = "프록시 인증정보는 스냅샷에 없음 → 필요 시 재입력"
+        if name in existing:
+            if not overwrite:
+                rep.add("repositories", str(name), "skip", "이미 존재")
+                continue
+            try:
+                await client.update_repository(fmt, type_, name, payload)
+                rep.add("repositories", str(name), "update",
+                        note or f"덮어씀 · {fmt}/{type_}")
+            except NexusError as exc:
+                rep.add("repositories", str(name), "fail", exc.message)
+            continue
         try:
             await client.create_repository(fmt, type_, payload)
             rep.add("repositories", str(name), "ok", note or f"{fmt}/{type_}")

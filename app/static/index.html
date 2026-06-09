@@ -289,6 +289,12 @@
             이미 있는 항목은 건너뜁니다. 프록시 저장소의 캐시 파일은 복구 대상이 아니며
             업스트림에서 자동으로 다시 받아옵니다.
             <label class="chk" style="margin-left:8px"><input type="checkbox" id="restore-include-security" /> 복구 시 보안(역할/권한/사용자)도 포함 — 사용자는 임시 비밀번호로 생성</label>
+            <label style="margin-left:8px">가져오기 방식
+              <select id="restore-mode">
+                <option value="merge">병합(merge) — 기존 유지, 없는 것만 추가</option>
+                <option value="overwrite">덮어쓰기(overwrite) — 기존 항목도 갱신</option>
+              </select>
+            </label>
           </p>
           <div id="restore-result"></div>
           <div id="settings-table"></div>

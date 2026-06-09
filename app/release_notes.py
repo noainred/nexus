@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.24",
+        "date": "2026-06-09",
+        "changes": [
+            {"type": "added", "text": "구성 가져오기에 방식 선택 추가 — 병합(merge: 기존 유지, 없는 것만 추가) / 덮어쓰기(overwrite: 기존 항목도 PUT으로 갱신). 저장소·라우팅·콘텐츠셀렉터·권한·역할·사용자 갱신 지원(blob store는 데이터 보호상 신규 생성만). 결과에 생성/갱신/건너뜀/실패 집계 표시"},
+        ],
+    },
+    {
         "version": "0.8.23",
         "date": "2026-06-09",
         "changes": [

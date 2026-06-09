@@ -337,6 +337,28 @@ class NexusClient:
     ) -> None:
         await self._request("POST", f"/repositories/{fmt}/{type_}", json=payload)
 
+    # -- Configuration restore: update existing (overwrite mode) -----------
+
+    async def update_content_selector(self, name: str, payload: dict[str, Any]) -> None:
+        await self._request("PUT", f"/security/content-selectors/{name}", json=payload)
+
+    async def update_privilege(self, ptype: str, name: str, payload: dict[str, Any]) -> None:
+        await self._request("PUT", f"/security/privileges/{ptype}/{name}", json=payload)
+
+    async def update_role(self, role_id: str, payload: dict[str, Any]) -> None:
+        await self._request("PUT", f"/security/roles/{role_id}", json=payload)
+
+    async def update_user(self, user_id: str, payload: dict[str, Any]) -> None:
+        await self._request("PUT", f"/security/users/{user_id}", json=payload)
+
+    async def update_routing_rule(self, name: str, payload: dict[str, Any]) -> None:
+        await self._request("PUT", f"/routing-rules/{name}", json=payload)
+
+    async def update_repository(
+        self, fmt: str, type_: str, name: str, payload: dict[str, Any]
+    ) -> None:
+        await self._request("PUT", f"/repositories/{fmt}/{type_}/{name}", json=payload)
+
     # -- Components ---------------------------------------------------------
 
     async def list_components(
