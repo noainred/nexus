@@ -1971,6 +1971,11 @@ async function loadSettings() {
           onclick: () => downloadInstanceConfig(i),
         }, "설정 ↓"),
         " ",
+        el("button", {
+          title: "다운로드한 구성 JSON을 이 서버에 복구(저장소·blob·정책 등 재생성, 기존 항목은 건너뜀)",
+          onclick: () => restoreInstanceConfig(i),
+        }, "복구 ↑"),
+        " ",
         el("button", { class: "danger", onclick: () => settingsDelete(i) }, "삭제"),
       ]),
     ])
@@ -1988,6 +1993,84 @@ function downloadInstanceConfig(inst) {
   // Collecting the full config (one call per repository) can take a moment.
   toast(`${inst.name} 설정 수집 중… 잠시 후 다운로드가 시작됩니다.`);
   window.location.href = `/api/instances/${encodeURIComponent(inst.id)}/config-export`;
+}
+
+let restoreTargetInst = null;
+
+function restoreInstanceConfig(inst) {
+  restoreTargetInst = inst;
+  const fi = document.getElementById("restore-file");
+  fi.value = "";
+  fi.click();
+}
+
+async function applyRestoreFile(file) {
+  const inst = restoreTargetInst;
+  if (!inst) return;
+  let snapshot;
+  try {
+    snapshot = JSON.parse(await file.text());
+  } catch (e) {
+    toast(`JSON 파싱 실패: ${e.message}`, "err");
+    return;
+  }
+  const includeSec = document.getElementById("restore-include-security")?.checked;
+  const base = ["blobStores", "cleanupPolicies", "routingRules", "repositories"];
+  const sec = ["contentSelectors", "privileges", "roles", "users", "anonymous"];
+  const sections = includeSec ? base.concat(sec) : base;
+  const srcName = (snapshot.instance && snapshot.instance.name) || "(알 수 없음)";
+  const repoCount = ((snapshot.sections || {}).repositories || []).length;
+  if (
+    !confirm(
+      `'${inst.name}' 서버에 구성을 복구합니다.\n` +
+        `원본 스냅샷: ${srcName} (저장소 ${repoCount}개)\n` +
+        `대상: ${sections.join(", ")}\n` +
+        (includeSec ? "보안 포함 — 사용자는 임시 비밀번호로 생성됩니다.\n" : "") +
+        `\n이미 존재하는 항목은 건너뜁니다. 진행할까요?`
+    )
+  )
+    return;
+  const box = document.getElementById("restore-result");
+  box.innerHTML = "";
+  toast(`${inst.name} 구성 복구 중…`);
+  try {
+    const r = await api(
+      `/api/instances/${encodeURIComponent(inst.id)}/config-restore?sections=${sections.join(",")}`,
+      { method: "POST", body: JSON.stringify(snapshot) }
+    );
+    renderRestoreReport(inst, srcName, r);
+  } catch (e) {
+    toast(`복구 실패: ${e.message}`, "err");
+    box.append(el("div", { class: "empty" }, `복구 실패: ${e.message}`));
+  }
+}
+
+function renderRestoreReport(inst, srcName, r) {
+  const box = document.getElementById("restore-result");
+  box.innerHTML = "";
+  const s = r.summary || { ok: 0, skip: 0, fail: 0 };
+  const head = el("div", { class: "settings-card" }, [
+    el("h3", {}, `복구 결과 — ${srcName} → ${inst.name}`),
+    el("p", { class: "hint" }, `성공 ${s.ok} · 건너뜀 ${s.skip} · 실패 ${s.fail}`),
+  ]);
+  if (r.tempPassword) {
+    head.append(
+      el("p", { class: "hint", style: "color:var(--warn,#d80)" },
+        `복구된 사용자 임시 비밀번호: ${r.tempPassword} — 로그인 후 즉시 변경하세요.`)
+    );
+  }
+  const rows = (r.items || []).map((it) =>
+    el("tr", { class: it.status === "fail" ? "row-err" : "" }, [
+      el("td", {}, it.section),
+      el("td", {}, it.item),
+      el("td", {}, { ok: "✓ 생성", skip: "· 건너뜀", fail: "✗ 실패" }[it.status] || it.status),
+      el("td", {}, it.detail || ""),
+    ])
+  );
+  head.append(buildTable(["섹션", "항목", "결과", "상세"], rows));
+  box.append(head);
+  toast(`복구 완료 — 생성 ${s.ok} / 건너뜀 ${s.skip} / 실패 ${s.fail}`, s.fail ? "err" : "ok");
+  loadSettings();
 }
 
 async function loadPingConfig() {
@@ -2388,6 +2471,13 @@ function setupSettings() {
     if (fileInput.files && fileInput.files[0]) importSettings(fileInput.files[0]);
     fileInput.value = "";  // allow re-selecting the same file
   });
+  const restoreInput = document.getElementById("restore-file");
+  if (restoreInput) {
+    restoreInput.addEventListener("change", () => {
+      if (restoreInput.files && restoreInput.files[0]) applyRestoreFile(restoreInput.files[0]);
+      restoreInput.value = "";  // allow re-selecting the same file
+    });
+  }
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const fd = new FormData(form);

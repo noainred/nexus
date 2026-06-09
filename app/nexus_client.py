@@ -245,6 +245,18 @@ class NexusClient:
 
         # Simple single-call config sections.
         await grab("blobStores", "/blobstores")
+        # Enrich file blob stores with their on-disk path/quota (the list view
+        # omits it, but a restore needs it to recreate the store).
+        if isinstance(sections.get("blobStores"), list):
+            for bs in sections["blobStores"]:
+                if isinstance(bs, dict) and (bs.get("type") or "").lower() == "file":
+                    try:
+                        resp = await self._request(
+                            "GET", f"/blobstores/file/{bs.get('name')}"
+                        )
+                        bs["detail"] = resp.json()
+                    except NexusError:
+                        pass
         await grab("routingRules", "/routing-rules")
         await grab("anonymous", "/security/anonymous")
         await grab("users", "/security/users")
@@ -288,6 +300,42 @@ class NexusClient:
         sections["repositories"] = repositories
 
         return {"sections": sections, "errors": errors}
+
+    # -- Configuration restore (create from a snapshot) --------------------
+
+    async def existing_names(self, path: str, key: str = "name") -> set:
+        """Return the set of existing item names for a list endpoint."""
+        try:
+            resp = await self._request("GET", path)
+        except NexusError:
+            return set()
+        data = resp.json()
+        if not isinstance(data, list):
+            return set()
+        return {str(item.get(key)) for item in data if isinstance(item, dict)}
+
+    async def create_blobstore_file(self, payload: dict[str, Any]) -> None:
+        await self._request("POST", "/blobstores/file", json=payload)
+
+    async def create_content_selector(self, payload: dict[str, Any]) -> None:
+        await self._request("POST", "/security/content-selectors", json=payload)
+
+    async def create_privilege(self, ptype: str, payload: dict[str, Any]) -> None:
+        await self._request("POST", f"/security/privileges/{ptype}", json=payload)
+
+    async def create_role(self, payload: dict[str, Any]) -> None:
+        await self._request("POST", "/security/roles", json=payload)
+
+    async def create_user(self, payload: dict[str, Any]) -> None:
+        await self._request("POST", "/security/users", json=payload)
+
+    async def create_routing_rule(self, payload: dict[str, Any]) -> None:
+        await self._request("POST", "/routing-rules", json=payload)
+
+    async def create_repository(
+        self, fmt: str, type_: str, payload: dict[str, Any]
+    ) -> None:
+        await self._request("POST", f"/repositories/{fmt}/{type_}", json=payload)
 
     # -- Components ---------------------------------------------------------
 

@@ -281,7 +281,16 @@
             <button id="settings-add-toggle">+ 새 서버 추가</button>
             <label class="chk"><input type="checkbox" id="import-merge" /> 병합(merge) — 해제 시 전체 교체</label>
             <input type="file" id="import-file" accept=".yaml,.yml,.json" class="hidden" />
+            <input type="file" id="restore-file" accept=".json" class="hidden" />
           </div>
+          <p class="hint">
+            ※ 각 서버 행의 <b>설정 ↓</b>로 그 Nexus의 구성을 JSON으로 받고,
+            <b>복구 ↑</b>로 그 JSON을 대상 서버에 다시 만듭니다(저장소·blob·정책 등).
+            이미 있는 항목은 건너뜁니다. 프록시 저장소의 캐시 파일은 복구 대상이 아니며
+            업스트림에서 자동으로 다시 받아옵니다.
+            <label class="chk" style="margin-left:8px"><input type="checkbox" id="restore-include-security" /> 복구 시 보안(역할/권한/사용자)도 포함 — 사용자는 임시 비밀번호로 생성</label>
+          </p>
+          <div id="restore-result"></div>
           <div id="settings-table"></div>
         </div>
 

@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.20",
+        "date": "2026-06-09",
+        "changes": [
+            {"type": "added", "text": "구성 복구(가져오기): 서버 행의 '복구 ↑'로 다운로드한 설정 JSON을 대상 Nexus에 재생성 — 저장소·blob store·cleanup/routing 정책을 의존성 순서로 만들고(기존 항목은 건너뜀), 선택 시 보안(역할/권한/콘텐츠셀렉터/사용자)도 복구. 프록시 캐시 등 실데이터는 업스트림에서 자동 재수신되므로 대상 아님"},
+            {"type": "changed", "text": "설정 다운로드에 file blob store의 경로(path)를 포함해 복구 시 그대로 재생성되도록 보강"},
+        ],
+    },
+    {
         "version": "0.8.19",
         "date": "2026-06-09",
         "changes": [

@@ -14,6 +14,7 @@ from ..config import (
     instances_to_yaml,
     parse_document,
 )
+from .. import restore as restore_mod
 from ..deps import InstanceRegistry, get_registry
 from ..models import (
     CompareFields,
@@ -265,6 +266,29 @@ async def export_instance_config(
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/{instance_id}/config-restore")
+async def restore_instance_config(
+    instance_id: str,
+    request: Request,
+    sections: str = Query("", description="Comma-separated sections to restore; empty = repositories + dependencies."),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Recreate configuration on a target server from an uploaded snapshot.
+
+    The request body is the JSON produced by ``/config-export``. Idempotent and
+    best-effort: existing items are skipped, failures are reported per item.
+    """
+    inst = registry.get(instance_id)  # 404 if unknown
+    raw = (await request.body()).decode("utf-8")
+    try:
+        snapshot = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"유효하지 않은 스냅샷 JSON: {exc}")
+    sel = {s.strip() for s in sections.split(",") if s.strip()} or None
+    client = NexusClient(inst, timeout=get_settings().request_timeout)
+    return await restore_mod.apply(client, snapshot, sel)
 
 
 @router.delete("/{instance_id}", status_code=204, response_class=Response)
