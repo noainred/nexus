@@ -1966,6 +1966,11 @@ async function loadSettings() {
       el("td", {}, [
         el("button", { onclick: () => settingsEdit(i) }, "수정"),
         " ",
+        el("button", {
+          title: "이 서버의 현재 Nexus 설정(저장소·blob·보안·작업 등)을 JSON으로 다운로드",
+          onclick: () => downloadInstanceConfig(i),
+        }, "설정 ↓"),
+        " ",
         el("button", { class: "danger", onclick: () => settingsDelete(i) }, "삭제"),
       ]),
     ])
@@ -1977,6 +1982,12 @@ async function loadSettings() {
   loadCompareFields();
   loadPingConfig();
   loadThroughputConfig();
+}
+
+function downloadInstanceConfig(inst) {
+  // Collecting the full config (one call per repository) can take a moment.
+  toast(`${inst.name} 설정 수집 중… 잠시 후 다운로드가 시작됩니다.`);
+  window.location.href = `/api/instances/${encodeURIComponent(inst.id)}/config-export`;
 }
 
 async function loadPingConfig() {

@@ -222,6 +222,73 @@ class NexusClient:
         resp = await self._request("GET", f"/repositories/{fmt}/{type_}/{name}")
         return resp.json()
 
+    # -- Configuration export ----------------------------------------------
+
+    async def export_configuration(self) -> dict[str, Any]:
+        """Collect the readable Nexus configuration into one JSON-able dict.
+
+        Every section is best-effort: a section the account cannot read (or
+        that the server version does not expose) is recorded under ``errors``
+        instead of failing the whole export. Passwords are never returned by
+        these read endpoints (Nexus redacts them), so the result is safe to
+        store as a configuration snapshot/backup.
+        """
+        sections: dict[str, Any] = {}
+        errors: dict[str, str] = {}
+
+        async def grab(key: str, path: str) -> None:
+            try:
+                resp = await self._request("GET", path)
+                sections[key] = resp.json()
+            except NexusError as exc:
+                errors[key] = exc.message
+
+        # Simple single-call config sections.
+        await grab("blobStores", "/blobstores")
+        await grab("routingRules", "/routing-rules")
+        await grab("anonymous", "/security/anonymous")
+        await grab("users", "/security/users")
+        await grab("roles", "/security/roles")
+        await grab("privileges", "/security/privileges")
+        await grab("contentSelectors", "/security/content-selectors")
+        await grab("activeRealms", "/security/realms/active")
+        await grab("tasks", "/tasks")
+
+        # Cleanup policies live under v1 or the legacy beta namespace.
+        try:
+            sections["cleanupPolicies"] = await self._cleanup_get("")
+        except NexusError as exc:
+            errors["cleanupPolicies"] = exc.message
+
+        # Repositories: list, then the full config for each one.
+        repositories: list = []
+        try:
+            repos = await self.list_repositories()
+        except NexusError as exc:
+            errors["repositories"] = exc.message
+            repos = []
+        for repo in repos:
+            fmt = (repo.format or "").strip()
+            type_ = (repo.type or "").strip()
+            entry: dict[str, Any] = {
+                "name": repo.name,
+                "format": repo.format,
+                "type": repo.type,
+                "url": repo.url,
+                "online": repo.online,
+            }
+            if fmt and type_:
+                try:
+                    entry["config"] = await self.get_repository_config(
+                        fmt, type_, repo.name
+                    )
+                except NexusError as exc:
+                    entry["configError"] = exc.message
+            repositories.append(entry)
+        sections["repositories"] = repositories
+
+        return {"sections": sections, "errors": errors}
+
     # -- Components ---------------------------------------------------------
 
     async def list_components(

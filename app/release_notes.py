@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.19",
+        "date": "2026-06-09",
+        "changes": [
+            {"type": "added", "text": "서버 설정 다운로드: 서버 목록의 '설정 ↓' 버튼으로 해당 Nexus의 현재 구성(저장소 전체 설정·blob store·cleanup/routing·보안·작업 등)을 JSON 스냅샷으로 내려받기(섹션별 best-effort, 읽기 권한 없는 항목은 errors에 기록)"},
+        ],
+    },
+    {
         "version": "0.8.18",
         "date": "2026-06-09",
         "changes": [

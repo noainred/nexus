@@ -1,6 +1,9 @@
 """Instance listing and management (CRUD) endpoints."""
 from __future__ import annotations
 
+import json
+import re
+from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -228,6 +231,40 @@ async def toggle_reference(
     else:
         registry.set_reference(instance_id)
     return [_summary(i) for i in registry.all()]
+
+
+@router.get("/{instance_id}/config-export")
+async def export_instance_config(
+    instance_id: str,
+    registry: InstanceRegistry = Depends(get_registry),
+) -> Response:
+    """Download the live Nexus configuration of one server as a JSON snapshot.
+
+    Aggregates the readable config (repositories with full settings, blob
+    stores, cleanup/routing policies, security, tasks) via the REST API. Each
+    section is best-effort, so a section the account cannot read is noted under
+    ``errors`` instead of failing the whole download.
+    """
+    inst = registry.get(instance_id)  # 404 if unknown
+    client = NexusClient(inst, timeout=get_settings().request_timeout)
+    try:
+        config = await client.export_configuration()
+    except NexusError as exc:
+        raise HTTPException(status_code=exc.status_code or 502, detail=exc.message)
+    payload = {
+        "instance": {"id": inst.id, "name": inst.name, "base_url": inst.base_url},
+        "exported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        **config,
+    }
+    text = json.dumps(payload, ensure_ascii=False, indent=2)
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", inst.name).strip("_") or inst.id
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    filename = f"nexus-config-{safe}-{stamp}.json"
+    return Response(
+        content=text,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.delete("/{instance_id}", status_code=204, response_class=Response)
