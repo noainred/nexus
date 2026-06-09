@@ -449,6 +449,14 @@ async def _first_blob_store(client) -> str:
     return stores[0].name if stores else "default"
 
 
+async def _repo_exists(client, name: str) -> bool:
+    try:
+        repos = await client.list_repositories()
+    except NexusError:
+        return False
+    return any(r.name == name for r in repos)
+
+
 async def provision(registry, settings: Settings, size_mb: int, repo_name: str = "speedtest") -> dict:
     """Create a raw speed-test repo on the Spine (+ dummy file) and a raw
     proxy of it on every Leaf, then point the throughput config at it."""
@@ -469,15 +477,18 @@ async def provision(registry, settings: Settings, size_mb: int, repo_name: str =
     sc = NexusClient(spine, timeout=get_settings().request_timeout)
     spine_bs = await _first_blob_store(sc)
 
-    # 1) raw(hosted) on the Spine (ignore "already exists").
-    try:
-        await sc.create_raw_hosted(repo_name, spine_bs)
-        steps.append({"target": spine.name, "action": f"raw 저장소 '{repo_name}' 생성",
-                      "ok": True, "detail": f"blob: {spine_bs}"})
-    except NexusError as exc:
-        existed = "exist" in (exc.message or "").lower()
+    # 1) raw(hosted) on the Spine (skip create if it already exists).
+    if await _repo_exists(sc, repo_name):
         steps.append({"target": spine.name, "action": f"raw 저장소 '{repo_name}'",
-                      "ok": existed, "detail": "이미 존재" if existed else exc.message})
+                      "ok": True, "detail": "이미 존재 — 재사용"})
+    else:
+        try:
+            await sc.create_raw_hosted(repo_name, spine_bs)
+            steps.append({"target": spine.name, "action": f"raw 저장소 '{repo_name}' 생성",
+                          "ok": True, "detail": f"blob: {spine_bs}"})
+        except NexusError as exc:
+            steps.append({"target": spine.name, "action": f"raw 저장소 '{repo_name}' 생성",
+                          "ok": False, "detail": exc.message})
 
     # 2) upload the dummy file (random so proxies can't compress it away).
     try:
@@ -494,6 +505,10 @@ async def provision(registry, settings: Settings, size_mb: int, repo_name: str =
     remote = spine.base_url.rstrip("/") + f"/repository/{repo_name}/"
     for leaf in leafs:
         lc = NexusClient(leaf, timeout=get_settings().request_timeout)
+        if await _repo_exists(lc, repo_name):
+            steps.append({"target": leaf.name, "action": f"raw 프록시 '{repo_name}'",
+                          "ok": True, "detail": "이미 존재 — 재사용"})
+            continue
         leaf_bs = await _first_blob_store(lc)
         try:
             await lc.create_raw_proxy(
@@ -502,9 +517,8 @@ async def provision(registry, settings: Settings, size_mb: int, repo_name: str =
             steps.append({"target": leaf.name, "action": f"raw 프록시 '{repo_name}' 생성",
                           "ok": True, "detail": f"→ {remote}"})
         except NexusError as exc:
-            existed = "exist" in (exc.message or "").lower()
-            steps.append({"target": leaf.name, "action": f"raw 프록시 '{repo_name}'",
-                          "ok": existed, "detail": "이미 존재" if existed else exc.message})
+            steps.append({"target": leaf.name, "action": f"raw 프록시 '{repo_name}' 생성",
+                          "ok": False, "detail": exc.message})
 
     # 4) point the throughput config at the new asset.
     registry.set_throughput_config(

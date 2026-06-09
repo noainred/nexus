@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.17",
+        "date": "2026-06-09",
+        "changes": [
+            {"type": "changed", "text": "측정 저장소 자동 구성: 저장소가 이미 있으면 생성 전에 목록으로 확인해 '재사용'으로 처리(Nexus의 'duplicated key' 400을 오류로 표시하던 문제 수정)"},
+        ],
+    },
+    {
         "version": "0.8.16",
         "date": "2026-06-09",
         "changes": [
