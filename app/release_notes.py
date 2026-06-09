@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.16",
+        "date": "2026-06-09",
+        "changes": [
+            {"type": "added", "text": "'측정 저장소 자동 구성' 버튼 — 적당한 자산이 없을 때 Spine에 raw 저장소+더미 파일(지정 크기)을 만들고 각 Leaf에 프록시를 자동 생성, 측정 설정까지 자동 반영"},
+        ],
+    },
+    {
         "version": "0.8.15",
         "date": "2026-06-09",
         "changes": [

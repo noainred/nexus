@@ -2113,6 +2113,49 @@ function startProgressTicker(elem, label) {
   return () => clearInterval(id);
 }
 
+async function provisionThroughput() {
+  const spineId = document.getElementById("tp-spine").value;
+  const status = document.getElementById("tp-provision-status");
+  const box = document.getElementById("tp-provision-result");
+  if (!spineId) {
+    toast("먼저 Spine 서버를 선택하세요.", "err");
+    return;
+  }
+  const minMb = Math.max(1, Number(document.getElementById("tp-size-mb").value) || 30);
+  const msg =
+    `Spine과 각 Leaf에 측정 전용 raw 저장소('speedtest')와 ${minMb}MB 더미 파일을 생성합니다.\n` +
+    `(서버에 저장소·파일이 실제로 만들어집니다. admin 권한 필요)\n\n진행할까요?`;
+  if (!window.confirm(msg)) return;
+  box.innerHTML = "";
+  const stop = startProgressTicker(status, `측정 저장소 구성 중 (${minMb}MB 업로드 포함)`);
+  try {
+    const r = await api(`/api/throughput-provision?size_mb=${minMb}&repo=speedtest`, { method: "POST" });
+    stop();
+    status.textContent = "";
+    const list = el("div", { class: "tp-test-list" });
+    r.steps.forEach((s) => {
+      list.append(
+        el("div", { class: `tp-test-row ${s.ok ? "ok" : "err"}` }, [
+          el("span", { class: "tp-test-icon" }, s.ok ? "✓" : "✗"),
+          el("span", { class: "tp-test-name" }, s.target),
+          el("span", { class: "tp-test-detail" }, `${s.action} · ${s.detail}`),
+        ])
+      );
+    });
+    box.append(list);
+    if (r.ok) {
+      toast("측정 저장소 구성 완료 — '저장' 후 측정하세요");
+      loadThroughputConfig();  // reflect new spine_repo/path
+    } else {
+      toast("일부 단계 실패 — 결과를 확인하세요", "err");
+      loadThroughputConfig();
+    }
+  } catch (e) {
+    stop();
+    status.textContent = `구성 실패: ${e.message}`;
+  }
+}
+
 async function autoConfigThroughput() {
   const spineId = document.getElementById("tp-spine").value;
   const status = document.getElementById("tp-find-status");
@@ -2306,6 +2349,7 @@ function setupSettings() {
   document.getElementById("tp-find-assets").addEventListener("click", () => findThroughputAssets(false));
   document.getElementById("tp-find-more").addEventListener("click", () => findThroughputAssets(true));
   document.getElementById("tp-test").addEventListener("click", testThroughputConnection);
+  document.getElementById("tp-provision").addEventListener("click", provisionThroughput);
   document.getElementById("tp-asset").addEventListener("change", (ev) => {
     const opt = ev.target.selectedOptions[0];
     if (opt && opt.dataset.repo) {

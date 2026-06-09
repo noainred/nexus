@@ -20,6 +20,7 @@ point is coloured warn/crit when it drops >=warn%/>=crit% BELOW the median.
 from __future__ import annotations
 
 import asyncio
+import os
 import statistics
 import time
 from datetime import datetime, timedelta, timezone
@@ -438,6 +439,80 @@ def query(
         series.append({"id": iid, "name": names.get(iid, iid), "baseline": baseline, "points": points})
 
     return {"days": days, "warn_pct": warn_pct, "crit_pct": crit_pct, "series": series}
+
+
+async def _first_blob_store(client) -> str:
+    try:
+        stores = await client.list_blobstores()
+    except NexusError:
+        return "default"
+    return stores[0].name if stores else "default"
+
+
+async def provision(registry, settings: Settings, size_mb: int, repo_name: str = "speedtest") -> dict:
+    """Create a raw speed-test repo on the Spine (+ dummy file) and a raw
+    proxy of it on every Leaf, then point the throughput config at it."""
+    cfg = registry.throughput_config()
+    spine_id = cfg.get("spine_id") or ""
+    by_id = {i.id: i for i in registry.all()}
+    spine = by_id.get(spine_id)
+    steps: list = []
+    if spine is None:
+        return {"ok": False, "spine_repo": "", "path": "", "steps": [
+            {"target": "-", "action": "Spine 확인", "ok": False, "detail": "Spine이 지정되지 않았습니다."}
+        ]}
+
+    size_mb = max(1, int(size_mb))
+    asset_path = f"{repo_name}-{size_mb}mb.bin"
+    leafs = select_leaves(registry, cfg)
+
+    sc = NexusClient(spine, timeout=get_settings().request_timeout)
+    spine_bs = await _first_blob_store(sc)
+
+    # 1) raw(hosted) on the Spine (ignore "already exists").
+    try:
+        await sc.create_raw_hosted(repo_name, spine_bs)
+        steps.append({"target": spine.name, "action": f"raw 저장소 '{repo_name}' 생성",
+                      "ok": True, "detail": f"blob: {spine_bs}"})
+    except NexusError as exc:
+        existed = "exist" in (exc.message or "").lower()
+        steps.append({"target": spine.name, "action": f"raw 저장소 '{repo_name}'",
+                      "ok": existed, "detail": "이미 존재" if existed else exc.message})
+
+    # 2) upload the dummy file (random so proxies can't compress it away).
+    try:
+        data = os.urandom(size_mb * 1024 * 1024)
+        await sc.upload_raw_content(repo_name, asset_path, data)
+        steps.append({"target": spine.name, "action": "더미 파일 업로드",
+                      "ok": True, "detail": f"{size_mb}MB → {repo_name}/{asset_path}"})
+    except NexusError as exc:
+        steps.append({"target": spine.name, "action": "더미 파일 업로드",
+                      "ok": False, "detail": exc.message})
+        return {"ok": False, "spine_repo": repo_name, "path": asset_path, "steps": steps}
+
+    # 3) raw(proxy) of the Spine repo on every Leaf.
+    remote = spine.base_url.rstrip("/") + f"/repository/{repo_name}/"
+    for leaf in leafs:
+        lc = NexusClient(leaf, timeout=get_settings().request_timeout)
+        leaf_bs = await _first_blob_store(lc)
+        try:
+            await lc.create_raw_proxy(
+                repo_name, remote, leaf_bs, auth=(spine.username, spine.password)
+            )
+            steps.append({"target": leaf.name, "action": f"raw 프록시 '{repo_name}' 생성",
+                          "ok": True, "detail": f"→ {remote}"})
+        except NexusError as exc:
+            existed = "exist" in (exc.message or "").lower()
+            steps.append({"target": leaf.name, "action": f"raw 프록시 '{repo_name}'",
+                          "ok": existed, "detail": "이미 존재" if existed else exc.message})
+
+    # 4) point the throughput config at the new asset.
+    registry.set_throughput_config(
+        spine_id, repo_name, asset_path, cfg["time"], size_mb,
+        cfg["warn_pct"], cfg["crit_pct"],
+    )
+    ok = all(s["ok"] for s in steps)
+    return {"ok": ok, "spine_repo": repo_name, "path": asset_path, "steps": steps}
 
 
 async def run_loop() -> None:

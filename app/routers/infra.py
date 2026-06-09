@@ -16,6 +16,7 @@ from ..models import (
     ThroughputHistory,
     ThroughputLeaf,
     ThroughputLeaves,
+    ThroughputProvision,
     ThroughputTargets,
     ThroughputTestResult,
 )
@@ -185,6 +186,21 @@ async def _first_asset_over(client, repo: str, lo: int, max_pages: int = 6):
         if not tok:
             break
     return None
+
+
+@router.post("/throughput-provision", response_model=ThroughputProvision)
+async def provision_throughput(
+    size_mb: int = Query(30, ge=1, le=200),
+    repo: str = Query("speedtest"),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> ThroughputProvision:
+    """Create a dedicated raw speed-test repo + dummy file when no suitable
+    asset exists: hosted on the Spine, proxied on each Leaf."""
+    cfg = registry.throughput_config()
+    if not cfg.get("spine_id"):
+        raise HTTPException(status_code=400, detail="먼저 Spine 서버를 지정하세요.")
+    res = await throughput.provision(registry, get_settings(), size_mb, repo)
+    return ThroughputProvision(**res)
 
 
 @router.get("/throughput-autoconfig", response_model=ThroughputAutoConfig)

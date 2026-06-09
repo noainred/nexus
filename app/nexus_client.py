@@ -141,6 +141,75 @@ class NexusClient:
     async def delete_repository(self, name: str) -> None:
         await self._request("DELETE", f"/repositories/{name}")
 
+    # -- Repository provisioning (speed-test infra) -------------------------
+
+    async def create_raw_hosted(self, name: str, blob_store: str) -> None:
+        """Create a raw(hosted) repository (idempotent-friendly via caller)."""
+        payload = {
+            "name": name,
+            "online": True,
+            "storage": {
+                "blobStoreName": blob_store,
+                "strictContentTypeValidation": False,
+                "writePolicy": "ALLOW",
+            },
+        }
+        await self._request("POST", "/repositories/raw/hosted", json=payload)
+
+    async def create_raw_proxy(
+        self,
+        name: str,
+        remote_url: str,
+        blob_store: str,
+        auth: Optional[tuple] = None,
+    ) -> None:
+        """Create a raw(proxy) repository pointing at ``remote_url``."""
+        http_client: dict[str, Any] = {"blocked": False, "autoBlock": True}
+        if auth:
+            http_client["authentication"] = {
+                "type": "username",
+                "username": auth[0],
+                "password": auth[1],
+            }
+        payload = {
+            "name": name,
+            "online": True,
+            "storage": {
+                "blobStoreName": blob_store,
+                "strictContentTypeValidation": False,
+            },
+            "proxy": {
+                "remoteUrl": remote_url,
+                "contentMaxAge": 1440,
+                "metadataMaxAge": 1440,
+            },
+            "negativeCache": {"enabled": False, "timeToLive": 1440},
+            "httpClient": http_client,
+        }
+        await self._request("POST", "/repositories/raw/proxy", json=payload)
+
+    async def upload_raw_content(self, repo: str, path: str, data: bytes) -> None:
+        """PUT raw bytes to a hosted raw repo's content path."""
+        base = self.instance.base_url.rstrip("/")
+        url = f"{base}/repository/{repo}/{path.lstrip('/')}"
+        verify = True if self.instance.verify_tls is None else self.instance.verify_tls
+        try:
+            async with httpx.AsyncClient(
+                auth=(self.instance.username, self.instance.password),
+                timeout=max(self._timeout, 120.0),
+                verify=verify,
+            ) as client:
+                resp = await client.put(
+                    url, content=data, headers={"Content-Type": "application/octet-stream"}
+                )
+        except httpx.HTTPError as exc:
+            raise NexusError(f"Upload failed: {_describe(exc)}") from exc
+        if resp.status_code >= 400:
+            raise NexusError(
+                f"Upload returned {resp.status_code}: {resp.text[:200]}",
+                status_code=resp.status_code,
+            )
+
     async def get_repository_config(
         self, fmt: str, type_: str, name: str
     ) -> dict[str, Any]:

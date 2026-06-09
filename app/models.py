@@ -169,6 +169,20 @@ class ThroughputDiag(BaseModel):
     mbps: Optional[float] = None
 
 
+class ThroughputProvisionStep(BaseModel):
+    target: str
+    action: str
+    ok: bool
+    detail: str = ""
+
+
+class ThroughputProvision(BaseModel):
+    ok: bool = False
+    spine_repo: str = ""
+    path: str = ""
+    steps: List[ThroughputProvisionStep] = Field(default_factory=list)
+
+
 class ThroughputLeaf(BaseModel):
     id: str
     name: str
