@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.18",
+        "date": "2026-06-09",
+        "changes": [
+            {"type": "changed", "text": "측정 저장소 자동 구성: Leaf의 'speedtest' 프록시는 항상 재생성하여 remote URL과 Spine 인증을 보장(기존 잘못된 프록시 재사용 시 측정에서 HTTP 500 나던 문제 해결)"},
+        ],
+    },
+    {
         "version": "0.8.17",
         "date": "2026-06-09",
         "changes": [

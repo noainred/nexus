@@ -501,23 +501,32 @@ async def provision(registry, settings: Settings, size_mb: int, repo_name: str =
                       "ok": False, "detail": exc.message})
         return {"ok": False, "spine_repo": repo_name, "path": asset_path, "steps": steps}
 
-    # 3) raw(proxy) of the Spine repo on every Leaf.
+    # 3) raw(proxy) of the Spine repo on every Leaf. Always (re)create so the
+    #    remote URL + Spine credentials are guaranteed correct — a pre-existing
+    #    'speedtest' repo with the wrong remote/auth makes the leaf return 500
+    #    when it tries to pull the asset from the Spine.
     remote = spine.base_url.rstrip("/") + f"/repository/{repo_name}/"
     for leaf in leafs:
         lc = NexusClient(leaf, timeout=get_settings().request_timeout)
-        if await _repo_exists(lc, repo_name):
-            steps.append({"target": leaf.name, "action": f"raw 프록시 '{repo_name}'",
-                          "ok": True, "detail": "이미 존재 — 재사용"})
-            continue
+        existed = await _repo_exists(lc, repo_name)
+        if existed:
+            try:
+                await lc.delete_repository(repo_name)
+            except NexusError as exc:
+                steps.append({"target": leaf.name, "action": f"raw 프록시 '{repo_name}' 재생성",
+                              "ok": False,
+                              "detail": f"기존 저장소 삭제 실패(권한 등): {exc.message}"})
+                continue
         leaf_bs = await _first_blob_store(lc)
+        verb = "재생성" if existed else "생성"
         try:
             await lc.create_raw_proxy(
                 repo_name, remote, leaf_bs, auth=(spine.username, spine.password)
             )
-            steps.append({"target": leaf.name, "action": f"raw 프록시 '{repo_name}' 생성",
+            steps.append({"target": leaf.name, "action": f"raw 프록시 '{repo_name}' {verb}",
                           "ok": True, "detail": f"→ {remote}"})
         except NexusError as exc:
-            steps.append({"target": leaf.name, "action": f"raw 프록시 '{repo_name}' 생성",
+            steps.append({"target": leaf.name, "action": f"raw 프록시 '{repo_name}' {verb}",
                           "ok": False, "detail": exc.message})
 
     # 4) point the throughput config at the new asset.
