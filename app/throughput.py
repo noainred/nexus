@@ -76,8 +76,13 @@ async def _find_proxy_repo(leaf, spine, spine_repo: str) -> Optional[str]:
         remote = proxy.get("remoteUrl") if isinstance(proxy, dict) else None
         if not remote or _host_key(remote) != skey:
             continue
-        if spine_repo and _repo_segment(remote) == spine_repo:
-            return r.name  # exact host+repo match — best
+        if spine_repo:
+            # When a specific Spine repo is chosen, only an exact host+repo
+            # match is valid — otherwise the asset path won't resolve and we'd
+            # get a misleading 404 from an unrelated proxy.
+            if _repo_segment(remote) == spine_repo:
+                return r.name
+            continue
         if host_match is None:
             host_match = r.name
     return host_match
@@ -134,6 +139,8 @@ async def measure(
     """
     repo = await _find_proxy_repo(leaf, spine, spine_repo)
     if not repo:
+        if spine_repo:
+            return None, f"'{spine_repo}'을(를) 프록시하는 저장소가 없음 (다단 구조이거나 미프록시)"
         return None, "Spine을 가리키는 프록시 저장소를 찾지 못함 (다단 프록시 구조일 수 있음)"
     url = leaf.base_url.rstrip("/") + f"/repository/{repo}/" + asset_path.lstrip("/")
     await _delete_cached(leaf, url)            # force cache miss
@@ -252,11 +259,16 @@ async def test_connectivity(registry, cfg: dict) -> List[dict]:
     for leaf in leafs:
         repo = await _find_proxy_repo(leaf, spine, spine_repo)
         if not repo:
+            detail = (
+                f"'{spine_repo}'을(를) 프록시하는 저장소가 없음"
+                if spine_repo
+                else "Spine을 가리키는 프록시 저장소를 찾지 못함"
+            )
             results.append({
                 "id": leaf.id,
                 "name": leaf.name,
                 "ok": False,
-                "detail": "Spine을 가리키는 프록시 저장소를 찾지 못함",
+                "detail": detail,
             })
             continue
         if not asset_path:

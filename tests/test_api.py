@@ -747,9 +747,10 @@ def test_throughput_assets_filters_by_size(http_client):
     assert resp.status_code == 200
     body = resp.json()
     # Group repo skipped; assets >= 30MB returned smallest-first (5MB dropped).
-    assert body["scanned_repositories"] == 1
     assert [a["path"] for a in body["assets"]] == ["good.jar", "huge.jar"]
     assert body["assets"][0]["repository"] == "maven-central"
+    # Single page, only repo exhausted -> scan is done.
+    assert body["done"] is True
 
 
 @respx.mock

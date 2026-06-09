@@ -2096,35 +2096,54 @@ async function saveThroughputTargets() {
   }
 }
 
-async function findThroughputAssets() {
+async function findThroughputAssets(more = false) {
   const spineId = document.getElementById("tp-spine").value;
   const status = document.getElementById("tp-find-status");
   const sel = document.getElementById("tp-asset");
+  const moreBtn = document.getElementById("tp-find-more");
   if (!spineId) {
     toast("먼저 Spine 서버를 선택하세요.", "err");
     return;
   }
   const minMb = Math.max(1, Number(document.getElementById("tp-size-mb").value) || 30);
+  // Fresh search resets the cursor + the dropdown; '더 찾기' continues it.
+  if (!more || !state.tpScan || state.tpScan.spineId !== spineId || state.tpScan.minMb !== minMb) {
+    state.tpScan = { spineId, minMb, repoIndex: 0, token: "", done: false, count: 0 };
+    sel.innerHTML = '<option value="">— 측정에 쓸 파일 선택 —</option>';
+  }
+  const sc = state.tpScan;
+  moreBtn.disabled = true;
   status.textContent = `Spine에서 ${minMb}MB 이상 파일을 찾는 중…`;
   try {
-    const r = await api(`/api/throughput-assets?spine_id=${encodeURIComponent(spineId)}&min_mb=${minMb}`);
-    if (!r.assets.length) {
-      sel.innerHTML = '<option value="">— 후보 없음 (크기를 낮추거나 직접 입력) —</option>';
-      status.textContent = `${minMb}MB 이상 후보 없음 (저장소 ${r.scanned_repositories}개 스캔). 크기를 낮추거나 경로를 직접 입력하세요.`;
-      return;
+    const params =
+      `spine_id=${encodeURIComponent(spineId)}&min_mb=${minMb}&limit=5` +
+      `&repo_index=${sc.repoIndex}&token=${encodeURIComponent(sc.token || "")}`;
+    const r = await api(`/api/throughput-assets?${params}`);
+    r.assets.forEach((a) => {
+      const o = document.createElement("option");
+      o.value = String(sc.count++);
+      o.dataset.repo = a.repository;
+      o.dataset.path = a.path;
+      o.textContent = `${a.repository} · ${a.path.split("/").pop()} (${fmtBytes(a.size_bytes)})`;
+      sel.append(o);
+    });
+    sc.repoIndex = r.next_repo_index;
+    sc.token = r.next_token || "";
+    sc.done = r.done;
+    moreBtn.style.display = sc.done ? "none" : "";
+    moreBtn.disabled = false;
+    if (sc.count === 0) {
+      status.textContent = sc.done
+        ? `${minMb}MB 이상 후보 없음. 크기를 낮추거나 경로를 직접 입력하세요.`
+        : `아직 후보 없음 — '더 찾기'로 계속 탐색하세요.`;
+    } else {
+      status.textContent = sc.done
+        ? `후보 ${sc.count}개 · 더 이상 없음. 하나를 고르면 저장소·경로가 자동 입력됩니다.`
+        : `후보 ${sc.count}개 · '더 찾기'로 더 볼 수 있습니다. 하나를 고르면 자동 입력됩니다.`;
     }
-    sel.innerHTML =
-      '<option value="">— 측정에 쓸 파일 선택 —</option>' +
-      r.assets
-        .map(
-          (a, idx) =>
-            `<option value="${idx}" data-repo="${a.repository}" data-path="${a.path.replace(/"/g, "&quot;")}">` +
-            `${a.repository} · ${a.path.split("/").pop()} (${fmtBytes(a.size_bytes)})</option>`
-        )
-        .join("");
-    status.textContent = `후보 ${r.assets.length}개${r.truncated ? "+" : ""} (저장소 ${r.scanned_repositories}개 스캔). 하나를 고르면 저장소·경로가 자동 입력됩니다.`;
   } catch (e) {
     status.textContent = `검색 실패: ${e.message}`;
+    moreBtn.disabled = false;
   }
 }
 
@@ -2225,7 +2244,8 @@ function setupSettings() {
       toast(e.message, "err");
     }
   });
-  document.getElementById("tp-find-assets").addEventListener("click", findThroughputAssets);
+  document.getElementById("tp-find-assets").addEventListener("click", () => findThroughputAssets(false));
+  document.getElementById("tp-find-more").addEventListener("click", () => findThroughputAssets(true));
   document.getElementById("tp-test").addEventListener("click", testThroughputConnection);
   document.getElementById("tp-asset").addEventListener("change", (ev) => {
     const opt = ev.target.selectedOptions[0];

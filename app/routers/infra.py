@@ -22,9 +22,9 @@ from ..nexus_client import NexusClient, NexusError
 
 router = APIRouter(prefix="/api", tags=["infra"])
 
-# How hard we scan each Spine repo when hunting for candidate assets.
-_MAX_PAGES_PER_REPO = 8
-_MAX_CANDIDATES = 40
+# Asset-page budget per "후보 파일 찾기" call, so a huge DB stays responsive.
+# The caller resumes from the returned cursor with '더 찾기'.
+_PAGES_PER_CALL = 6
 
 
 @router.get("/ping-history", response_model=PingHistory)
@@ -173,12 +173,16 @@ async def test_throughput(
 async def throughput_assets(
     spine_id: str = Query(..., description="Instance id to scan for candidates."),
     min_mb: float = Query(30.0, ge=0),
+    limit: int = Query(5, ge=1, le=50, description="Stop once this many are found."),
+    repo_index: int = Query(0, ge=0, description="Resume cursor: repo position."),
+    token: str = Query("", description="Resume cursor: asset page token."),
     registry: InstanceRegistry = Depends(get_registry),
 ) -> ThroughputAssets:
-    """Find assets on the Spine that are at least ``min_mb`` in size.
+    """Find up to ``limit`` Spine assets ≥ ``min_mb``, resumably.
 
-    These become a convenient pick-list for the speed test so the operator
-    doesn't have to type an asset path by hand.
+    Scans at most ``_PAGES_PER_CALL`` asset pages per call so a huge DB stays
+    responsive; the caller passes ``next_repo_index``/``next_token`` back in to
+    continue with '더 찾기'. ``done`` is true once every repo is exhausted.
     """
     spine = registry.get(spine_id)  # 404 if unknown
     client = NexusClient(spine, timeout=get_settings().request_timeout)
@@ -189,49 +193,52 @@ async def throughput_assets(
     except NexusError:
         repos = []
     # Hosted repos hold the real bytes; skip group repos (no own assets).
+    repos = [r for r in repos if (r.type or "").lower() != "group"]
+
     candidates: list[ThroughputAsset] = []
-    scanned = 0
-    truncated = False
-    for repo in repos:
-        if (repo.type or "").lower() == "group":
-            continue
-        scanned += 1
-        token = None
-        pages = 0
+    pages = 0
+    i = repo_index
+    tok = token or None
+    nxt_index, nxt_token = i, None
+    while i < len(repos):
+        repo = repos[i]
         try:
-            while pages < _MAX_PAGES_PER_REPO:
-                page = await client.list_assets(repo.name, token)
-                for a in page.items:
-                    size = a.file_size or 0
-                    if size >= lo and a.path:
-                        candidates.append(
-                            ThroughputAsset(
-                                repository=repo.name,
-                                path=a.path,
-                                size_bytes=size,
-                                format=a.format,
-                            )
-                        )
-                        if len(candidates) >= _MAX_CANDIDATES:
-                            truncated = True
-                            break
-                if len(candidates) >= _MAX_CANDIDATES:
-                    break
-                token = page.continuation_token
-                pages += 1
-                if not token:
-                    break
+            page = await client.list_assets(repo.name, tok)
         except NexusError:
+            i += 1
+            tok = None
+            nxt_index, nxt_token = i, None
             continue
-        if len(candidates) >= _MAX_CANDIDATES:
+        pages += 1
+        for a in page.items:
+            size = a.file_size or 0
+            if size >= lo and a.path:
+                candidates.append(
+                    ThroughputAsset(
+                        repository=repo.name,
+                        path=a.path,
+                        size_bytes=size,
+                        format=a.format,
+                    )
+                )
+        if page.continuation_token:
+            tok = page.continuation_token
+            nxt_index, nxt_token = i, page.continuation_token
+        else:
+            i += 1
+            tok = None
+            nxt_index, nxt_token = i, None
+        if len(candidates) >= limit or pages >= _PAGES_PER_CALL:
             break
 
+    done = i >= len(repos)
     # Smallest-first so the candidates closest to the requested size lead.
     candidates.sort(key=lambda c: c.size_bytes)
     return ThroughputAssets(
         spine_id=spine_id,
         min_mb=min_mb,
         assets=candidates,
-        scanned_repositories=scanned,
-        truncated=truncated,
+        next_repo_index=nxt_index,
+        next_token=nxt_token,
+        done=done,
     )

@@ -127,8 +127,9 @@ class ThroughputAssets(BaseModel):
     spine_id: str
     min_mb: float
     assets: List[ThroughputAsset] = Field(default_factory=list)
-    scanned_repositories: int = 0
-    truncated: bool = False
+    next_repo_index: int = 0
+    next_token: Optional[str] = None
+    done: bool = False
 
 
 class ThroughputPoint(BaseModel):

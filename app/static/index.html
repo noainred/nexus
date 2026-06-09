@@ -351,6 +351,9 @@
             <label>측정 자산 (Spine의 공통 모듈)
               <select name="asset_pick" id="tp-asset"><option value="">— 후보 파일 찾기를 먼저 실행 —</option></select>
             </label>
+            <div class="form-actions" style="justify-content:flex-start">
+              <button type="button" id="tp-find-more" style="display:none">더 찾기 (+5)</button>
+            </div>
             <label>Spine 저장소 <input name="spine_repo" id="tp-spine-repo" type="text" placeholder="maven-central" /></label>
             <label>자산 경로 (저장소 내 경로) <input name="path" id="tp-path" type="text" placeholder="org/.../artifact.jar" /></label>
             <div class="form-actions" style="justify-content:flex-start">
