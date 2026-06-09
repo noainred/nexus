@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.21",
+        "date": "2026-06-09",
+        "changes": [
+            {"type": "changed", "text": "측정 저장소 자동 구성: 드롭다운에서 고른 Spine을 그대로 사용하고(저장 안 해도 됨), 구성 후 선택한 Spine이 빈칸으로 풀리던 문제 수정"},
+        ],
+    },
+    {
         "version": "0.8.20",
         "date": "2026-06-09",
         "changes": [

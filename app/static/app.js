@@ -2223,7 +2223,10 @@ async function provisionThroughput() {
   box.innerHTML = "";
   const stop = startProgressTicker(status, `측정 저장소 구성 중 (${minMb}MB 업로드 포함)`);
   try {
-    const r = await api(`/api/throughput-provision?size_mb=${minMb}&repo=speedtest`, { method: "POST" });
+    const r = await api(
+      `/api/throughput-provision?size_mb=${minMb}&repo=speedtest&spine_id=${encodeURIComponent(spineId)}`,
+      { method: "POST" }
+    );
     stop();
     status.textContent = "";
     const list = el("div", { class: "tp-test-list" });
@@ -2237,12 +2240,14 @@ async function provisionThroughput() {
       );
     });
     box.append(list);
+    // Reflect the new spine_repo/path, but keep the user's Spine selection
+    // (loadThroughputConfig repaints the dropdown from the saved config).
+    await loadThroughputConfig();
+    document.getElementById("tp-spine").value = spineId;
     if (r.ok) {
       toast("측정 저장소 구성 완료 — '저장' 후 측정하세요");
-      loadThroughputConfig();  // reflect new spine_repo/path
     } else {
       toast("일부 단계 실패 — 결과를 확인하세요", "err");
-      loadThroughputConfig();
     }
   } catch (e) {
     stop();

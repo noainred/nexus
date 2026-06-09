@@ -457,11 +457,21 @@ async def _repo_exists(client, name: str) -> bool:
     return any(r.name == name for r in repos)
 
 
-async def provision(registry, settings: Settings, size_mb: int, repo_name: str = "speedtest") -> dict:
+async def provision(
+    registry,
+    settings: Settings,
+    size_mb: int,
+    repo_name: str = "speedtest",
+    spine_id: Optional[str] = None,
+) -> dict:
     """Create a raw speed-test repo on the Spine (+ dummy file) and a raw
-    proxy of it on every Leaf, then point the throughput config at it."""
+    proxy of it on every Leaf, then point the throughput config at it.
+
+    ``spine_id`` (the server picked in the UI) takes precedence over the saved
+    config so the user does not have to save first; it is persisted at the end.
+    """
     cfg = registry.throughput_config()
-    spine_id = cfg.get("spine_id") or ""
+    spine_id = spine_id or cfg.get("spine_id") or ""
     by_id = {i.id: i for i in registry.all()}
     spine = by_id.get(spine_id)
     steps: list = []

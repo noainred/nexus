@@ -192,14 +192,16 @@ async def _first_asset_over(client, repo: str, lo: int, max_pages: int = 6):
 async def provision_throughput(
     size_mb: int = Query(30, ge=1, le=200),
     repo: str = Query("speedtest"),
+    spine_id: str = Query("", description="Spine picked in the UI; overrides saved config."),
     registry: InstanceRegistry = Depends(get_registry),
 ) -> ThroughputProvision:
     """Create a dedicated raw speed-test repo + dummy file when no suitable
     asset exists: hosted on the Spine, proxied on each Leaf."""
     cfg = registry.throughput_config()
-    if not cfg.get("spine_id"):
-        raise HTTPException(status_code=400, detail="먼저 Spine 서버를 지정하세요.")
-    res = await throughput.provision(registry, get_settings(), size_mb, repo)
+    sid = spine_id or cfg.get("spine_id") or ""
+    if not sid:
+        raise HTTPException(status_code=400, detail="먼저 Spine 서버를 선택하세요.")
+    res = await throughput.provision(registry, get_settings(), size_mb, repo, sid)
     return ThroughputProvision(**res)
 
 
