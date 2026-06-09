@@ -135,8 +135,12 @@ async def _timed_get(inst, url: str, cap_bytes: int) -> Tuple[Optional[Tuple[int
     return (total, elapsed), ""
 
 
-async def _delete_cached(inst, url: str) -> None:
-    """Best-effort delete of a cached asset on a proxy (forces a re-fetch)."""
+async def _delete_cached(inst, url: str) -> str:
+    """Best-effort delete of a cached asset on a proxy (forces a re-fetch).
+
+    Returns a short status so the UI can show whether the cache was actually
+    cleared (OK), was already absent (없음), or the delete failed (권한 등).
+    """
     verify = True if inst.verify_tls is None else inst.verify_tls
     try:
         async with httpx.AsyncClient(
@@ -145,9 +149,14 @@ async def _delete_cached(inst, url: str) -> None:
             auth=(inst.username, inst.password),
             follow_redirects=True,
         ) as client:
-            await client.delete(url)
-    except httpx.HTTPError:
-        pass
+            resp = await client.delete(url)
+    except httpx.HTTPError as exc:
+        return f"실패({type(exc).__name__})"
+    if resp.status_code in (200, 202, 204):
+        return "OK"
+    if resp.status_code == 404:
+        return "없음"
+    return f"HTTP{resp.status_code}"
 
 
 async def measure(
@@ -163,7 +172,7 @@ async def measure(
             return None, f"'{spine_repo}'을(를) 프록시하는 저장소가 없음 (다단 구조이거나 미프록시)"
         return None, "Spine을 가리키는 프록시 저장소를 찾지 못함 (다단 프록시 구조일 수 있음)"
     url = leaf.base_url.rstrip("/") + f"/repository/{repo}/" + asset_path.lstrip("/")
-    await _delete_cached(leaf, url)            # force cache miss
+    del_status = await _delete_cached(leaf, url)   # force a cache miss
     miss, derr = await _timed_get(leaf, url, cap_bytes)
     if miss is None:
         return None, f"자산 다운로드 실패: {derr} (프록시 {repo}/{asset_path.lstrip('/')})"
@@ -174,7 +183,11 @@ async def measure(
     floor = max(miss_ms * 0.1, 1.0)            # guard against noise/streaming
     if spine_ms < floor:
         spine_ms = floor
-    detail = f"성공 · {repo} · miss {round(miss_ms)}ms / hit {round(hit_ms)}ms"
+    mb = miss_bytes / 1024 / 1024
+    detail = (
+        f"성공 · {repo} · {mb:.1f}MB · 캐시삭제 {del_status} · "
+        f"miss {round(miss_ms)}ms / hit {round(hit_ms)}ms"
+    )
     return (miss_bytes, round(spine_ms, 1)), detail
 
 

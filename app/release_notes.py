@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.15",
+        "date": "2026-06-09",
+        "changes": [
+            {"type": "added", "text": "측정 결과에 실제 받은 용량(MB)과 캐시 삭제 결과(OK/없음/실패)를 표시 — 캐시를 안 쓰고 실제 파일을 받는지 검증 가능"},
+        ],
+    },
+    {
         "version": "0.8.14",
         "date": "2026-06-09",
         "changes": [
