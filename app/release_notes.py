@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.23",
+        "date": "2026-06-09",
+        "changes": [
+            {"type": "changed", "text": "측정 저장소 자동 구성의 기본 저장소 이름을 'speedtest' → 'speedtest_hosted'로 변경(hosted 용도를 명확히 하고 옛 proxy 'speedtest'와의 이름 충돌 회피)"},
+        ],
+    },
+    {
         "version": "0.8.22",
         "date": "2026-06-09",
         "changes": [

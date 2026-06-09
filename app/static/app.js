@@ -2217,14 +2217,14 @@ async function provisionThroughput() {
   }
   const minMb = Math.max(1, Number(document.getElementById("tp-size-mb").value) || 30);
   const msg =
-    `Spine과 각 Leaf에 측정 전용 raw 저장소('speedtest')와 ${minMb}MB 더미 파일을 생성합니다.\n` +
+    `Spine과 각 Leaf에 측정 전용 raw 저장소('speedtest_hosted')와 ${minMb}MB 더미 파일을 생성합니다.\n` +
     `(서버에 저장소·파일이 실제로 만들어집니다. admin 권한 필요)\n\n진행할까요?`;
   if (!window.confirm(msg)) return;
   box.innerHTML = "";
   const stop = startProgressTicker(status, `측정 저장소 구성 중 (${minMb}MB 업로드 포함)`);
   try {
     const r = await api(
-      `/api/throughput-provision?size_mb=${minMb}&repo=speedtest&spine_id=${encodeURIComponent(spineId)}`,
+      `/api/throughput-provision?size_mb=${minMb}&repo=speedtest_hosted&spine_id=${encodeURIComponent(spineId)}`,
       { method: "POST" }
     );
     stop();

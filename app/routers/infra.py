@@ -191,7 +191,7 @@ async def _first_asset_over(client, repo: str, lo: int, max_pages: int = 6):
 @router.post("/throughput-provision", response_model=ThroughputProvision)
 async def provision_throughput(
     size_mb: int = Query(30, ge=1, le=200),
-    repo: str = Query("speedtest"),
+    repo: str = Query("speedtest_hosted"),
     spine_id: str = Query("", description="Spine picked in the UI; overrides saved config."),
     registry: InstanceRegistry = Depends(get_registry),
 ) -> ThroughputProvision:

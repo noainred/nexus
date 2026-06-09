@@ -473,7 +473,7 @@ async def provision(
     registry,
     settings: Settings,
     size_mb: int,
-    repo_name: str = "speedtest",
+    repo_name: str = "speedtest_hosted",
     spine_id: Optional[str] = None,
 ) -> dict:
     """Create a raw speed-test repo on the Spine (+ dummy file) and a raw
