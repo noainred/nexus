@@ -21,8 +21,9 @@ from .config import Settings, get_settings
 from .nexus_client import NexusClient, NexusError
 
 
-def _backup_root(settings: Settings) -> Path:
-    p = Path(settings.backup_dir)
+def resolve_root(path: str, settings: Settings) -> Path:
+    """Backup directory: the user-configured path, else the default."""
+    p = Path((path or "").strip() or settings.backup_dir)
     if not p.is_absolute():
         p = Path.cwd() / p
     return p
@@ -34,7 +35,7 @@ def _safe(name: str) -> str:
 
 async def run_backup(registry, settings: Settings) -> dict:
     """Back up every managed server's configuration once. Returns a summary."""
-    root = _backup_root(settings)
+    root = resolve_root(registry.backup_config().get("path", ""), settings)
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     out = root / ts
     out.mkdir(parents=True, exist_ok=True)
@@ -67,7 +68,8 @@ async def run_backup(registry, settings: Settings) -> dict:
 
     _prune(root, registry.backup_config().get("keep", 14))
     ok = sum(1 for i in items if i.get("ok"))
-    return {"timestamp": ts, "ok": ok, "total": len(items), "items": items}
+    return {"timestamp": ts, "ok": ok, "total": len(items),
+            "directory": str(out), "items": items}
 
 
 def _prune(root: Path, keep: int) -> None:
@@ -78,8 +80,7 @@ def _prune(root: Path, keep: int) -> None:
         shutil.rmtree(d, ignore_errors=True)
 
 
-def list_backups(settings: Settings) -> List[dict]:
-    root = _backup_root(settings)
+def list_backups(root: Path) -> List[dict]:
     if not root.exists():
         return []
     out: List[dict] = []
@@ -93,13 +94,13 @@ def list_backups(settings: Settings) -> List[dict]:
     return out
 
 
-def backup_file_path(settings: Settings, ts: str, name: str) -> Optional[Path]:
+def backup_file_path(root: Path, ts: str, name: str) -> Optional[Path]:
     """Resolve a backup file, guarding against path traversal."""
     if not re.fullmatch(r"[0-9][0-9-]{0,20}", ts or ""):
         return None
     if not re.fullmatch(r"[A-Za-z0-9._-]+\.json", name or ""):
         return None
-    p = _backup_root(settings) / ts / name
+    p = root / ts / name
     return p if p.is_file() else None
 
 

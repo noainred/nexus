@@ -95,6 +95,7 @@ class BackupConfig(BaseModel):
     enabled: bool = False
     time: str = "02:00"        # daily HH:MM (local time)
     keep: int = 14             # how many backup runs to retain
+    path: str = ""             # directory to write backups to ("" = default)
 
 
 class InstanceTestRequest(BaseModel):

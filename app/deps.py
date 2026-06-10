@@ -34,18 +34,21 @@ class InstanceRegistry:
         self._backup_enabled: bool = document.backup_enabled
         self._backup_time: str = document.backup_time
         self._backup_keep: int = document.backup_keep
+        self._backup_path: str = document.backup_path
 
     def backup_config(self) -> dict:
         return {
             "enabled": self._backup_enabled,
             "time": self._backup_time,
             "keep": self._backup_keep,
+            "path": self._backup_path,
         }
 
-    def set_backup_config(self, enabled: bool, time: str, keep: int) -> None:
+    def set_backup_config(self, enabled: bool, time: str, keep: int, path: str = "") -> None:
         self._backup_enabled = bool(enabled)
         self._backup_time = (time or "02:00").strip()
         self._backup_keep = max(1, int(keep))
+        self._backup_path = (path or "").strip()
         self._persist()
 
     def compare_fields(self) -> List[str]:
@@ -172,6 +175,7 @@ class InstanceRegistry:
         self._backup_enabled = doc.backup_enabled
         self._backup_time = doc.backup_time
         self._backup_keep = doc.backup_keep
+        self._backup_path = doc.backup_path
 
 
 # Singleton registry, initialised at import time from the configured file.

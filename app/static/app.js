@@ -2518,6 +2518,7 @@ async function loadBackupConfig() {
   try {
     const c = await api("/api/backup-config");
     document.getElementById("backup-enabled").checked = !!c.enabled;
+    document.getElementById("backup-path").value = c.path || "";
     document.getElementById("backup-time").value = c.time || "02:00";
     document.getElementById("backup-keep").value = c.keep != null ? c.keep : 14;
   } catch (e) {
@@ -2562,7 +2563,7 @@ async function runBackupNow() {
   status.textContent = "백업 중…";
   try {
     const r = await api("/api/backup-run", { method: "POST" });
-    status.textContent = `백업 완료 · ${r.timestamp} · 성공 ${r.ok}/${r.total}`;
+    status.textContent = `백업 완료 · ${r.timestamp} · 성공 ${r.ok}/${r.total}${r.directory ? ` · 경로: ${r.directory}` : ""}`;
     const failed = (r.items || []).filter((i) => !i.ok);
     if (failed.length) {
       toast(`백업 일부 실패: ${failed.map((i) => i.name).join(", ")}`, "err");
@@ -2658,6 +2659,7 @@ function setupSettings() {
         method: "PUT",
         body: JSON.stringify({
           enabled: document.getElementById("backup-enabled").checked,
+          path: String(document.getElementById("backup-path").value || "").trim(),
           time: String(document.getElementById("backup-time").value || "02:00").trim(),
           keep: Number(document.getElementById("backup-keep").value) || 14,
         }),

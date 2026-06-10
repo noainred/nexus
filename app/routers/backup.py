@@ -23,8 +23,12 @@ async def set_backup_config(
     cfg: BackupConfig,
     registry: InstanceRegistry = Depends(get_registry),
 ) -> BackupConfig:
-    registry.set_backup_config(cfg.enabled, cfg.time, cfg.keep)
+    registry.set_backup_config(cfg.enabled, cfg.time, cfg.keep, cfg.path)
     return BackupConfig(**registry.backup_config())
+
+
+def _root(registry: InstanceRegistry):
+    return backup_mod.resolve_root(registry.backup_config().get("path", ""), get_settings())
 
 
 @router.post("/backup-run")
@@ -36,13 +40,19 @@ async def run_backup_now(
 
 
 @router.get("/backups")
-async def list_backups() -> list:
-    return backup_mod.list_backups(get_settings())
+async def list_backups(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> list:
+    return backup_mod.list_backups(_root(registry))
 
 
 @router.get("/backups/{ts}/{name}")
-async def download_backup(ts: str, name: str) -> Response:
-    path = backup_mod.backup_file_path(get_settings(), ts, name)
+async def download_backup(
+    ts: str,
+    name: str,
+    registry: InstanceRegistry = Depends(get_registry),
+) -> Response:
+    path = backup_mod.backup_file_path(_root(registry), ts, name)
     if path is None:
         raise HTTPException(status_code=404, detail="백업 파일을 찾을 수 없습니다.")
     return Response(

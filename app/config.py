@@ -84,6 +84,7 @@ class InstancesDocument(BaseModel):
     backup_enabled: bool = False
     backup_time: str = "02:00"
     backup_keep: int = 14
+    backup_path: str = ""
 
 
 @lru_cache
@@ -168,6 +169,7 @@ def instances_to_dict(
         data["backup_enabled"] = bool(backup.get("enabled", False))
         data["backup_time"] = backup.get("time", "02:00")
         data["backup_keep"] = int(backup.get("keep", 14))
+        data["backup_path"] = backup.get("path", "")
     return data
 
 

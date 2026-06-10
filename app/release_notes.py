@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.42",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "서버 설정 백업에 '백업 저장 경로' 지정 추가 — 사용자가 지정한 디렉터리에 백업 저장(비우면 기본 backups/). '지금 백업' 결과에 실제 저장 경로 표시"},
+        ],
+    },
+    {
         "version": "0.8.41",
         "date": "2026-06-10",
         "changes": [
