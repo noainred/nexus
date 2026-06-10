@@ -141,6 +141,59 @@ function restoreActiveTab() {
   if (name) selectTab(name);
 }
 
+// ---- proxy remote-status board --------------------------------------------
+
+async function loadProxyStatus() {
+  const table = document.getElementById("pxs-table");
+  const summary = document.getElementById("pxs-summary");
+  table.innerHTML = "";
+  summary.textContent = "전 서버 프록시 상태 조회 중…";
+  let r;
+  try {
+    r = await api("/api/proxy-status");
+  } catch (e) {
+    summary.textContent = `조회 실패: ${e.message}`;
+    return;
+  }
+  state.proxyStatus = r;
+  renderProxyStatus();
+}
+
+function renderProxyStatus() {
+  const r = state.proxyStatus;
+  if (!r) return;
+  const table = document.getElementById("pxs-table");
+  const summary = document.getElementById("pxs-summary");
+  const c = r.counts || {};
+  summary.textContent =
+    `서버 ${r.scanned}대 조회 · 정상 ${c.ok || 0} · 차단 ${c.blocked || 0} · ` +
+    `오프라인 ${c.offline || 0} · 확인불가 ${c.unknown || 0}` +
+    (Object.keys(r.errors || {}).length ? ` · 조회 실패 서버: ${Object.keys(r.errors).join(", ")}` : "");
+  table.innerHTML = "";
+  const problemOnly = document.getElementById("pxs-problem-only").checked;
+  let items = r.items || [];
+  if (problemOnly) items = items.filter((i) => i.state !== "ok");
+  if (!items.length) {
+    table.append(el("div", { class: "empty" },
+      problemOnly ? "문제 있는 프록시가 없습니다 ✓" : "프록시 저장소가 없습니다."));
+    return;
+  }
+  const badge = (s) => {
+    const map = { ok: ["up", "정상"], blocked: ["down", "차단됨"], offline: ["warn", "오프라인"], unknown: ["warn", "확인불가"] };
+    const [cls, label] = map[s] || ["warn", s];
+    return el("span", { class: `badge ${cls}` }, label);
+  };
+  const rows = items.map((i) => el("tr", {}, [
+    el("td", {}, i.instance_name),
+    el("td", {}, el("span", { class: "link", onclick: () => openRepoDiff(i.repository) }, i.repository)),
+    el("td", {}, i.format || ""),
+    el("td", { class: "url" }, i.remote_url || ""),
+    el("td", {}, badge(i.state)),
+    el("td", {}, i.detail || ""),
+  ]));
+  table.append(buildTable(["서버", "저장소", "포맷", "원격(remote)", "상태", "사유"], rows));
+}
+
 // ---- fleet-wide search ---------------------------------------------------
 
 function setupSearch() {
@@ -679,6 +732,8 @@ function renderInfraChart(s, opts = {}) {
 function setupTopology() {
   document.getElementById("topo-refresh").addEventListener("click", loadTopology);
   document.getElementById("topo-probe").addEventListener("change", loadTopology);
+  document.getElementById("pxs-refresh").addEventListener("click", loadProxyStatus);
+  document.getElementById("pxs-problem-only").addEventListener("change", renderProxyStatus);
 }
 
 async function loadTopology() {

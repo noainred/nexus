@@ -111,3 +111,74 @@ async def topology(
 
     broken_total = sum(1 for node in nodes for lnk in node.proxies if lnk.broken)
     return Topology(nodes=nodes, broken_links=broken_total)
+
+
+@router.get("/proxy-status")
+async def proxy_status(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Fleet-wide proxy remote-health board.
+
+    For every monitored instance, combine the repository list (remote URLs)
+    with the internal per-repo runtime status (the only API that exposes
+    'Remote Auto Blocked') and classify each proxy: ok / blocked / offline.
+    """
+    instances = registry.monitoring()
+
+    async def one(inst):
+        client = NexusClient(inst, timeout=get_settings().request_timeout)
+        try:
+            repos = await client.list_repositories()
+        except NexusError as exc:
+            return inst, None, None, exc.message
+        statuses = None
+        try:
+            statuses = await client.repo_statuses()
+        except NexusError:
+            pass  # older version / no permission — degrade to unknown
+        return inst, repos, statuses, None
+
+    results = await asyncio.gather(*(one(i) for i in instances))
+
+    items: List[dict] = []
+    errors: Dict[str, str] = {}
+    counts = {"ok": 0, "blocked": 0, "offline": 0, "unknown": 0}
+    for inst, repos, statuses, err in results:
+        if err is not None:
+            errors[inst.id] = err
+            continue
+        smap = {}
+        for s in statuses or []:
+            if isinstance(s, dict) and s.get("name"):
+                smap[s["name"]] = s.get("status") or {}
+        for repo in repos or []:
+            if (repo.type or "").lower() != "proxy":
+                continue
+            remote = _remote_url(repo) or ""
+            st = smap.get(repo.name)
+            if st is None:
+                state, detail = "unknown", "상태 조회 불가"
+            else:
+                online = st.get("online")
+                desc = st.get("description") or ""
+                reason = st.get("reason") or ""
+                if online is False:
+                    state, detail = "offline", desc or "offline"
+                elif "blocked" in desc.lower():
+                    state, detail = "blocked", (f"{desc} — {reason}" if reason else desc)
+                else:
+                    state, detail = "ok", desc or "Ready to Connect"
+            counts[state] = counts.get(state, 0) + 1
+            items.append({
+                "instance_id": inst.id,
+                "instance_name": inst.name,
+                "repository": repo.name,
+                "format": repo.format,
+                "remote_url": remote,
+                "state": state,
+                "detail": detail,
+            })
+
+    order = {"blocked": 0, "offline": 1, "unknown": 2, "ok": 3}
+    items.sort(key=lambda x: (order.get(x["state"], 9), x["instance_name"], x["repository"]))
+    return {"counts": counts, "items": items, "errors": errors, "scanned": len(instances)}

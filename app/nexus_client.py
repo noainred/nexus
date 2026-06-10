@@ -151,6 +151,33 @@ class NexusClient:
     async def delete_repository(self, name: str) -> None:
         await self._request("DELETE", f"/repositories/{name}")
 
+    async def repo_statuses(self) -> list[dict[str, Any]]:
+        """Per-repository runtime status (online / 'Remote Auto Blocked' …).
+
+        Uses the internal UI endpoint the Nexus web UI itself relies on —
+        the public v1 API does not expose auto-block state. May 404 on some
+        versions; callers should degrade gracefully.
+        """
+        url = self.instance.base_url.rstrip("/") + "/service/rest/internal/ui/repositories"
+        verify = True if self.instance.verify_tls is None else self.instance.verify_tls
+        try:
+            async with httpx.AsyncClient(
+                auth=(self.instance.username, self.instance.password),
+                timeout=self._timeout,
+                verify=verify,
+                headers={"Accept": "application/json"},
+            ) as client:
+                resp = await client.get(url, params={"withAll": "true"})
+        except httpx.HTTPError as exc:
+            raise NexusError(f"Connection error: {_describe(exc)}") from exc
+        if resp.status_code >= 400:
+            raise NexusError(
+                f"Nexus returned {resp.status_code} for internal repositories",
+                status_code=resp.status_code,
+            )
+        data = resp.json()
+        return data if isinstance(data, list) else []
+
     # -- Repository provisioning (speed-test infra) -------------------------
 
     async def create_raw_hosted(self, name: str, blob_store: str) -> None:

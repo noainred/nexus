@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.52",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "프록시 원격 상태 보드 — 토폴로지 탭에서 전 서버 프록시의 Remote Auto Blocked/오프라인 상태를 한 표로 조회(차단/문제 우선 정렬, '문제만 보기' 필터, 요약 집계). 신규 GET /api/proxy-status"},
+        ],
+    },
+    {
         "version": "0.8.51",
         "date": "2026-06-10",
         "changes": [

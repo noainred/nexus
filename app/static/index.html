@@ -49,6 +49,20 @@
         <p class="hint">각 프록시 저장소의 원격 주소로 노드 간 부모↔자식 관계를 도출합니다. 상위 노드가 다운된 끊긴 링크는 빨갛게 표시되며, 해당 프록시는 Auto-block 위험이 있습니다.</p>
         <div id="topo-summary" class="cards"></div>
         <div id="topo-body"></div>
+
+        <div class="matrix-header" style="margin-top:24px">
+          <h2>프록시 원격 상태 보드 (Auto-block)</h2>
+          <div class="matrix-controls">
+            <label class="drift-only">
+              <input type="checkbox" id="pxs-problem-only" checked />
+              문제만 보기
+            </label>
+            <button id="pxs-refresh">상태 조회</button>
+          </div>
+        </div>
+        <p class="hint">전 서버의 프록시 저장소가 각자 원격(remote)에 연결 가능한지, <b>Remote Auto Blocked</b> 상태인지를 한 표로 보여줍니다. 차단된 프록시는 해당 서버 Nexus가 원격에 못 닿고 있다는 뜻입니다.</p>
+        <p id="pxs-summary" class="hint"></p>
+        <div id="pxs-table"></div>
       </section>
 
       <section id="overview" class="panel active">
