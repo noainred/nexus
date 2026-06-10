@@ -86,6 +86,7 @@ class InstancesDocument(BaseModel):
     backup_time: str = "02:00"
     backup_keep: int = 14
     backup_path: str = ""
+    sync_jobs: List[dict] = Field(default_factory=list)
 
 
 @lru_cache
@@ -139,6 +140,7 @@ def instances_to_dict(
     compare_fields: Optional[List[str]] = None,
     ping: Optional[dict] = None,
     backup: Optional[dict] = None,
+    sync_jobs: Optional[List[dict]] = None,
 ) -> dict:
     """Serialise instances to the plain dict written to YAML / exported."""
     data: dict = {
@@ -171,6 +173,8 @@ def instances_to_dict(
         data["backup_time"] = backup.get("time", "02:00")
         data["backup_keep"] = int(backup.get("keep", 14))
         data["backup_path"] = backup.get("path", "")
+    if sync_jobs is not None:
+        data["sync_jobs"] = list(sync_jobs)
     return data
 
 
@@ -180,9 +184,10 @@ def instances_to_yaml(
     compare_fields: Optional[List[str]] = None,
     ping: Optional[dict] = None,
     backup: Optional[dict] = None,
+    sync_jobs: Optional[List[dict]] = None,
 ) -> str:
     return yaml.safe_dump(
-        instances_to_dict(instances, group_order, compare_fields, ping, backup),
+        instances_to_dict(instances, group_order, compare_fields, ping, backup, sync_jobs),
         allow_unicode=True,
         sort_keys=False,
     )
@@ -200,6 +205,7 @@ def save_instances(
     compare_fields: Optional[List[str]] = None,
     ping: Optional[dict] = None,
     backup: Optional[dict] = None,
+    sync_jobs: Optional[List[dict]] = None,
     settings: Optional[Settings] = None,
 ) -> None:
     """Persist the managed instances (and view prefs) back to the YAML file."""
@@ -207,6 +213,6 @@ def save_instances(
     path = _instance_path(settings)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        instances_to_yaml(instances, group_order, compare_fields, ping, backup),
+        instances_to_yaml(instances, group_order, compare_fields, ping, backup, sync_jobs),
         encoding="utf-8",
     )

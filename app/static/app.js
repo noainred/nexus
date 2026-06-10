@@ -2659,6 +2659,7 @@ async function loadSettings() {
   loadCompareFields();
   loadPingConfig();
   loadBackupConfig();
+  loadSyncJobs();
 }
 
 function downloadInstanceConfig(inst) {
@@ -2830,6 +2831,88 @@ async function runBackupNow() {
   }
 }
 
+async function loadSyncJobs() {
+  const list = document.getElementById("syncjob-list");
+  if (!list) return;
+  // Populate source/target dropdowns from known instances.
+  const opts = () => (state.instances || []).map((i) => el("option", { value: i.id }, i.name));
+  const src = document.getElementById("syncjob-src");
+  const tgt = document.getElementById("syncjob-tgt");
+  if (src && !src.options.length) opts().forEach((o) => src.append(o));
+  if (tgt && !tgt.options.length) {
+    opts().forEach((o) => tgt.append(o));
+    if (tgt.options.length > 1) tgt.selectedIndex = 1;
+  }
+  let jobs = [];
+  try { jobs = (await api("/api/sync-jobs")).jobs || []; } catch (e) { return; }
+  state.syncJobs = jobs;
+  list.innerHTML = "";
+  if (!jobs.length) {
+    list.append(el("p", { class: "hint" }, "예약된 동기화 작업이 없습니다."));
+    return;
+  }
+  const nameOf = (id) => ((state.instances || []).find((i) => i.id === id) || {}).name || id;
+  const rows = jobs.map((j) => el("tr", {}, [
+    el("td", {}, `${nameOf(j.source_id)} → ${nameOf(j.target_id)}`),
+    el("td", {}, j.repository),
+    el("td", {}, j.time),
+    el("td", {}, el("label", { class: "chk" }, [
+      el("input", { type: "checkbox", ...(j.enabled ? { checked: "checked" } : {}), onclick: () => toggleSyncJob(j.id) }),
+      " 사용",
+    ])),
+    el("td", {}, [
+      el("button", { onclick: () => runSyncJob(j.id) }, "지금"),
+      " ",
+      el("button", { class: "danger", onclick: () => deleteSyncJob(j.id) }, "삭제"),
+    ]),
+  ]));
+  list.append(buildTable(["원본 → 대상", "저장소", "시각", "사용", ""], rows));
+}
+
+async function saveSyncJobs(jobs) {
+  await api("/api/sync-jobs", { method: "PUT", body: JSON.stringify({ jobs }) });
+  await loadSyncJobs();
+}
+
+async function addSyncJob() {
+  const src = document.getElementById("syncjob-src").value;
+  const tgt = document.getElementById("syncjob-tgt").value;
+  const repo = document.getElementById("syncjob-repo").value.trim();
+  const time = (document.getElementById("syncjob-time").value || "03:00").trim();
+  if (!src || !tgt || !repo) { toast("원본/대상/저장소를 입력하세요.", "err"); return; }
+  if (src === tgt) { toast("원본과 대상이 같습니다.", "err"); return; }
+  const jobs = [...(state.syncJobs || []), { source_id: src, target_id: tgt, repository: repo, time, enabled: true }];
+  try {
+    await saveSyncJobs(jobs);
+    document.getElementById("syncjob-repo").value = "";
+    toast("동기화 작업 추가됨");
+  } catch (e) { toast(`추가 실패: ${e.message}`, "err"); }
+}
+
+async function toggleSyncJob(id) {
+  const jobs = (state.syncJobs || []).map((j) => j.id === id ? { ...j, enabled: !j.enabled } : j);
+  try { await saveSyncJobs(jobs); } catch (e) { toast(e.message, "err"); }
+}
+
+async function deleteSyncJob(id) {
+  if (!confirm("이 동기화 작업을 삭제할까요?")) return;
+  const jobs = (state.syncJobs || []).filter((j) => j.id !== id);
+  try { await saveSyncJobs(jobs); toast("삭제됨"); } catch (e) { toast(e.message, "err"); }
+}
+
+async function runSyncJob(id) {
+  const status = document.getElementById("syncjob-status");
+  status.textContent = "동기화 실행 중…";
+  try {
+    const r = await api(`/api/sync-jobs/run?id=${encodeURIComponent(id)}`, { method: "POST" });
+    status.textContent = `완료 · 처리 ${r.processed} · 캐시 ${r.warmed} · 실패 ${r.failed}`;
+    toast(`동기화 완료 — 캐시 ${r.warmed} / 실패 ${r.failed}`, r.failed ? "err" : "ok");
+  } catch (e) {
+    status.textContent = `실패: ${e.message}`;
+    toast(`동기화 실패: ${e.message}`, "err");
+  }
+}
+
 async function setReference(inst) {
   try {
     await api(`/api/instances/${encodeURIComponent(inst.id)}/reference`, { method: "POST" });
@@ -2924,6 +3007,7 @@ function setupSettings() {
     }
   });
   document.getElementById("backup-now").addEventListener("click", runBackupNow);
+  document.getElementById("syncjob-add").addEventListener("click", addSyncJob);
   // "새 서버 추가" button reveals the form (add mode); 취소 hides it.
   document.getElementById("settings-add-toggle").addEventListener("click", () => {
     settingsResetForm();

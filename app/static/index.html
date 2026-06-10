@@ -369,6 +369,20 @@
           <div id="backup-list"></div>
         </div>
 
+        <div class="settings-card">
+          <h3>예약 콘텐츠 동기화 (프록시 캐시)</h3>
+          <p class="hint">원본 서버의 저장소 캐시를 대상(프록시) 서버에 매일 지정 시각에 자동으로 채웁니다. Pro의 콘텐츠 복제를 대신해, 마스터→사이트로 아티팩트를 미리 내려두어 원격 사이트의 첫 다운로드 지연을 없앱니다.</p>
+          <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap;gap:8px;align-items:flex-end">
+            <label class="ref-pick">원본 <select id="syncjob-src"></select></label>
+            <label class="ref-pick">대상 <select id="syncjob-tgt"></select></label>
+            <label>저장소 <input id="syncjob-repo" type="text" placeholder="예: maven-central" /></label>
+            <label>시각 <input id="syncjob-time" type="text" placeholder="03:00" style="width:80px" /></label>
+            <button type="button" id="syncjob-add">작업 추가</button>
+            <span id="syncjob-status" class="hint" style="margin:0"></span>
+          </div>
+          <div id="syncjob-list"></div>
+        </div>
+
       </section>
 
       <section id="about" class="panel">

@@ -89,6 +89,21 @@ class PingHistory(BaseModel):
     series: List[PingSeries] = Field(default_factory=list)
 
 
+class SyncJob(BaseModel):
+    """One scheduled proxy cache-warming job."""
+
+    id: str = ""
+    source_id: str
+    target_id: str
+    repository: str
+    time: str = "03:00"        # daily HH:MM (local time)
+    enabled: bool = True
+
+
+class SyncJobs(BaseModel):
+    jobs: List[SyncJob] = Field(default_factory=list)
+
+
 class BackupConfig(BaseModel):
     """Scheduled configuration-backup settings."""
 

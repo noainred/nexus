@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.51",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "예약 콘텐츠 동기화 — 서버 설정에 '예약 콘텐츠 동기화' 추가. 원본→대상(프록시) 저장소 캐시를 매일 지정 시각에 자동으로 채움(Pro 콘텐츠 복제의 OSS 대체). 작업 추가/사용토글/지금실행/삭제 + 백그라운드 스케줄러. 신규 /api/sync-jobs"},
+        ],
+    },
+    {
         "version": "0.8.50",
         "date": "2026-06-10",
         "changes": [

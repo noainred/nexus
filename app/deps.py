@@ -35,6 +35,14 @@ class InstanceRegistry:
         self._backup_time: str = document.backup_time
         self._backup_keep: int = document.backup_keep
         self._backup_path: str = document.backup_path
+        self._sync_jobs: List[dict] = [dict(j) for j in document.sync_jobs]
+
+    def sync_jobs(self) -> List[dict]:
+        return [dict(j) for j in self._sync_jobs]
+
+    def set_sync_jobs(self, jobs: List[dict]) -> None:
+        self._sync_jobs = [dict(j) for j in jobs]
+        self._persist()
 
     def backup_config(self) -> dict:
         return {
@@ -162,6 +170,7 @@ class InstanceRegistry:
             self._compare_fields,
             self.ping_config(),
             self.backup_config(),
+            self._sync_jobs,
         )
 
     def reload(self) -> None:
@@ -176,6 +185,7 @@ class InstanceRegistry:
         self._backup_time = doc.backup_time
         self._backup_keep = doc.backup_keep
         self._backup_path = doc.backup_path
+        self._sync_jobs = [dict(j) for j in doc.sync_jobs]
 
 
 # Singleton registry, initialised at import time from the configured file.
