@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.56",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "added", "text": "Auto-block 진단·해제 — 프록시 상태 보드에서 문제 행의 '진단' 클릭 시 원격 프로브(응답/지연)와 현재 timeout·재시도·auto-block 설정, 권장 조치를 표시. 원클릭 조치: 차단 초기화(재시도)/타임아웃 60초 상향/auto-block 해제. 신규 /api/proxy-status/diagnose·fix"},
+        ],
+    },
+    {
         "version": "0.8.55",
         "date": "2026-06-11",
         "changes": [

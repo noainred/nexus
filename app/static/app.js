@@ -183,15 +183,78 @@ function renderProxyStatus() {
     const [cls, label] = map[s] || ["warn", s];
     return el("span", { class: `badge ${cls}` }, label);
   };
-  const rows = items.map((i) => el("tr", {}, [
-    el("td", {}, i.instance_name),
-    el("td", {}, el("span", { class: "link", onclick: () => openRepoDiff(i.repository) }, i.repository)),
-    el("td", {}, i.format || ""),
-    el("td", { class: "url" }, i.remote_url || ""),
-    el("td", {}, badge(i.state)),
-    el("td", {}, i.detail || ""),
-  ]));
+  const rows = [];
+  items.forEach((i) => {
+    const tr = el("tr", {}, [
+      el("td", {}, i.instance_name),
+      el("td", {}, el("span", { class: "link", onclick: () => openRepoDiff(i.repository) }, i.repository)),
+      el("td", {}, i.format || ""),
+      el("td", { class: "url" }, i.remote_url || ""),
+      el("td", {}, badge(i.state)),
+      el("td", {}, [
+        i.detail || "",
+        i.state !== "ok"
+          ? el("button", { style: "margin-left:8px", onclick: (ev) => diagnoseProxy(ev, i) }, "진단")
+          : null,
+      ]),
+    ]);
+    rows.push(tr);
+  });
   table.append(buildTable(["서버", "저장소", "포맷", "원격(remote)", "상태", "사유"], rows));
+}
+
+// Expand a diagnosis row (manager-side remote probe + one-click fixes).
+async function diagnoseProxy(ev, item) {
+  const tr = ev.target.closest("tr");
+  if (tr.nextSibling && tr.nextSibling.classList && tr.nextSibling.classList.contains("pxs-diag")) {
+    tr.nextSibling.remove();  // toggle off
+    return;
+  }
+  const cell = el("td", { colspan: "6" }, "진단 중… (원격 프로브)");
+  const diagRow = el("tr", { class: "pxs-diag" }, [cell]);
+  tr.after(diagRow);
+  let d;
+  try {
+    d = await api(
+      `/api/proxy-status/diagnose?instance_id=${encodeURIComponent(item.instance_id)}` +
+        `&repository=${encodeURIComponent(item.repository)}`
+    );
+  } catch (e) {
+    cell.textContent = `진단 실패: ${e.message}`;
+    return;
+  }
+  if (d.error) { cell.textContent = d.error; return; }
+  cell.innerHTML = "";
+  const probe = d.reachable
+    ? `원격 응답 HTTP ${d.status_code} · ${d.elapsed_ms}ms`
+    : `원격 연결 실패 (${d.probe_error || "오류"})`;
+  const fixBtn = (action, label) => el("button", {
+    style: "margin-right:6px",
+    onclick: async () => {
+      if (!confirm(`'${item.repository}' (${item.instance_name})에 적용: ${label}\n진행할까요?`)) return;
+      try {
+        const r = await api(
+          `/api/proxy-status/fix?instance_id=${encodeURIComponent(item.instance_id)}` +
+            `&repository=${encodeURIComponent(item.repository)}&action=${action}`,
+          { method: "POST" }
+        );
+        toast(r.detail || "적용됨");
+        loadProxyStatus();
+      } catch (e) { toast(`적용 실패: ${e.message}`, "err"); }
+    },
+  }, label);
+  cell.append(el("div", {}, [
+    el("p", { class: "hint", style: "margin:4px 0" },
+      `매니저→원격 프로브: ${probe} · 현재 설정: timeout ${d.timeout ?? "기본(20s)"} / ` +
+      `재시도 ${d.retries ?? "기본(3)"} / auto-block ${d.auto_block ? "켜짐" : "꺼짐"}`),
+    el("p", { style: "margin:4px 0" }, `→ ${d.suggestion}`),
+    el("p", { class: "hint", style: "margin:4px 0" }, d.note || ""),
+    el("div", { style: "margin-top:6px" }, [
+      fixBtn("reset", "차단 초기화(재시도)"),
+      fixBtn("timeout", "타임아웃 60초로 상향"),
+      fixBtn("autoblock_off", "auto-block 해제"),
+    ]),
+  ]));
 }
 
 // ---- fleet-wide search ---------------------------------------------------

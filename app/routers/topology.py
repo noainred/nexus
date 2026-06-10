@@ -182,3 +182,125 @@ async def proxy_status(
     order = {"blocked": 0, "offline": 1, "unknown": 2, "ok": 3}
     items.sort(key=lambda x: (order.get(x["state"], 9), x["instance_name"], x["repository"]))
     return {"counts": counts, "items": items, "errors": errors, "scanned": len(instances)}
+
+
+def _suggest(reachable: bool, elapsed_ms, auto_block: bool) -> str:
+    if not reachable:
+        return ("매니저에서도 원격에 연결할 수 없습니다 — 네트워크/방화벽 차단 또는 원격 다운. "
+                "경로 개통(또는 원격 복구) 후 '차단 초기화'를 누르세요.")
+    if elapsed_ms is not None and elapsed_ms > 5000:
+        return ("원격이 매우 느립니다 — 기본 타임아웃(20초×3회) 안에 응답하지 못해 차단됐을 수 있습니다. "
+                "'타임아웃 60초로 상향'을 권장합니다.")
+    return ("매니저에서는 원격이 정상입니다 — 해당 Nexus 서버↔원격 구간 문제였거나 일시 장애입니다. "
+            "'차단 초기화'로 즉시 재시도시키세요." + ("" if auto_block else " (auto-block은 이미 꺼져 있음)"))
+
+
+@router.get("/proxy-status/diagnose")
+async def proxy_diagnose(
+    instance_id: str = Query(...),
+    repository: str = Query(...),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Diagnose a blocked proxy: probe its remote from the manager and report
+    the repo's timeout/retry/auto-block settings with a suggested fix."""
+    import time as _time
+
+    inst = registry.get(instance_id)
+    client = NexusClient(inst, timeout=get_settings().request_timeout)
+    try:
+        repos = await client.list_repositories()
+    except NexusError as exc:
+        return {"error": f"저장소 조회 실패: {exc.message}"}
+    repo = next((r for r in repos if r.name == repository), None)
+    if repo is None:
+        return {"error": f"'{repository}' 저장소가 없습니다."}
+    remote = _remote_url(repo) or ""
+
+    cfg = {}
+    try:
+        cfg = await client.get_repository_config(repo.format, repo.type, repository)
+    except NexusError:
+        pass
+    http = cfg.get("httpClient") or {}
+    conn = http.get("connection") or {}
+
+    reachable = False
+    status_code = None
+    elapsed_ms = None
+    err = ""
+    if remote:
+        start = _time.perf_counter()
+        try:
+            async with httpx.AsyncClient(timeout=10.0, verify=False, follow_redirects=True) as c:
+                resp = await c.get(remote)
+            status_code = resp.status_code
+            reachable = True
+        except httpx.HTTPError as exc:
+            err = str(exc).strip() or type(exc).__name__
+        elapsed_ms = round((_time.perf_counter() - start) * 1000)
+
+    auto_block = bool(http.get("autoBlock", True))
+    return {
+        "remote_url": remote,
+        "reachable": reachable,
+        "status_code": status_code,
+        "elapsed_ms": elapsed_ms,
+        "probe_error": err,
+        "timeout": conn.get("timeout"),
+        "retries": conn.get("retries"),
+        "auto_block": auto_block,
+        "blocked": bool(http.get("blocked", False)),
+        "suggestion": _suggest(reachable, elapsed_ms, auto_block),
+        "note": "※ 이 점검은 매니저 서버 기준입니다. 해당 Nexus 서버에서의 도달성은 다를 수 있습니다.",
+    }
+
+
+@router.post("/proxy-status/fix")
+async def proxy_fix(
+    instance_id: str = Query(...),
+    repository: str = Query(...),
+    action: str = Query(..., pattern="^(reset|timeout|autoblock_off)$"),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Apply a fix to a blocked proxy.
+
+    * ``reset`` — re-save the config unchanged, which resets the proxy facet
+      and clears the auto-block so Nexus retries the remote immediately.
+    * ``timeout`` — raise request timeout to 60s with 3 retries (community
+      recommendation for slow remotes).
+    * ``autoblock_off`` — disable auto-block for this repository.
+    """
+    inst = registry.get(instance_id)
+    client = NexusClient(inst, timeout=get_settings().request_timeout)
+    try:
+        repos = await client.list_repositories()
+    except NexusError as exc:
+        raise HTTPException(status_code=502, detail=f"저장소 조회 실패: {exc.message}")
+    repo = next((r for r in repos if r.name == repository), None)
+    if repo is None:
+        raise HTTPException(status_code=404, detail=f"'{repository}' 저장소가 없습니다.")
+    try:
+        cfg = await client.get_repository_config(repo.format, repo.type, repository)
+    except NexusError as exc:
+        raise HTTPException(status_code=502, detail=f"설정 읽기 실패(권한 등): {exc.message}")
+
+    payload = {k: v for k, v in cfg.items() if k not in ("format", "type", "url")}
+    http = dict(payload.get("httpClient") or {"blocked": False, "autoBlock": True})
+    if action == "timeout":
+        conn = dict(http.get("connection") or {})
+        conn["timeout"] = 60
+        conn["retries"] = 3
+        http["connection"] = conn
+        detail = "Request Timeout 60초 / 재시도 3회로 상향"
+    elif action == "autoblock_off":
+        http["autoBlock"] = False
+        detail = "auto-block 해제됨 (원격 장애 시 요청이 길게 대기할 수 있음)"
+    else:
+        detail = "설정 재저장으로 차단 초기화 — Nexus가 원격을 즉시 재시도합니다"
+    payload["httpClient"] = http
+
+    try:
+        await client.update_repository(repo.format, repo.type, repository, payload)
+    except NexusError as exc:
+        raise HTTPException(status_code=502, detail=f"설정 변경 실패: {exc.message}")
+    return {"ok": True, "action": action, "detail": detail}
