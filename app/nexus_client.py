@@ -151,6 +151,16 @@ class NexusClient:
     async def delete_repository(self, name: str) -> None:
         await self._request("DELETE", f"/repositories/{name}")
 
+    async def list_repository_settings(self) -> list[dict[str, Any]]:
+        """All repositories with full settings in one call (incl. cleanup).
+
+        ``GET /repositorySettings`` (3.21+) returns every repo's config —
+        much cheaper than fetching each repo's config individually.
+        """
+        resp = await self._request("GET", "/repositorySettings")
+        data = resp.json()
+        return data if isinstance(data, list) else []
+
     async def repo_statuses(self) -> list[dict[str, Any]]:
         """Per-repository runtime status (online / 'Remote Auto Blocked' …).
 

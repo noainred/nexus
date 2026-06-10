@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.53",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "플릿 정리 점검 — 정리 정책 탭에서 전 서버의 cleanup 위생을 일괄 점검(정책 수·정책 없는 저장소·Compact blob store 작업 유무·마지막 실행). 'Compact 전체 실행'으로 모든 서버의 Compact 작업을 일괄 실행, 정책을 원본에서 전 서버로 일괄 복사. 신규 /api/cleanup-audit·/api/cleanup-compact-run·/api/cleanup-push-policy"},
+        ],
+    },
+    {
         "version": "0.8.52",
         "date": "2026-06-10",
         "changes": [

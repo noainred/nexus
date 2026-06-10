@@ -3168,7 +3168,100 @@ function setupCleanup() {
   fillInstanceSelect(sel);
   sel.addEventListener("change", loadCleanup);
   document.getElementById("cleanup-refresh").addEventListener("click", loadCleanup);
+  fillInstanceSelect(document.getElementById("ca-src"));
+  document.getElementById("ca-audit").addEventListener("click", runCleanupAudit);
+  document.getElementById("ca-compact").addEventListener("click", runCompactEverywhere);
+  document.getElementById("ca-push").addEventListener("click", pushPolicyEverywhere);
   loadCleanup();
+}
+
+async function runCleanupAudit() {
+  const status = document.getElementById("ca-status");
+  const table = document.getElementById("ca-table");
+  status.textContent = "전 서버 점검 중…";
+  table.innerHTML = "";
+  let r;
+  try {
+    r = await api("/api/cleanup-audit");
+  } catch (e) {
+    status.textContent = `점검 실패: ${e.message}`;
+    return;
+  }
+  const servers = r.servers || [];
+  const issues = servers.filter((s) => !s.error && (s.compact_tasks === 0 || (s.repos_without_cleanup || 0) > 0)).length;
+  status.textContent = `완료 · ${servers.length}대 점검 · 조치 필요 ${issues}대`;
+  const rows = servers.map((s) => {
+    if (s.error) {
+      return el("tr", {}, [
+        el("td", {}, s.name),
+        el("td", { colspan: "5", class: "url", style: "color:var(--red)" }, `조회 실패: ${s.error}`),
+      ]);
+    }
+    const compactCell = s.compact_tasks
+      ? el("span", {}, `${s.compact_tasks}개 · ${s.compact_last_result || "—"}`)
+      : el("span", { class: "badge down" }, "없음 ⚠");
+    const noCleanup = s.repos_without_cleanup;
+    const noCleanupCell = noCleanup == null ? "—"
+      : noCleanup > 0
+        ? el("span", {
+            class: "badge warn",
+            title: (s.repos_without_cleanup_names || []).join(", "),
+          }, `${noCleanup}개`)
+        : "0";
+    return el("tr", {}, [
+      el("td", {}, s.name),
+      el("td", { class: "num" }, String(s.policies ?? "—")),
+      el("td", {}, noCleanupCell),
+      el("td", { class: "num" }, String(s.blobstores ?? "—")),
+      el("td", {}, compactCell),
+      el("td", {}, fmtDate(s.compact_last) || "—"),
+    ]);
+  });
+  table.append(buildTable(
+    ["서버", "정책 수", "정책 없는 저장소", "Blob store", "Compact 작업", "마지막 Compact"], rows
+  ));
+}
+
+async function runCompactEverywhere() {
+  if (!confirm(
+    "모든 서버에서 'Compact blob store' 작업을 즉시 실행합니다.\n" +
+    "(soft-delete된 blob을 실제로 회수 — 디스크 I/O 부하가 있으니 가급적 한가한 시간에)\n\n진행할까요?"
+  )) return;
+  const status = document.getElementById("ca-status");
+  status.textContent = "Compact 실행 중…";
+  try {
+    const r = await api("/api/cleanup-compact-run", { method: "POST" });
+    const servers = r.servers || [];
+    const started = servers.reduce((a, s) => a + (s.started || 0), 0);
+    const none = servers.filter((s) => !s.error && s.tasks === 0).map((s) => s.name);
+    status.textContent = `완료 · ${started}개 작업 시작` + (none.length ? ` · 작업 없는 서버: ${none.join(", ")}` : "");
+    toast(`Compact 일괄 실행 — ${started}개 작업 시작`, none.length ? "err" : "ok");
+  } catch (e) {
+    status.textContent = `실패: ${e.message}`;
+  }
+}
+
+async function pushPolicyEverywhere() {
+  const src = document.getElementById("ca-src").value;
+  const name = document.getElementById("ca-policy").value.trim();
+  const status = document.getElementById("ca-push-status");
+  if (!src || !name) { toast("원본 서버와 정책 이름을 입력하세요.", "err"); return; }
+  if (!confirm(`'${name}' 정책을 원본에서 읽어 모든 서버에 복사합니다(없는 곳만 생성). 진행할까요?`)) return;
+  status.textContent = "정책 복사 중…";
+  try {
+    const r = await api(
+      `/api/cleanup-push-policy?source_id=${encodeURIComponent(src)}&name=${encodeURIComponent(name)}`,
+      { method: "POST" }
+    );
+    const ok = r.servers.filter((s) => s.status === "ok").length;
+    const skip = r.servers.filter((s) => s.status === "skip").length;
+    const fail = r.servers.filter((s) => s.status === "fail");
+    status.textContent = `완료 · 생성 ${ok} · 이미 존재 ${skip} · 실패 ${fail.length}` +
+      (fail.length ? ` (${fail.map((s) => s.name).join(", ")})` : "");
+    toast(`정책 복사 완료 — 생성 ${ok} / 실패 ${fail.length}`, fail.length ? "err" : "ok");
+  } catch (e) {
+    status.textContent = `실패: ${e.message}`;
+  }
 }
 
 async function loadCleanup() {

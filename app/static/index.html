@@ -253,6 +253,24 @@
 
       <section id="cleanup" class="panel">
         <h2>정리(Cleanup) 정책</h2>
+
+        <div class="settings-card">
+          <h3>플릿 정리 점검 (전 서버)</h3>
+          <p class="hint">서버별 정리 위생 상태를 한 번에 점검합니다 — cleanup 정책 수, 정책이 없는 저장소, <b>Compact blob store</b> 작업 유무(없으면 soft-delete가 디스크를 계속 차지). 필요 시 Compact를 전 서버에서 일괄 실행하거나, 정책을 전 서버로 복사할 수 있습니다.</p>
+          <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap;gap:8px">
+            <button type="button" id="ca-audit">점검 실행</button>
+            <button type="button" id="ca-compact">Compact 전체 실행</button>
+            <span id="ca-status" class="hint" style="margin:0"></span>
+          </div>
+          <div id="ca-table"></div>
+          <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap;gap:8px;margin-top:8px">
+            <label class="ref-pick">원본 <select id="ca-src"></select></label>
+            <label>정책 이름 <input id="ca-policy" type="text" placeholder="예: purge-old-snapshots" /></label>
+            <button type="button" id="ca-push">전체 서버에 정책 복사</button>
+            <span id="ca-push-status" class="hint" style="margin:0"></span>
+          </div>
+        </div>
+
         <div class="dl-controls">
           <label>서버 <select id="cleanup-inst"></select></label>
           <button id="cleanup-refresh">새로고침</button>

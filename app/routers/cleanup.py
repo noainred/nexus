@@ -67,3 +67,132 @@ async def create_cleanup_policy(
         notes=body.notes,
         criteria=criteria,
     )
+
+
+# -- Fleet-wide cleanup audit / bulk actions --------------------------------
+
+import asyncio
+
+from fastapi import Depends, Query
+
+from ..config import get_settings
+from ..deps import InstanceRegistry, get_registry
+
+fleet_router = APIRouter(prefix="/api", tags=["cleanup"])
+
+
+@fleet_router.get("/cleanup-audit")
+async def cleanup_audit(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Per-server cleanup hygiene: policies, repos without a cleanup policy,
+    blob stores, and whether a 'Compact blob store' task exists/last ran."""
+    instances = registry.monitoring()
+
+    async def one(inst):
+        client = NexusClient(inst, timeout=get_settings().request_timeout)
+        row = {"id": inst.id, "name": inst.name}
+        try:
+            policies, tasks, blobs = await asyncio.gather(
+                client.list_cleanup_policies(),
+                client.list_tasks(),
+                client.list_blobstores(),
+            )
+        except NexusError as exc:
+            row["error"] = exc.message
+            return row
+        compact = [t for t in tasks if (t.type or "") == "blobstore.compact"]
+        cleanup_tasks = [t for t in tasks if "cleanup" in (t.type or "")]
+        row.update(
+            policies=len(policies),
+            policy_names=[p.name for p in policies],
+            blobstores=len(blobs),
+            compact_tasks=len(compact),
+            compact_last=max((t.last_run or "" for t in compact), default=""),
+            compact_last_result=next(
+                (t.last_run_result for t in sorted(compact, key=lambda x: x.last_run or "", reverse=True)),
+                None,
+            ),
+            cleanup_tasks=len(cleanup_tasks),
+        )
+        # Repos (non-group) without any cleanup policy assigned.
+        try:
+            settings_list = await client.list_repository_settings()
+            repos = [r for r in settings_list if (r.get("type") or "").lower() != "group"]
+            without = [
+                r.get("name") for r in repos
+                if not ((r.get("cleanup") or {}).get("policyNames"))
+            ]
+            row.update(repos=len(repos), repos_without_cleanup=len(without),
+                       repos_without_cleanup_names=without[:50])
+        except NexusError:
+            row.update(repos=None, repos_without_cleanup=None)
+        return row
+
+    rows = await asyncio.gather(*(one(i) for i in instances))
+    return {"servers": list(rows)}
+
+
+@fleet_router.post("/cleanup-compact-run")
+async def run_compact_everywhere(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Run every 'Compact blob store' task on every monitored server."""
+    instances = registry.monitoring()
+
+    async def one(inst):
+        client = NexusClient(inst, timeout=get_settings().request_timeout)
+        try:
+            tasks = await client.list_tasks()
+        except NexusError as exc:
+            return {"id": inst.id, "name": inst.name, "error": exc.message}
+        compact = [t for t in tasks if (t.type or "") == "blobstore.compact"]
+        started = 0
+        errors = []
+        for t in compact:
+            try:
+                await client.run_task(t.id)
+                started += 1
+            except NexusError as exc:
+                errors.append(exc.message)
+        return {"id": inst.id, "name": inst.name, "tasks": len(compact),
+                "started": started, "errors": errors}
+
+    return {"servers": list(await asyncio.gather(*(one(i) for i in instances)))}
+
+
+@fleet_router.post("/cleanup-push-policy")
+async def push_policy_everywhere(
+    source_id: str = Query(...),
+    name: str = Query(..., description="Cleanup policy name on the source."),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Copy one cleanup policy from a source server to every other server
+    (created only where missing)."""
+    src = registry.get(source_id)
+    sc = NexusClient(src, timeout=get_settings().request_timeout)
+    try:
+        policies = await sc.list_cleanup_policies()
+    except NexusError as exc:
+        raise HTTPException(status_code=502, detail=f"원본 정책 조회 실패: {exc.message}")
+    policy = next((p for p in policies if p.name == name), None)
+    if policy is None:
+        raise HTTPException(status_code=404, detail=f"원본에 '{name}' 정책이 없습니다.")
+    payload = {"name": policy.name, "format": policy.format,
+               "notes": policy.notes or "", "criteria": policy.criteria}
+
+    async def one(inst):
+        if inst.id == source_id:
+            return None
+        client = NexusClient(inst, timeout=get_settings().request_timeout)
+        try:
+            existing = {p.name for p in await client.list_cleanup_policies()}
+            if name in existing:
+                return {"id": inst.id, "name": inst.name, "status": "skip", "detail": "이미 존재"}
+            await client.create_cleanup_policy(payload)
+            return {"id": inst.id, "name": inst.name, "status": "ok", "detail": "생성됨"}
+        except NexusError as exc:
+            return {"id": inst.id, "name": inst.name, "status": "fail", "detail": exc.message}
+
+    results = [r for r in await asyncio.gather(*(one(i) for i in registry.monitoring())) if r]
+    return {"policy": name, "servers": results}
