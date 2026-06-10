@@ -48,6 +48,13 @@
         </div>
         <p class="hint">각 프록시 저장소의 원격 주소로 노드 간 부모↔자식 관계를 도출합니다. 상위 노드가 다운된 끊긴 링크는 빨갛게 표시되며, 해당 프록시는 Auto-block 위험이 있습니다.</p>
         <div id="topo-summary" class="cards"></div>
+        <div class="legend" style="margin-top:6px">
+          <span><i class="sw" style="background:var(--green)"></i> 정상 노드</span>
+          <span><i class="sw" style="background:var(--red)"></i> 다운 노드</span>
+          <span><i class="sw" style="border-top:2px solid var(--red);background:transparent"></i> 끊긴 링크</span>
+          <span class="hint" style="margin:0">노드를 클릭하면 그 서버의 Nexus가 새 탭으로 열립니다</span>
+        </div>
+        <div id="topo-tree" class="topo-tree-wrap"></div>
         <div id="topo-body"></div>
 
         <div class="matrix-header" style="margin-top:24px">

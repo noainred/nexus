@@ -837,6 +837,123 @@ function setupTopology() {
   document.getElementById("pxs-problem-only").addEventListener("change", renderProxyStatus);
 }
 
+// Hierarchical status board: tiers derived from internal proxy links
+// (e.g. DMZ → HQ → 15 global DCs), drawn as an SVG tree like a wallboard.
+function renderTopoTree(data) {
+  const wrap = document.getElementById("topo-tree");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  const nodes = data.nodes || [];
+  if (nodes.length < 2) return;
+  const byId = {};
+  nodes.forEach((n) => { byId[n.id] = n; });
+
+  // child --proxy--> parent(upstream). Pick the most-proxied upstream as the
+  // primary parent for layout; draw every internal edge.
+  const parentOf = {};
+  const edges = [];
+  nodes.forEach((n) => {
+    const counts = {};
+    const broken = {};
+    (n.proxies || []).forEach((p) => {
+      if (p.internal && p.target_id && byId[p.target_id] && p.target_id !== n.id) {
+        counts[p.target_id] = (counts[p.target_id] || 0) + 1;
+        if (p.broken) broken[p.target_id] = true;
+      }
+    });
+    const ids = Object.keys(counts);
+    ids.forEach((pid) => edges.push({ from: pid, to: n.id, count: counts[pid], broken: !!broken[pid] }));
+    if (ids.length) parentOf[n.id] = ids.sort((a, b) => counts[b] - counts[a])[0];
+  });
+  if (!edges.length) {
+    wrap.append(el("p", { class: "hint" }, "내부(서버 간) 프록시 링크가 없어 계위 트리를 그릴 수 없습니다."));
+    return;
+  }
+
+  // Tier (depth) per node: roots are the top of the hierarchy (e.g. DMZ).
+  const depth = {};
+  nodes.forEach((n) => { if (parentOf[n.id] == null) depth[n.id] = 0; });
+  for (let i = 0; i < 20; i++) {
+    let changed = false;
+    nodes.forEach((n) => {
+      const p = parentOf[n.id];
+      if (p != null && depth[p] != null && depth[n.id] == null) {
+        depth[n.id] = depth[p] + 1;
+        changed = true;
+      }
+    });
+    if (!changed) break;
+  }
+  nodes.forEach((n) => { if (depth[n.id] == null) depth[n.id] = 1; });  // cycles
+
+  const layers = [];
+  nodes.forEach((n) => {
+    const d = depth[n.id];
+    (layers[d] = layers[d] || []).push(n);
+  });
+
+  const NW = 150, NH = 48, HGAP = 22, VGAP = 120, PAD = 70;
+  const maxCount = Math.max(...layers.map((l) => (l ? l.length : 0)));
+  const width = Math.max(maxCount * (NW + HGAP) - HGAP + PAD * 2, 640);
+  const height = layers.length * VGAP + 30;
+  const pos = {};
+  layers.forEach((layer, li) => {
+    if (!layer) return;
+    if (li > 0) {
+      layer.sort((a, b) => {
+        const pa = pos[parentOf[a.id]] ? pos[parentOf[a.id]].x : 0;
+        const pb = pos[parentOf[b.id]] ? pos[parentOf[b.id]].x : 0;
+        return pa - pb || a.name.localeCompare(b.name);
+      });
+    }
+    const total = layer.length * (NW + HGAP) - HGAP;
+    const x0 = (width - total) / 2;
+    layer.forEach((n, i) => {
+      pos[n.id] = { x: x0 + i * (NW + HGAP), y: 26 + li * VGAP };
+    });
+  });
+
+  const tierName = (li) => (li === 0 ? "최상위" : li === 1 ? "중계(HQ)" : `계위 ${li + 1}`);
+  let s = "";
+  // Tier guide labels on the left.
+  layers.forEach((layer, li) => {
+    if (!layer) return;
+    s += `<text x="10" y="${26 + li * VGAP + NH / 2 + 4}" class="tt-tier">${escapeHtml(tierName(li))}</text>`;
+  });
+  // Edges (parent bottom → child top).
+  edges.forEach((e) => {
+    const a = pos[e.from], b = pos[e.to];
+    if (!a || !b) return;
+    const x1 = a.x + NW / 2, y1 = a.y + NH;
+    const x2 = b.x + NW / 2, y2 = b.y;
+    const my = (y1 + y2) / 2;
+    const cls = e.broken ? "tt-edge broken" : "tt-edge";
+    s += `<path class="${cls}" d="M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}"/>` +
+      (e.count > 1 ? `<text x="${(x1 + x2) / 2}" y="${my - 4}" class="tt-count">${e.count}</text>` : "");
+  });
+  // Nodes.
+  nodes.forEach((n) => {
+    const p = pos[n.id];
+    if (!p) return;
+    const cls = n.reachable ? "tt-node up" : "tt-node down";
+    const host = hostOf(n.base_url) || n.base_url;
+    s += `<g class="${cls}" data-id="${escapeHtml(n.id)}" transform="translate(${p.x},${p.y})">` +
+      `<rect width="${NW}" height="${NH}" rx="9"/>` +
+      `<text x="${NW / 2}" y="19" class="tt-name">${escapeHtml(n.name)}</text>` +
+      `<text x="${NW / 2}" y="36" class="tt-host">${escapeHtml(host)}</text>` +
+      `<title>${escapeHtml(n.name)} · ${escapeHtml(n.base_url)}${n.reachable ? "" : " · 연결 불가"}</title></g>`;
+  });
+
+  wrap.innerHTML =
+    `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+  wrap.querySelectorAll("g.tt-node").forEach((g) => {
+    g.addEventListener("click", () => {
+      const n = byId[g.getAttribute("data-id")];
+      if (n) window.open(n.base_url, "_blank", "noopener,noreferrer");
+    });
+  });
+}
+
 async function loadTopology() {
   const summary = document.getElementById("topo-summary");
   const body = document.getElementById("topo-body");
@@ -865,6 +982,8 @@ async function loadTopology() {
     body.append(el("div", { class: "empty" }, "노드가 없습니다."));
     return;
   }
+
+  renderTopoTree(data);
 
   data.nodes.forEach((node) => {
     const statusBadge = node.reachable

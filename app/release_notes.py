@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.58",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "added", "text": "계위 상황판 — 토폴로지 탭에 프록시 연결로 계위(DMZ→HQ→글로벌 DC)를 자동 도출한 SVG 트리 대시보드 추가. 노드 색(정상/다운), 끊긴 링크 빨간 점선, 좌측 계위 라벨, 노드 클릭 시 해당 Nexus 새 탭"},
+        ],
+    },
+    {
         "version": "0.8.57",
         "date": "2026-06-11",
         "changes": [

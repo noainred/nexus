@@ -182,6 +182,23 @@ h3 { font-size: 14px; color: var(--muted); }
 }
 .mtip .mtip-difftable th { color: var(--muted); background: rgba(255,255,255,.03); }
 .mtip .mtip-difftable td { color: var(--text); }
+
+/* Hierarchical topology status board (SVG tree) */
+.topo-tree-wrap {
+  overflow-x: auto; margin: 14px 0;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 8px;
+}
+.topo-tree-wrap .tt-tier { fill: var(--muted); font-size: 12px; font-weight: 700; }
+.topo-tree-wrap .tt-edge { fill: none; stroke: var(--border); stroke-width: 1.6; }
+.topo-tree-wrap .tt-edge.broken { stroke: var(--red); stroke-width: 2; stroke-dasharray: 5 4; }
+.topo-tree-wrap .tt-count { fill: var(--muted); font-size: 10px; text-anchor: middle; }
+.topo-tree-wrap g.tt-node { cursor: pointer; }
+.topo-tree-wrap g.tt-node rect { fill: var(--panel-2); stroke: var(--green); stroke-width: 1.6; }
+.topo-tree-wrap g.tt-node.down rect { stroke: var(--red); fill: rgba(248,81,73,.10); }
+.topo-tree-wrap g.tt-node:hover rect { stroke: var(--accent); }
+.topo-tree-wrap .tt-name { fill: var(--text); font-size: 13px; font-weight: 700; text-anchor: middle; }
+.topo-tree-wrap .tt-host { fill: var(--muted); font-size: 10px; text-anchor: middle; }
 .card .metrics { margin-top: 12px; display: flex; gap: 18px; }
 .card .metric .label { color: var(--muted); font-size: 11px; }
 .card .metric .value { font-size: 18px; font-weight: 600; }
