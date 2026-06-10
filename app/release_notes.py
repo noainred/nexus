@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.40",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "프록시 캐시 동기화 — 저장소 비교 팝업에서 원본 서버의 캐시 자산 목록으로 대상 프록시의 캐시를 채움(Range GET 워밍, 재개식 진행, 성공/실패 집계). 신규 POST /api/instances/{id}/cache-warm"},
+        ],
+    },
+    {
         "version": "0.8.39",
         "date": "2026-06-10",
         "changes": [

@@ -1411,10 +1411,73 @@ function renderRepoDiff() {
   body.innerHTML = "";
   if (!state.repoDiff) return;
   body.append(diffTable(state.repoDiff, document.getElementById("repo-diff-only").checked));
+  body.append(repoCacheSyncPanel());
+}
+
+// Panel to warm a target proxy's cache for this repo using a source's assets.
+function repoCacheSyncPanel() {
+  const repo = state.repoDiffName;
+  const cols = (state.repoDiff && state.repoDiff.columns) || [];
+  const src = el("select", { id: "warm-src" }, cols.map((c) => el("option", { value: c.id }, c.name)));
+  const tgt = el("select", { id: "warm-tgt" }, cols.map((c) => el("option", { value: c.id }, c.name)));
+  if (cols.length > 1) tgt.selectedIndex = 1;
+  const status = el("span", { class: "hint", style: "margin:0" });
+  const btn = el("button", {
+    type: "button",
+    onclick: () => warmRepoCache(repo, src.value, tgt.value, src, tgt, status),
+  }, "캐시 동기화 시작");
+  return el("div", { class: "settings-card", style: "margin-top:14px" }, [
+    el("h3", {}, "프록시 캐시 동기화 (데이터)"),
+    el("p", { class: "hint" },
+      `원본 서버의 '${repo}' 캐시 자산 목록을 받아, 대상 서버에서 각 파일을 당겨 캐시를 채웁니다. ` +
+      `대상은 프록시 저장소여야 하며(자기 업스트림에서 받아옴), 용량이 크면 시간이 걸립니다.`),
+    el("div", { class: "form-actions", style: "justify-content:flex-start;flex-wrap:wrap;gap:8px" }, [
+      el("label", { class: "ref-pick" }, ["원본 ", src]),
+      el("label", { class: "ref-pick" }, ["대상 ", tgt]),
+      btn, status,
+    ]),
+  ]);
+}
+
+async function warmRepoCache(repo, sourceId, targetId, srcSel, tgtSel, status) {
+  if (!sourceId || !targetId) { toast("원본/대상 서버를 선택하세요.", "err"); return; }
+  if (sourceId === targetId) { toast("원본과 대상이 같습니다.", "err"); return; }
+  const sName = srcSel.options[srcSel.selectedIndex].text;
+  const tName = tgtSel.options[tgtSel.selectedIndex].text;
+  if (!confirm(
+    `'${sName}'의 '${repo}' 캐시 자산 목록을 받아 '${tName}'에서 각 파일을 당겨 캐시를 채웁니다.\n` +
+    `(대상은 프록시여야 함. 대용량이면 오래 걸립니다.)\n\n진행할까요?`
+  )) return;
+  let token = "";
+  let warmed = 0, failed = 0, processed = 0, done = false, guard = 0;
+  const t0 = Date.now();
+  try {
+    while (!done && guard < 100000) {
+      guard++;
+      const r = await api(
+        `/api/instances/${encodeURIComponent(targetId)}/cache-warm` +
+          `?source_id=${encodeURIComponent(sourceId)}&repository=${encodeURIComponent(repo)}` +
+          `&token=${encodeURIComponent(token)}&pages=5`,
+        { method: "POST" }
+      );
+      warmed += r.warmed; failed += r.failed; processed += r.processed;
+      const sec = Math.round((Date.now() - t0) / 1000);
+      status.textContent = `진행 중… 처리 ${processed} · 캐시 ${warmed} · 실패 ${failed} (${sec}초)`;
+      token = r.next_token || "";
+      done = r.done;
+      if (!done && !token) break;
+    }
+    status.textContent = `완료 · 처리 ${processed} · 캐시 ${warmed} · 실패 ${failed}`;
+    toast(`캐시 동기화 완료 — ${tName}: ${warmed}개 캐시 / ${failed} 실패`, failed ? "err" : "ok");
+  } catch (e) {
+    status.textContent = `중단: ${e.message} (처리 ${processed} · 캐시 ${warmed})`;
+    toast(`캐시 동기화 실패: ${e.message}`, "err");
+  }
 }
 
 async function openRepoDiff(name) {
   document.getElementById("repo-modal-title").textContent = `저장소 설정 비교 — ${name}`;
+  state.repoDiffName = name;
   const modal = document.getElementById("repo-modal");
   const body = document.getElementById("repo-modal-body");
   modal.classList.remove("hidden");

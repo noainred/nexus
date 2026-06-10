@@ -24,6 +24,7 @@ from .routers import (
     monitoring,
     repositories,
     security,
+    sync,
     tasks,
     topology,
 )
@@ -71,6 +72,7 @@ app.include_router(content.router)
 app.include_router(topology.router)
 app.include_router(alerts.router)
 app.include_router(infra.router)
+app.include_router(sync.router)
 app.include_router(meta.router)
 
 
