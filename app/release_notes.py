@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.33",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "비교 매트릭스 셀에 마우스를 올리면 그 저장소의 전체 설정(blob store·write policy·proxy·cleanup·멤버 등)을 카드로 표시 — 호버 시 설정을 불러와 모든 항목을 한눈에. 한 번 본 셀은 캐시"},
+        ],
+    },
+    {
         "version": "0.8.32",
         "date": "2026-06-10",
         "changes": [

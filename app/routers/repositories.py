@@ -26,6 +26,21 @@ async def list_repositories(instance_id: str) -> List[Repository]:
         raise _translate(exc)
 
 
+@router.get("/repository-config")
+async def repository_config(
+    instance_id: str,
+    repository: str = Query(...),
+    format: str = Query(...),
+    type: str = Query(...),
+) -> dict:
+    """Full configuration for one repository (used by the matrix hover card)."""
+    client: NexusClient = get_client(instance_id)
+    try:
+        return await client.get_repository_config(format, type, repository)
+    except NexusError as exc:
+        raise _translate(exc)
+
+
 @router.delete("/repositories/{name}", status_code=204, response_class=Response)
 async def delete_repository(instance_id: str, name: str) -> Response:
     client: NexusClient = get_client(instance_id)

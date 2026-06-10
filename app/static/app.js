@@ -842,6 +842,114 @@ function matrixColName(id) {
   return c ? c.name : id;
 }
 
+// --- Rich hover card showing a repository's full configuration -------------
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (ch) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]
+  ));
+}
+
+function matrixTip() {
+  let t = document.getElementById("mtip");
+  if (!t) {
+    t = el("div", { id: "mtip", class: "mtip hidden" });
+    document.body.append(t);
+  }
+  return t;
+}
+
+function positionMatrixTip(x, y) {
+  const t = matrixTip();
+  const pad = 14;
+  const r = t.getBoundingClientRect();
+  let left = x + pad;
+  let top = y + pad;
+  if (left + r.width > window.innerWidth - 8) left = x - r.width - pad;
+  if (top + r.height > window.innerHeight - 8) top = y - r.height - pad;
+  t.style.left = `${Math.max(8, left)}px`;
+  t.style.top = `${Math.max(8, top)}px`;
+}
+
+function showMatrixTip(html, x, y) {
+  const t = matrixTip();
+  t.innerHTML = html;
+  t.classList.remove("hidden");
+  positionMatrixTip(x, y);
+}
+
+function hideMatrixTip() {
+  matrixTip().classList.add("hidden");
+}
+
+// Flatten a (possibly nested) config object into "a.b.c: value" lines so the
+// hover card can show everything about the repository.
+function flattenConfig(obj, prefix, out) {
+  Object.entries(obj).forEach(([k, v]) => {
+    if (k === "password") return;
+    const key = prefix ? `${prefix}.${k}` : k;
+    if (v === null || v === undefined || v === "") return;
+    if (Array.isArray(v)) {
+      if (v.length) out.push(`${key}: ${v.join(", ")}`);
+    } else if (typeof v === "object") {
+      flattenConfig(v, key, out);
+    } else {
+      out.push(`${key}: ${v}`);
+    }
+  });
+  return out;
+}
+
+function renderCfgTip(repo, instName, cfg) {
+  const header =
+    `<b>${escapeHtml(repo)}</b> <span class="mtip-sub">@ ${escapeHtml(instName)}` +
+    ` · ${escapeHtml(cfg.format || "—")}/${escapeHtml(cfg.type || "—")}</span>`;
+  const skip = new Set(["name", "format", "type", "url"]);
+  const flat = [];
+  Object.entries(cfg).forEach(([k, v]) => {
+    if (!skip.has(k)) flattenConfig({ [k]: v }, "", flat);
+  });
+  if (cfg.url) flat.unshift(`url: ${cfg.url}`);
+  const body = flat.length ? flat.map(escapeHtml).join("<br>") : "(추가 설정 없음)";
+  return `${header}<hr>${body}`;
+}
+
+async function onMatrixCellHover(e, repo, col, c) {
+  const x = e.clientX;
+  const y = e.clientY;
+  const key = `${col.id}:${repo}`;
+  if (c.unknown) {
+    showMatrixTip(`<b>${escapeHtml(repo)}</b><hr>조회 불가 (인스턴스 응답 없음)`, x, y);
+    return;
+  }
+  if (!c.present) {
+    showMatrixTip(`<b>${escapeHtml(repo)}</b> <span class="mtip-sub">@ ${escapeHtml(col.name)}</span><hr>이 인스턴스에 없음`, x, y);
+    return;
+  }
+  state.repoCfgCache = state.repoCfgCache || {};
+  if (state.repoCfgCache[key]) {
+    showMatrixTip(renderCfgTip(repo, col.name, state.repoCfgCache[key]), x, y);
+    return;
+  }
+  const base =
+    `<b>${escapeHtml(repo)}</b> <span class="mtip-sub">@ ${escapeHtml(col.name)} · ` +
+    `${escapeHtml(c.format || "—")}/${escapeHtml(c.type || "—")}</span><hr>`;
+  showMatrixTip(`${base}<span class="mtip-sub">전체 설정 불러오는 중…</span>`, x, y);
+  try {
+    const cfg = await api(
+      `/api/instances/${encodeURIComponent(col.id)}/repository-config` +
+        `?repository=${encodeURIComponent(repo)}` +
+        `&format=${encodeURIComponent(c.format || "")}&type=${encodeURIComponent(c.type || "")}`
+    );
+    state.repoCfgCache[key] = cfg;
+    if (state.matrixHoverKey === key) showMatrixTip(renderCfgTip(repo, col.name, cfg), x, y);
+  } catch (err) {
+    if (state.matrixHoverKey === key) {
+      showMatrixTip(`${base}<span class="mtip-sub">설정 조회 실패: ${escapeHtml(err.message)}</span>`, x, y);
+    }
+  }
+}
+
 // Drag a present (green/≠) cell onto another cell in the SAME repository row
 // to copy that repo's config from the source instance to the target.
 function onMatrixDragStart(e, repo, inst, present) {
@@ -953,16 +1061,13 @@ function renderMatrix() {
       else if (match) { cls = "consistent"; mark = "✓"; meta = c.format || ""; }
       else { cls = "drift"; mark = "≠"; meta = [c.type, c.remote_url].filter(Boolean).join(" · ") || c.format || ""; }
 
-      let title = cellDetail(c);
-      if (cls === "drift" && refCell) {
-        title = `기준(${refLabel}): ${cellValueText(refCell)}\n이 서버(${col.name}): ${cellValueText(c)}`;
-      }
       const refMark = col.id === refId ? "ref-col" : "";
       const present = !!c.present && !c.unknown;
-      const inner = el("span", { class: `mcell ${cls}`, title }, [
+      const inner = el("span", { class: `mcell ${cls}` }, [
         el("span", { class: "mark" }, mark),
         meta ? el("span", { class: "meta" }, meta) : null,
       ]);
+      const cell = c;
       const td = el("td", {
         class: `mdrop ${refMark}`,
         draggable: present ? "true" : "false",
@@ -971,6 +1076,9 @@ function renderMatrix() {
         ondragenter: (e) => e.currentTarget.classList.add("drop-hover"),
         ondragleave: (e) => e.currentTarget.classList.remove("drop-hover"),
         ondrop: (e) => onMatrixDrop(e, row.repository, col.id),
+        onmouseenter: (e) => { state.matrixHoverKey = `${col.id}:${row.repository}`; onMatrixCellHover(e, row.repository, col, cell); },
+        onmousemove: (e) => { if (state.matrixHoverKey === `${col.id}:${row.repository}`) positionMatrixTip(e.clientX, e.clientY); },
+        onmouseleave: () => { state.matrixHoverKey = null; hideMatrixTip(); },
       }, inner);
       tds.push(td);
     });

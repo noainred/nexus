@@ -132,6 +132,18 @@ h3 { font-size: 14px; color: var(--muted); }
 .matrix td.mdrop[draggable="true"] { cursor: grab; }
 .matrix td.mdrop[draggable="true"]:active { cursor: grabbing; }
 .matrix td.drop-hover { outline: 2px dashed var(--accent); outline-offset: -2px; }
+
+.mtip {
+  position: fixed; z-index: 1000;
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 11px;
+  font-size: 12px; line-height: 1.55; color: var(--text);
+  max-width: 460px; box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  pointer-events: none; white-space: normal; word-break: break-word;
+}
+.mtip.hidden { display: none; }
+.mtip hr { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+.mtip .mtip-sub { color: var(--muted); font-weight: normal; }
 .card .metrics { margin-top: 12px; display: flex; gap: 18px; }
 .card .metric .label { color: var(--muted); font-size: 11px; }
 .card .metric .value { font-size: 18px; font-weight: 600; }
