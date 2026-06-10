@@ -401,6 +401,33 @@ class NexusClient:
     async def delete_component(self, component_id: str) -> None:
         await self._request("DELETE", f"/components/{component_id}")
 
+    async def search_components(
+        self, params: dict[str, str], max_pages: int = 5
+    ) -> list[dict[str, Any]]:
+        """Search components via /search, returning a few pages of matches."""
+        out: list[dict[str, Any]] = []
+        token: Optional[str] = None
+        pages = 0
+        while True:
+            p = dict(params)
+            if token:
+                p["continuationToken"] = token
+            resp = await self._request("GET", "/search", params=p)
+            data = resp.json()
+            for it in data.get("items", []):
+                out.append({
+                    "repository": it.get("repository"),
+                    "format": it.get("format"),
+                    "group": it.get("group"),
+                    "name": it.get("name"),
+                    "version": it.get("version"),
+                })
+            token = data.get("continuationToken")
+            pages += 1
+            if not token or pages >= max_pages:
+                break
+        return out
+
     # -- Assets (used for download usage) -----------------------------------
 
     async def list_assets(

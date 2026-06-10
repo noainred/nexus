@@ -141,6 +141,56 @@ function restoreActiveTab() {
   if (name) selectTab(name);
 }
 
+// ---- fleet-wide search ---------------------------------------------------
+
+function setupSearch() {
+  const form = document.getElementById("search-form");
+  if (!form) return;
+  form.addEventListener("submit", (ev) => { ev.preventDefault(); runSearch(); });
+}
+
+async function runSearch() {
+  const q = document.getElementById("search-q").value.trim();
+  const format = document.getElementById("search-format").value.trim();
+  const repo = document.getElementById("search-repo").value.trim();
+  const scope = document.getElementById("search-all").checked ? "all" : "monitoring";
+  const status = document.getElementById("search-status");
+  const box = document.getElementById("search-results");
+  if (!q && !format && !repo) { toast("검색어를 입력하세요.", "err"); return; }
+  box.innerHTML = "";
+  status.textContent = "검색 중… (모든 서버 조회)";
+  try {
+    const params = new URLSearchParams({ q, format, repository: repo, scope });
+    const r = await api(`/api/search?${params.toString()}`);
+    status.textContent = `완료 · ${r.scanned}개 서버 · ${r.count}건`;
+    renderSearchResults(r);
+  } catch (e) {
+    status.textContent = `검색 실패: ${e.message}`;
+  }
+}
+
+function renderSearchResults(r) {
+  const box = document.getElementById("search-results");
+  box.innerHTML = "";
+  const errIds = Object.keys(r.errors || {});
+  if (errIds.length) {
+    box.append(el("p", { class: "hint", style: "color:var(--amber)" },
+      `조회 실패 서버 ${errIds.length}개 (권한/연결): ${errIds.join(", ")}`));
+  }
+  if (!r.hits.length) {
+    box.append(el("div", { class: "empty" }, "일치하는 아티팩트가 없습니다."));
+    return;
+  }
+  const rows = r.hits.map((h) => el("tr", {}, [
+    el("td", {}, h.instance_name),
+    el("td", {}, h.repository || ""),
+    el("td", {}, [h.group, h.name].filter(Boolean).join(" : ") || h.name || ""),
+    el("td", {}, h.version || ""),
+    el("td", {}, h.format || ""),
+  ]));
+  box.append(buildTable(["서버", "저장소", "그룹 : 이름", "버전", "포맷"], rows));
+}
+
 // ---- overview ------------------------------------------------------------
 
 function openStatusDetail(s) {
@@ -3144,6 +3194,7 @@ async function init() {
   setupTopology();
   setupAlerts();
   setupInfra();
+  setupSearch();
   setupReleaseNotes();
   loadOverview();
   loadMatrix();

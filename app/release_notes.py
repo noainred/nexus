@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.48",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "통합 검색 탭 — 검색어/포맷/저장소로 모든 서버의 컴포넌트(아티팩트)를 한 번에 검색해 어느 서버·저장소에 어떤 버전이 있는지 표시(취약 라이브러리 추적·배포 확인). 신규 GET /api/search"},
+        ],
+    },
+    {
         "version": "0.8.47",
         "date": "2026-06-10",
         "changes": [

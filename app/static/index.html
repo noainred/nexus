@@ -16,6 +16,7 @@
 
     <nav class="tabs">
       <button class="tab active" data-tab="overview">개요</button>
+      <button class="tab" data-tab="search">통합 검색</button>
       <button class="tab" data-tab="blobstore">Blob Store</button>
       <button class="tab" data-tab="metrics">JVM / 리소스</button>
       <button class="tab" data-tab="infra">인프라 체크</button>
@@ -53,6 +54,22 @@
       <section id="overview" class="panel active">
         <h2>인스턴스 상태</h2>
         <div id="status-cards"></div>
+      </section>
+
+      <section id="search" class="panel">
+        <h2>통합 검색 (전 서버 아티팩트)</h2>
+        <p class="hint">검색어로 모든 서버의 컴포넌트(아티팩트)를 한 번에 찾아, 어느 서버·저장소에 어떤 버전이 있는지 보여줍니다. 취약 라이브러리 추적·배포 확인에 유용합니다.</p>
+        <form id="search-form" class="form" style="max-width:none">
+          <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap;gap:8px">
+            <input id="search-q" type="text" placeholder="검색어 (예: log4j-core, spring, 2.14)" style="min-width:280px" />
+            <input id="search-format" type="text" placeholder="포맷(선택): maven2, npm, pypi…" style="min-width:180px" />
+            <input id="search-repo" type="text" placeholder="저장소(선택)" style="min-width:160px" />
+            <label class="chk"><input type="checkbox" id="search-all" /> 모니터링 외 서버도 포함</label>
+            <button type="submit">검색</button>
+            <span id="search-status" class="hint" style="margin:0"></span>
+          </div>
+        </form>
+        <div id="search-results"></div>
       </section>
 
       <section id="blobstore" class="panel">
