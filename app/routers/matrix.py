@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -94,6 +95,80 @@ async def copy_repo_config(
     for it in items:
         summary[it["status"]] = summary.get(it["status"], 0) + 1
     return {"items": items, "summary": summary, "mode": "overwrite"}
+
+
+def _repo_from_remote(url: str) -> str:
+    m = re.search(r"/repository/([^/]+)", url or "")
+    return m.group(1) if m else ""
+
+
+@router.post("/matrix/sync-slave-config")
+async def sync_slave_config(
+    repository: str = Query(..., description="Repository name on the slave."),
+    slave_id: str = Query(..., description="Slave (proxy) instance to update."),
+    master_id: str = Query(..., description="Master instance it proxies."),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Make a slave proxy match its master's config, keeping the slave's own
+    proxy remoteUrl (which points at the master) and proxy credentials."""
+    if slave_id == master_id:
+        raise HTTPException(status_code=400, detail="슬레이브와 마스터가 같습니다.")
+    slave = registry.get(slave_id)
+    master = registry.get(master_id)
+
+    sc = NexusClient(slave, timeout=get_settings().request_timeout)
+    mc = NexusClient(master, timeout=get_settings().request_timeout)
+    try:
+        s_repos = await sc.list_repositories()
+    except NexusError as exc:
+        raise HTTPException(status_code=502, detail=f"슬레이브 저장소 조회 실패: {exc.message}")
+    sm = next((r for r in s_repos if r.name == repository), None)
+    if sm is None:
+        raise HTTPException(status_code=404, detail=f"슬레이브에 '{repository}'가 없습니다.")
+    try:
+        s_cfg = await sc.get_repository_config(sm.format, sm.type, repository)
+    except NexusError as exc:
+        raise HTTPException(status_code=502, detail=f"슬레이브 설정 읽기 실패: {exc.message}")
+
+    s_proxy = s_cfg.get("proxy") if isinstance(s_cfg.get("proxy"), dict) else {}
+    s_remote = (s_proxy or {}).get("remoteUrl") or ""
+    m_repo = _repo_from_remote(s_remote) or repository
+
+    try:
+        m_repos = await mc.list_repositories()
+    except NexusError as exc:
+        raise HTTPException(status_code=502, detail=f"마스터 저장소 조회 실패: {exc.message}")
+    mm = next((r for r in m_repos if r.name == m_repo), None)
+    if mm is None:
+        raise HTTPException(status_code=404, detail=f"마스터에 '{m_repo}'가 없습니다.")
+    try:
+        m_cfg = await mc.get_repository_config(mm.format, mm.type, m_repo)
+    except NexusError as exc:
+        raise HTTPException(status_code=502, detail=f"마스터 설정 읽기 실패(권한 등): {exc.message}")
+
+    # Master config, but preserve the slave's host-specific bits.
+    payload = {k: v for k, v in m_cfg.items() if k not in ("format", "type", "url")}
+    payload["name"] = repository
+    if isinstance(payload.get("proxy"), dict):
+        payload["proxy"] = dict(payload["proxy"])
+        if s_remote:
+            payload["proxy"]["remoteUrl"] = s_remote
+    elif s_proxy:
+        payload["proxy"] = dict(s_proxy)
+    # Keep the slave's proxy credentials (master's are redacted/not applicable).
+    if isinstance(payload.get("httpClient"), dict):
+        payload["httpClient"] = dict(payload["httpClient"])
+        s_auth = (s_cfg.get("httpClient") or {}).get("authentication")
+        if s_auth:
+            payload["httpClient"]["authentication"] = s_auth
+        else:
+            payload["httpClient"].pop("authentication", None)
+
+    try:
+        await sc.update_repository(sm.format, sm.type, repository, payload)
+    except NexusError as exc:
+        raise HTTPException(status_code=502, detail=f"슬레이브 설정 업데이트 실패: {exc.message}")
+    return {"ok": True, "repository": repository, "master": master.name, "slave": slave.name}
 
 
 async def _fetch_repos(

@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.44",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "슬레이브 설정 맞추기 — 저장소 비교 팝업에 'proxy URL 유지' 버튼 추가. 프록시 remoteUrl(마스터 지향)과 인증정보는 유지하고 나머지 설정을 마스터와 동일하게 맞춤. 신규 POST /api/matrix/sync-slave-config"},
+        ],
+    },
+    {
         "version": "0.8.43",
         "date": "2026-06-10",
         "changes": [

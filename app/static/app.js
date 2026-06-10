@@ -1420,7 +1420,74 @@ function renderRepoDiff() {
   body.innerHTML = "";
   if (!state.repoDiff) return;
   body.append(diffTable(state.repoDiff, document.getElementById("repo-diff-only").checked));
+  const sync = repoSlaveSyncPanel();
+  if (sync) body.append(sync);
   body.append(repoCacheSyncPanel());
+}
+
+// Offer to align each slave (proxy → managed master) repo with its master,
+// keeping the slave's own remoteUrl.
+function repoSlaveSyncPanel() {
+  const repo = state.repoDiffName;
+  const cols = (state.repoDiff && state.repoDiff.columns) || [];
+  const fields = (state.repoDiff && state.repoDiff.fields) || [];
+  const fmap = {};
+  fields.forEach((f) => { fmap[f.key] = f.values; });
+  const colIds = new Set(cols.map((c) => c.id));
+  const skip = new Set(["proxy.remoteUrl", "url", "name"]);
+  const rows = [];
+  cols.forEach((col) => {
+    const remote = fmap["proxy.remoteUrl"] ? fmap["proxy.remoteUrl"][col.id] : null;
+    if (!remote) return;
+    const h = hostOf(remote);
+    const master = (state.instances || []).find((i) => i.id !== col.id && hostOf(i.base_url) === h);
+    if (!master) return;
+    let diffN = null;
+    if (colIds.has(master.id)) {
+      diffN = 0;
+      fields.forEach((f) => {
+        if (skip.has(f.key)) return;
+        if (f.values[col.id] !== f.values[master.id]) diffN++;
+      });
+      if (diffN === 0) return;  // already matching — nothing to do
+    }
+    const label = diffN == null ? "마스터에 맞추기" : `${diffN}개 항목 다름 — 마스터에 맞추기`;
+    rows.push(el("div", { class: "form-actions", style: "justify-content:flex-start;gap:10px" }, [
+      el("span", {}, `${col.name} → ${master.name} Slave`),
+      el("button", {
+        type: "button",
+        onclick: () => syncSlaveConfig(repo, col.id, master.id, col.name, master.name),
+      }, label),
+    ]));
+  });
+  if (!rows.length) return null;
+  return el("div", { class: "settings-card", style: "margin-top:14px" }, [
+    el("h3", {}, "슬레이브 설정 맞추기 (proxy URL 유지)"),
+    el("p", { class: "hint" },
+      "프록시 remoteUrl(마스터를 가리킴)은 그대로 두고, 나머지 설정을 마스터와 동일하게 맞춥니다."),
+    ...rows,
+  ]);
+}
+
+async function syncSlaveConfig(repo, slaveId, masterId, sName, mName) {
+  if (!confirm(
+    `'${sName}'의 '${repo}' 설정을 '${mName}'에 맞춥니다.\n` +
+    `프록시 remoteUrl(→ 마스터)만 유지하고, 나머지 설정을 마스터와 동일하게 덮어씁니다.\n\n진행할까요?`
+  )) return;
+  try {
+    await api(
+      `/api/matrix/sync-slave-config?repository=${encodeURIComponent(repo)}` +
+        `&slave_id=${encodeURIComponent(slaveId)}&master_id=${encodeURIComponent(masterId)}`,
+      { method: "POST" }
+    );
+    toast(`'${sName}' 설정을 '${mName}'에 맞췄습니다 (remoteUrl 유지)`);
+    state.slaveDiffCache = {};
+    state.repoCfgCache = {};
+    if (state.matrix) renderMatrix();
+    openRepoDiff(repo);  // refresh the popup
+  } catch (e) {
+    toast(`맞추기 실패: ${e.message}`, "err");
+  }
 }
 
 // Panel to warm a target proxy's cache for this repo using a source's assets.
