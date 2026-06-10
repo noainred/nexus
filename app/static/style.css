@@ -238,6 +238,11 @@ button.ghost { background: transparent; border-color: var(--border); color: var(
   padding: 12px 20px;
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  max-width: min(90vw, 680px);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 .toast.err { border-color: var(--red); }
 .toast.ok { border-color: var(--green); }

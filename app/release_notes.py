@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.32",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "changed", "text": "Maven 저장소 설정 읽기/복사/복구 시 404 나던 문제 수정 — 포맷 'maven2'를 admin API 경로 'maven'으로 매핑(상세 비교·드래그 복사·구성 가져오기 모두 적용)"},
+            {"type": "changed", "text": "토스트(알림)가 길면 화면 밖으로 잘리던 문제 수정 — 자동 줄바꿈 및 최대 폭 적용"},
+        ],
+    },
+    {
         "version": "0.8.31",
         "date": "2026-06-10",
         "changes": [

@@ -30,6 +30,16 @@ def _describe(exc: Exception) -> str:
     return text or type(exc).__name__
 
 
+# The repository *format* reported by /repositories (e.g. "maven2") is not
+# always the segment used by the typed admin endpoints (.../repositories/
+# {format}/{type}/{name}). Map the known exceptions here.
+_FORMAT_PATH_SEG = {"maven2": "maven"}
+
+
+def _fmt_seg(fmt: str) -> str:
+    return _FORMAT_PATH_SEG.get((fmt or "").lower(), fmt)
+
+
 class NexusError(Exception):
     """Raised when a Nexus REST call fails.
 
@@ -219,7 +229,9 @@ class NexusClient:
         exposes storage, cleanup, proxy, negativeCache and httpClient settings
         used by the detailed cross-instance comparison.
         """
-        resp = await self._request("GET", f"/repositories/{fmt}/{type_}/{name}")
+        resp = await self._request(
+            "GET", f"/repositories/{_fmt_seg(fmt)}/{type_}/{name}"
+        )
         return resp.json()
 
     # -- Configuration export ----------------------------------------------
@@ -335,7 +347,7 @@ class NexusClient:
     async def create_repository(
         self, fmt: str, type_: str, payload: dict[str, Any]
     ) -> None:
-        await self._request("POST", f"/repositories/{fmt}/{type_}", json=payload)
+        await self._request("POST", f"/repositories/{_fmt_seg(fmt)}/{type_}", json=payload)
 
     # -- Configuration restore: update existing (overwrite mode) -----------
 
@@ -357,7 +369,9 @@ class NexusClient:
     async def update_repository(
         self, fmt: str, type_: str, name: str, payload: dict[str, Any]
     ) -> None:
-        await self._request("PUT", f"/repositories/{fmt}/{type_}/{name}", json=payload)
+        await self._request(
+            "PUT", f"/repositories/{_fmt_seg(fmt)}/{type_}/{name}", json=payload
+        )
 
     # -- Components ---------------------------------------------------------
 
