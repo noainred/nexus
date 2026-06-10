@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.49",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "플릿 헬스 대시보드 — 개요 상단에 전체 요약 막대(서버 수, 정상/주의/다운, 저장소 합계, 평균 응답)를 표시"},
+        ],
+    },
+    {
         "version": "0.8.48",
         "date": "2026-06-10",
         "changes": [

@@ -281,9 +281,35 @@ async function loadOverview() {
   renderStatusCards(statuses, order);
 }
 
+function fleetSummary(items) {
+  const real = items.filter((i) => !i.loading);
+  if (!real.length) return null;
+  let up = 0, warn = 0, down = 0, repoSum = 0, respSum = 0, respN = 0;
+  real.forEach((s) => {
+    if (!s.reachable) down++;
+    else if (s.healthy === false) warn++;
+    else up++;
+    if (s.repository_count != null) repoSum += s.repository_count;
+    if (s.response_ms != null) { respSum += s.response_ms; respN++; }
+  });
+  const avg = respN ? Math.round(respSum / respN) : null;
+  const chip = (cls, label, n) => el("span", { class: `fleet-chip ${cls}${n ? "" : " zero"}` }, `${label} ${n}`);
+  return el("div", { class: "fleet-summary" }, [
+    el("span", { class: "fleet-total" }, `서버 ${real.length}`),
+    chip("up", "정상", up),
+    chip("warn", "주의", warn),
+    chip("down", "다운", down),
+    el("span", { class: "fleet-sep" }, "·"),
+    el("span", { class: "fleet-meta" }, `저장소 합계 ${repoSum.toLocaleString()}`),
+    avg != null ? el("span", { class: "fleet-meta" }, `평균 응답 ${avg}ms`) : null,
+  ]);
+}
+
 function renderStatusCards(items, order) {
   const cards = document.getElementById("status-cards");
   cards.innerHTML = "";
+  const summary = fleetSummary(items);
+  if (summary) cards.append(summary);
 
   const groups = new Map();
   items.forEach((s) => {
