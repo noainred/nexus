@@ -151,6 +151,9 @@ h3 { font-size: 14px; color: var(--muted); }
 }
 .mtip .mtip-slave-name { font-weight: 700; color: var(--accent); }
 .mtip .mtip-slave-tag { font-weight: 700; letter-spacing: 1px; color: var(--accent); }
+.mtip .mtip-slave.diff { background: rgba(210,153,34,.14); border-color: var(--amber); }
+.mtip .mtip-slave.diff .mtip-slave-name,
+.mtip .mtip-slave.diff .mtip-slave-tag { color: var(--amber); }
 .card .metrics { margin-top: 12px; display: flex; gap: 18px; }
 .card .metric .label { color: var(--muted); font-size: 11px; }
 .card .metric .value { font-size: 18px; font-weight: 600; }

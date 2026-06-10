@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.38",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "changed", "text": "Slave 노드를 전체 설정으로 검증 — remoteUrl만 다르면 정상(✓), 그 외 항목(예: httpClient.autoBlock)이 다르면 drift(≠ '설정 다름')로 표시하고 행 상태에도 반영. 호버 카드는 어떤 항목이 다른지 키 목록을 표시(슬레이브 셀은 매트릭스 로드 시 지연 검증)"},
+        ],
+    },
+    {
         "version": "0.8.37",
         "date": "2026-06-10",
         "changes": [

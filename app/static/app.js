@@ -766,7 +766,12 @@ function evaluateRow(row, columns, refId) {
     columns.forEach((col) => {
       const c = row.cells[col.id];
       if (!c || !c.present) { matches[col.id] = null; return; }
-      if (cellIsSlave(c)) { matches[col.id] = true; return; }
+      if (cellIsSlave(c)) {
+        const sd = (state.slaveDiffCache || {})[`${col.id}:${row.repository}`];
+        if (sd && sd.differs) { matches[col.id] = false; anyDiff = true; }
+        else matches[col.id] = true;  // clean mirror (or not yet verified)
+        return;
+      }
       const m = cellSignature(c) === majSig;
       matches[col.id] = m;
       if (!m) anyDiff = true;
@@ -799,7 +804,12 @@ function evaluateRow(row, columns, refId) {
   columns.forEach((col) => {
     const c = row.cells[col.id];
     if (!c || !c.present) { matches[col.id] = null; return; }
-    if (cellIsSlave(c)) { matches[col.id] = true; return; }  // master/slave is normal
+    if (cellIsSlave(c)) {
+      const sd = (state.slaveDiffCache || {})[`${col.id}:${row.repository}`];
+      if (sd && sd.differs) { matches[col.id] = false; anyDiff = true; }
+      else matches[col.id] = true;
+      return;
+    }
     const m = cellSignature(c) === refSig;
     matches[col.id] = m;
     if (!m) anyDiff = true;
@@ -980,55 +990,99 @@ function masterNameForCell(c) {
   return m ? m.name : "";
 }
 
-// True when two repo configs are identical apart from host-specific fields
-// (the proxy remote URL, the repo URL, and the name).
-function configsEqualExceptRemote(a, b) {
+// Keys that differ between two repo configs, ignoring host-specific fields
+// (the proxy remote URL, the repo URL, and the name). Empty array = identical
+// apart from those, i.e. a clean master/slave mirror.
+function configDiffKeys(a, b) {
   const norm = (cfg) => {
     const out = [];
     flattenConfig(cfg, "", out);
-    return out
-      .filter((l) => !l.startsWith("proxy.remoteUrl:") && !l.startsWith("url:") && !l.startsWith("name:"))
-      .sort()
-      .join("\n");
+    const map = {};
+    out.forEach((l) => {
+      const i = l.indexOf(": ");
+      const k = l.slice(0, i);
+      if (k === "proxy.remoteUrl" || k === "url" || k === "name") return;
+      map[k] = l.slice(i + 2);
+    });
+    return map;
   };
-  return norm(a) === norm(b);
+  const ma = norm(a);
+  const mb = norm(b);
+  const keys = new Set([...Object.keys(ma), ...Object.keys(mb)]);
+  const diffs = [];
+  keys.forEach((k) => { if (ma[k] !== mb[k]) diffs.push(k); });
+  return diffs.sort();
+}
+
+// Resolve (and cache) a slave cell's relationship to its master: which master,
+// which repo, and whether anything beyond remoteUrl differs (with the keys).
+async function ensureSlaveInfo(repo, col, c) {
+  const key = `${col.id}:${repo}`;
+  state.slaveDiffCache = state.slaveDiffCache || {};
+  if (key in state.slaveDiffCache) return state.slaveDiffCache[key];
+  const h = c && c.remote_url ? hostOf(c.remote_url) : "";
+  const master = h
+    ? (state.instances || []).find((i) => i.id !== col.id && hostOf(i.base_url) === h)
+    : null;
+  if (!master) { state.slaveDiffCache[key] = { master: null }; return state.slaveDiffCache[key]; }
+  const mRepo = repoNameFromRemote(c.remote_url) || repo;
+  let entry = { master, mRepo, differs: false, keys: [], unverified: true };
+  try {
+    state.repoCfgCache = state.repoCfgCache || {};
+    let myCfg = state.repoCfgCache[key];
+    if (!myCfg) {
+      myCfg = await api(
+        `/api/instances/${encodeURIComponent(col.id)}/repository-config` +
+          `?repository=${encodeURIComponent(repo)}` +
+          `&format=${encodeURIComponent(c.format || "")}&type=${encodeURIComponent(c.type || "")}`
+      );
+      state.repoCfgCache[key] = myCfg;
+    }
+    const mKey = `${master.id}:${mRepo}`;
+    let mCfg = state.repoCfgCache[mKey];
+    if (!mCfg) {
+      mCfg = await api(
+        `/api/instances/${encodeURIComponent(master.id)}/repository-config-by-name` +
+          `?repository=${encodeURIComponent(mRepo)}`
+      );
+      state.repoCfgCache[mKey] = mCfg;
+    }
+    const diffs = configDiffKeys(myCfg, mCfg);
+    entry = { master, mRepo, differs: diffs.length > 0, keys: diffs, unverified: false };
+  } catch (_) {
+    /* keep unverified entry */
+  }
+  state.slaveDiffCache[key] = entry;
+  return entry;
 }
 
 // Detect whether a proxy repo points at another *managed* server (its master)
 // and, if so, annotate the hover card with a "<master> Slave" badge.
 async function detectSlave(repo, col, cfg, key) {
   state.slaveCache = state.slaveCache || {};
-  const remote = cfg.proxy && cfg.proxy.remoteUrl;
-  const h = remote ? hostOf(remote) : "";
-  const master = h
-    ? (state.instances || []).find((i) => i.id !== col.id && hostOf(i.base_url) === h)
-    : null;
-  if (!master) { state.slaveCache[key] = ""; return; }
+  const cLike = {
+    remote_url: cfg.proxy && cfg.proxy.remoteUrl,
+    format: cfg.format,
+    type: cfg.type,
+  };
+  const info = await ensureSlaveInfo(repo, col, cLike);
+  if (!info || !info.master) { state.slaveCache[key] = ""; return; }
 
-  const mRepo = repoNameFromRemote(remote) || repo;
-  let suffix = "";
-  try {
-    const mKey = `${master.id}:${mRepo}`;
-    let mCfg = (state.repoCfgCache || {})[mKey];
-    if (!mCfg) {
-      mCfg = await api(
-        `/api/instances/${encodeURIComponent(master.id)}/repository-config-by-name` +
-          `?repository=${encodeURIComponent(mRepo)}`
-      );
-      state.repoCfgCache = state.repoCfgCache || {};
-      state.repoCfgCache[mKey] = mCfg;
-    }
-    suffix = configsEqualExceptRemote(cfg, mCfg)
-      ? " · 설정 동일 (remoteUrl만 다름)"
-      : " · 일부 설정 다름";
-  } catch (_) {
-    suffix = "";
+  let suffix;
+  let cls = "";
+  if (info.unverified) {
+    suffix = " · 마스터 설정 확인 불가";
+  } else if (info.differs) {
+    cls = "diff";
+    suffix = ` · 다른 항목: ${info.keys.join(", ")}`;
+  } else {
+    suffix = " · 설정 동일 (remoteUrl만 다름)";
   }
   const note =
-    `<div class="mtip-slave">` +
-    `<div class="mtip-slave-name">⛓ ${escapeHtml(master.name)}</div>` +
-    `<div class="mtip-slave-tag">Slave</div>` +
-    `<div class="mtip-sub">→ ${escapeHtml(mRepo)}${escapeHtml(suffix)}</div>` +
+    `<div class="mtip-slave ${cls}">` +
+    `<div class="mtip-slave-name">⛓ ${escapeHtml(info.master.name)}</div>` +
+    `<div class="mtip-slave-tag">Slave${info.differs ? " · 설정 다름" : ""}</div>` +
+    `<div class="mtip-sub">→ ${escapeHtml(info.mRepo)}${escapeHtml(suffix)}</div>` +
     `</div>`;
   state.slaveCache[key] = note;
   if (state.matrixHoverKey === key) {
@@ -1190,13 +1244,19 @@ function renderMatrix() {
 
       const refMark = col.id === refId ? "ref-col" : "";
       const present = !!c.present && !c.unknown;
-      // A slave (proxy → managed master) is the expected setup: show it as
-      // normal (✓) with a "<master> Slave" tag instead of a red ≠ remote URL.
+      // A slave (proxy → managed master) is the expected setup. If only the
+      // remoteUrl differs it is normal (✓ "<master> Slave"); if other settings
+      // differ it is a real drift (≠ "<master> Slave·다름").
       if (present && cellIsSlave(c)) {
-        cls = "consistent";
-        mark = "✓";
         const mn = masterNameForCell(c);
-        meta = `${mn ? `${mn} ` : ""}Slave`;
+        const sd = (state.slaveDiffCache || {})[`${col.id}:${row.repository}`];
+        if (sd && sd.differs) {
+          cls = "drift"; mark = "≠";
+          meta = `${mn ? `${mn} ` : ""}Slave·설정 다름`;
+        } else {
+          cls = "consistent"; mark = "✓";
+          meta = `${mn ? `${mn} ` : ""}Slave${sd && sd.unverified ? "?" : ""}`;
+        }
       }
       const inner = el("span", { class: `mcell ${cls}` }, [
         el("span", { class: "mark" }, mark),
@@ -1222,6 +1282,26 @@ function renderMatrix() {
 
   const table = el("table", { class: "matrix" }, [thead, el("tbody", {}, body)]);
   container.append(table);
+
+  // Lazily verify slave cells' deep config (remoteUrl aside) and re-render once
+  // resolved, so cells/rows reflect real differences instead of assuming clean.
+  const toVerify = [];
+  rows.forEach((row) => {
+    columns.forEach((col) => {
+      const c = row.cells[col.id];
+      if (c && c.present && !c.unknown && cellIsSlave(c)) {
+        const k = `${col.id}:${row.repository}`;
+        if (!(state.slaveDiffCache && k in state.slaveDiffCache)) {
+          toVerify.push({ repo: row.repository, col, c });
+        }
+      }
+    });
+  });
+  if (toVerify.length && !state.slaveVerifying) {
+    state.slaveVerifying = true;
+    Promise.allSettled(toVerify.map((v) => ensureSlaveInfo(v.repo, v.col, v.c)))
+      .then(() => { state.slaveVerifying = false; renderMatrix(); });
+  }
 }
 
 function populateMatrixRef() {
