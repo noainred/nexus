@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.43",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "changed", "text": "Slave 설정 다름 표시를 표(항목/이 서버/마스터)로 한 줄에 하나씩 — 어떤 값이 어떻게 다른지 가독성 있게 표시"},
+        ],
+    },
+    {
         "version": "0.8.42",
         "date": "2026-06-10",
         "changes": [

@@ -1003,9 +1003,8 @@ function masterNameForCell(c) {
   return m ? m.name : "";
 }
 
-// Keys that differ between two repo configs, ignoring host-specific fields
-// (the proxy remote URL, the repo URL, and the name). Empty array = identical
-// apart from those, i.e. a clean master/slave mirror.
+// Keys (with both values) that differ between two repo configs, ignoring
+// host-specific fields. Empty = identical apart from those (clean mirror).
 function configDiffKeys(a, b) {
   const norm = (cfg) => {
     const out = [];
@@ -1023,8 +1022,9 @@ function configDiffKeys(a, b) {
   const mb = norm(b);
   const keys = new Set([...Object.keys(ma), ...Object.keys(mb)]);
   const diffs = [];
-  keys.forEach((k) => { if (ma[k] !== mb[k]) diffs.push(k); });
-  return diffs.sort();
+  keys.forEach((k) => { if (ma[k] !== mb[k]) diffs.push({ key: k, a: ma[k], b: mb[k] }); });
+  diffs.sort((x, y) => (x.key < y.key ? -1 : 1));
+  return diffs;
 }
 
 // Resolve (and cache) a slave cell's relationship to its master: which master,
@@ -1081,22 +1081,31 @@ async function detectSlave(repo, col, cfg, key) {
   const info = await ensureSlaveInfo(repo, col, cLike);
   if (!info || !info.master) { state.slaveCache[key] = ""; return; }
 
-  let suffix;
   let cls = "";
+  let tag = "Slave";
+  let sub = `→ ${escapeHtml(info.mRepo)}`;
+  let extra = "";
   if (info.unverified) {
-    suffix = " · 마스터 설정 확인 불가";
+    sub += " · 마스터 설정 확인 불가";
   } else if (info.differs) {
     cls = "diff";
-    suffix = ` · 다른 항목: ${info.keys.join(", ")}`;
+    tag = "Slave · 설정 다름";
+    const rows = (info.keys || []).map((d) =>
+      `<tr><td>${escapeHtml(d.key)}</td>` +
+      `<td>${escapeHtml(d.a == null ? "(없음)" : d.a)}</td>` +
+      `<td>${escapeHtml(d.b == null ? "(없음)" : d.b)}</td></tr>`
+    ).join("");
+    extra =
+      `<table class="mtip-difftable">` +
+      `<tr><th>항목</th><th>이 서버</th><th>마스터</th></tr>${rows}</table>`;
   } else {
-    suffix = " · 설정 동일 (remoteUrl만 다름)";
+    sub += " · 설정 동일 (remoteUrl만 다름)";
   }
   const note =
     `<div class="mtip-slave ${cls}">` +
     `<div class="mtip-slave-name">⛓ ${escapeHtml(info.master.name)}</div>` +
-    `<div class="mtip-slave-tag">Slave${info.differs ? " · 설정 다름" : ""}</div>` +
-    `<div class="mtip-sub">→ ${escapeHtml(info.mRepo)}${escapeHtml(suffix)}</div>` +
-    `</div>`;
+    `<div class="mtip-slave-tag">${tag}</div>` +
+    `<div class="mtip-sub">${sub}</div>${extra}</div>`;
   state.slaveCache[key] = note;
   if (state.matrixHoverKey === key) {
     updateMatrixTip(renderCfgTip(repo, col.name, cfg, note));
