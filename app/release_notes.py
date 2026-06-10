@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.45",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "changed", "text": "매트릭스 셀 클릭은 항목별 비교 팝업을 열도록 변경(의도치 않게 Nexus로 이동하던 동작 제거). Nexus admin 저장소 설정은 비교 팝업의 서버 이름 링크로 이동"},
+        ],
+    },
+    {
         "version": "0.8.44",
         "date": "2026-06-10",
         "changes": [

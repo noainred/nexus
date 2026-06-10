@@ -891,12 +891,11 @@ function instBaseUrl(id) {
   return i ? (i.base_url || "") : "";
 }
 
-// Click a cell to open that server's Nexus admin page for the repository.
-function onMatrixCellClick(instId, repo) {
+// URL of a server's Nexus admin page for a repository (used by the popup).
+function adminRepoUrl(instId, repo) {
   const base = instBaseUrl(instId);
-  if (!base) return;
-  const url = `${base.replace(/\/+$/, "")}/#admin/repository/repositories:${encodeURIComponent(repo)}`;
-  window.open(url, "_blank", "noopener,noreferrer");
+  if (!base) return "";
+  return `${base.replace(/\/+$/, "")}/#admin/repository/repositories:${encodeURIComponent(repo)}`;
 }
 
 // --- Rich hover card showing a repository's full configuration -------------
@@ -1298,7 +1297,7 @@ function renderMatrix() {
       const td = el("td", {
         class: `mdrop ${refMark}${present ? " clickable" : ""}`,
         draggable: present ? "true" : "false",
-        onclick: present ? () => onMatrixCellClick(col.id, row.repository) : null,
+        onclick: present ? () => openRepoDiff(row.repository) : null,
         ondragstart: (e) => onMatrixDragStart(e, row.repository, col.id, present),
         ondragover: (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; },
         ondragenter: (e) => e.currentTarget.classList.add("drop-hover"),
@@ -1397,7 +1396,14 @@ function diffTable(diff, diffOnly) {
   const headCells = [el("th", {}, "설정 항목")];
   diff.columns.forEach((col) => {
     const label = col.reachable ? col.name : `${col.name} ⚠`;
-    headCells.push(el("th", { title: col.error || col.name }, label));
+    const url = adminRepoUrl(col.id, diff.repository);
+    const node = url
+      ? el("a", {
+          class: "col-link", href: url, target: "_blank", rel: "noopener noreferrer",
+          title: `${col.name}의 admin 저장소 설정 열기`,
+        }, label)
+      : label;
+    headCells.push(el("th", { title: col.error || col.name }, node));
   });
   const thead = el("thead", {}, el("tr", {}, headCells));
 
