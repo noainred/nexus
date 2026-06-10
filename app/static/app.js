@@ -3069,6 +3069,59 @@ async function runSyncJob(id) {
   }
 }
 
+async function runDrAudit() {
+  const status = document.getElementById("dr-status");
+  const table = document.getElementById("dr-table");
+  status.textContent = "전 서버 점검 중…";
+  table.innerHTML = "";
+  let r;
+  try {
+    r = await api("/api/dr-audit");
+  } catch (e) {
+    status.textContent = `점검 실패: ${e.message}`;
+    return;
+  }
+  const c = r.counts || {};
+  const cb = r.config_backup || {};
+  status.textContent =
+    `정상 ${c.ok || 0} · 주의 ${c.warn || 0} · 위험 ${c.crit || 0}` +
+    ` | 구성 백업: ${cb.enabled ? `사용(${cb.time})` : "꺼짐 ⚠"}` +
+    (cb.last_run ? ` · 마지막 ${cb.last_run}` : " · 실행 기록 없음");
+  const badge = (s) => {
+    const map = { ok: ["up", "정상"], warn: ["warn", "주의"], crit: ["down", "없음"], unknown: ["warn", "확인불가"] };
+    const [cls, label] = map[s] || ["warn", s];
+    return el("span", { class: `badge ${cls}` }, label);
+  };
+  const rows = (r.servers || []).map((s) => el("tr", {}, [
+    el("td", {}, s.name),
+    el("td", { class: "num" }, String(s.tasks ?? "—")),
+    el("td", {}, fmtDate(s.last_run) || "—"),
+    el("td", {}, s.last_result || "—"),
+    el("td", {}, badge(s.state)),
+    el("td", {}, s.error || s.detail || ""),
+  ]));
+  table.append(buildTable(["서버", "백업 태스크", "마지막 실행", "결과", "상태", "비고"], rows));
+}
+
+async function runDrBackups() {
+  if (!confirm(
+    "모든 서버에서 DB 백업 태스크('Export databases for backup')를 즉시 실행합니다.\n진행할까요?"
+  )) return;
+  const status = document.getElementById("dr-status");
+  status.textContent = "DB 백업 실행 중…";
+  try {
+    const r = await api("/api/dr-run-backup", { method: "POST" });
+    const servers = r.servers || [];
+    const started = servers.reduce((a, s) => a + (s.started || 0), 0);
+    const none = servers.filter((s) => !s.error && s.tasks === 0).map((s) => s.name);
+    status.textContent = `완료 · ${started}개 백업 시작` +
+      (none.length ? ` · 태스크 없는 서버: ${none.join(", ")}` : "");
+    toast(`DB 백업 일괄 실행 — ${started}개 시작`, none.length ? "err" : "ok");
+  } catch (e) {
+    status.textContent = `실패: ${e.message}`;
+  }
+}
+
 async function setReference(inst) {
   try {
     await api(`/api/instances/${encodeURIComponent(inst.id)}/reference`, { method: "POST" });
@@ -3163,6 +3216,8 @@ function setupSettings() {
     }
   });
   document.getElementById("backup-now").addEventListener("click", runBackupNow);
+  document.getElementById("dr-audit").addEventListener("click", runDrAudit);
+  document.getElementById("dr-run").addEventListener("click", runDrBackups);
   document.getElementById("syncjob-add").addEventListener("click", addSyncJob);
   // "새 서버 추가" button reveals the form (add mode); 취소 hides it.
   document.getElementById("settings-add-toggle").addEventListener("click", () => {

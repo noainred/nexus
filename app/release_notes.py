@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.57",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "added", "text": "DR 준비도 점검 — 서버 설정에 'DR 준비도 점검(DB 백업)' 추가. 모든 서버에 'Export databases for backup' 태스크가 있고 최근 8일 내 성공했는지 점검(구성 백업 상태 요약 포함), 'DB 백업 전체 실행' 일괄 트리거. 신규 /api/dr-audit·/api/dr-run-backup"},
+        ],
+    },
+    {
         "version": "0.8.56",
         "date": "2026-06-11",
         "changes": [
