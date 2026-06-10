@@ -259,9 +259,11 @@
           <p class="hint">서버별 정리 위생 상태를 한 번에 점검합니다 — cleanup 정책 수, 정책이 없는 저장소, <b>Compact blob store</b> 작업 유무(없으면 soft-delete가 디스크를 계속 차지). 필요 시 Compact를 전 서버에서 일괄 실행하거나, 정책을 전 서버로 복사할 수 있습니다.</p>
           <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap;gap:8px">
             <button type="button" id="ca-audit">점검 실행</button>
+            <button type="button" id="ca-docker">Docker 정리(GC) 전체 실행</button>
             <button type="button" id="ca-compact">Compact 전체 실행</button>
             <span id="ca-status" class="hint" style="margin:0"></span>
           </div>
+          <p class="hint" style="margin-top:4px">※ Docker는 <b>2단계</b>입니다: ① <b>Docker 정리(GC)</b>로 고아 레이어를 지운 뒤 ② <b>Compact</b>로 실제 디스크를 회수합니다. GC 완료 후 잠시 뒤 Compact를 실행하세요.</p>
           <div id="ca-table"></div>
           <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap;gap:8px;margin-top:8px">
             <label class="ref-pick">원본 <select id="ca-src"></select></label>

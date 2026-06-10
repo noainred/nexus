@@ -3170,6 +3170,7 @@ function setupCleanup() {
   document.getElementById("cleanup-refresh").addEventListener("click", loadCleanup);
   fillInstanceSelect(document.getElementById("ca-src"));
   document.getElementById("ca-audit").addEventListener("click", runCleanupAudit);
+  document.getElementById("ca-docker").addEventListener("click", runDockerGcEverywhere);
   document.getElementById("ca-compact").addEventListener("click", runCompactEverywhere);
   document.getElementById("ca-push").addEventListener("click", pushPolicyEverywhere);
   loadCleanup();
@@ -3208,18 +3209,44 @@ async function runCleanupAudit() {
             title: (s.repos_without_cleanup_names || []).join(", "),
           }, `${noCleanup}개`)
         : "0";
+    // Docker GC only matters when the server has docker repos.
+    let dockerCell;
+    if (!s.has_docker) dockerCell = el("span", { class: "url" }, "—");
+    else if (s.docker_gc_tasks) dockerCell = el("span", {}, `${s.docker_gc_tasks}개 · ${fmtDate(s.docker_gc_last) || "미실행"}`);
+    else dockerCell = el("span", { class: "badge down", title: "Docker 저장소가 있으나 GC 작업이 없어 고아 레이어가 쌓입니다" }, "없음 ⚠");
     return el("tr", {}, [
       el("td", {}, s.name),
       el("td", { class: "num" }, String(s.policies ?? "—")),
       el("td", {}, noCleanupCell),
+      el("td", {}, dockerCell),
       el("td", { class: "num" }, String(s.blobstores ?? "—")),
       el("td", {}, compactCell),
       el("td", {}, fmtDate(s.compact_last) || "—"),
     ]);
   });
   table.append(buildTable(
-    ["서버", "정책 수", "정책 없는 저장소", "Blob store", "Compact 작업", "마지막 Compact"], rows
+    ["서버", "정책 수", "정책 없는 저장소", "Docker GC", "Blob store", "Compact 작업", "마지막 Compact"], rows
   ));
+}
+
+async function runDockerGcEverywhere() {
+  if (!confirm(
+    "모든 서버에서 'Docker - Delete unused manifests and images'(GC) 작업을 실행합니다.\n" +
+    "(고아 레이어 soft-delete — 이후 Compact를 돌려야 실제 디스크가 회수됩니다)\n\n진행할까요?"
+  )) return;
+  const status = document.getElementById("ca-status");
+  status.textContent = "Docker GC 실행 중…";
+  try {
+    const r = await api("/api/cleanup-docker-run", { method: "POST" });
+    const servers = r.servers || [];
+    const started = servers.reduce((a, s) => a + (s.started || 0), 0);
+    const none = servers.filter((s) => !s.error && s.tasks === 0).map((s) => s.name);
+    status.textContent = `완료 · ${started}개 GC 작업 시작` +
+      (none.length ? ` · GC 작업 없는 서버: ${none.join(", ")}` : "");
+    toast(`Docker GC 일괄 실행 — ${started}개 시작 (완료 후 Compact 실행)`, none.length ? "err" : "ok");
+  } catch (e) {
+    status.textContent = `실패: ${e.message}`;
+  }
 }
 
 async function runCompactEverywhere() {

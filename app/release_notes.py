@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.54",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "Docker 2단계 정리 일괄화 — 플릿 정리 점검에 'Docker GC' 컬럼(고아 레이어 정리 작업 유무) 추가, 'Docker 정리(GC) 전체 실행' 버튼으로 전 서버 GC 일괄 실행(이후 Compact로 디스크 회수). 신규 /api/cleanup-docker-run"},
+        ],
+    },
+    {
         "version": "0.8.53",
         "date": "2026-06-10",
         "changes": [

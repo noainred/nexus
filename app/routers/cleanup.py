@@ -81,6 +81,14 @@ from ..deps import InstanceRegistry, get_registry
 fleet_router = APIRouter(prefix="/api", tags=["cleanup"])
 
 
+def _is_docker_gc(t) -> bool:
+    """'Docker - Delete unused manifests and images' task."""
+    ttype = (t.type or "").lower()
+    name = (t.name or "").lower()
+    return "docker.gc" in ttype or ("manifest" in name and "docker" in name) or \
+        ("unused" in name and "manifest" in name)
+
+
 @fleet_router.get("/cleanup-audit")
 async def cleanup_audit(
     registry: InstanceRegistry = Depends(get_registry),
@@ -103,6 +111,7 @@ async def cleanup_audit(
             return row
         compact = [t for t in tasks if (t.type or "") == "blobstore.compact"]
         cleanup_tasks = [t for t in tasks if "cleanup" in (t.type or "")]
+        docker_gc = [t for t in tasks if _is_docker_gc(t)]
         row.update(
             policies=len(policies),
             policy_names=[p.name for p in policies],
@@ -114,8 +123,11 @@ async def cleanup_audit(
                 None,
             ),
             cleanup_tasks=len(cleanup_tasks),
+            docker_gc_tasks=len(docker_gc),
+            docker_gc_last=max((t.last_run or "" for t in docker_gc), default=""),
+            has_docker=False,
         )
-        # Repos (non-group) without any cleanup policy assigned.
+        # Repos (non-group) without any cleanup policy assigned + docker presence.
         try:
             settings_list = await client.list_repository_settings()
             repos = [r for r in settings_list if (r.get("type") or "").lower() != "group"]
@@ -123,8 +135,11 @@ async def cleanup_audit(
                 r.get("name") for r in repos
                 if not ((r.get("cleanup") or {}).get("policyNames"))
             ]
-            row.update(repos=len(repos), repos_without_cleanup=len(without),
-                       repos_without_cleanup_names=without[:50])
+            row.update(
+                repos=len(repos), repos_without_cleanup=len(without),
+                repos_without_cleanup_names=without[:50],
+                has_docker=any((r.get("format") or "").lower() == "docker" for r in settings_list),
+            )
         except NexusError:
             row.update(repos=None, repos_without_cleanup=None)
         return row
@@ -156,6 +171,36 @@ async def run_compact_everywhere(
             except NexusError as exc:
                 errors.append(exc.message)
         return {"id": inst.id, "name": inst.name, "tasks": len(compact),
+                "started": started, "errors": errors}
+
+    return {"servers": list(await asyncio.gather(*(one(i) for i in instances)))}
+
+
+@fleet_router.post("/cleanup-docker-run")
+async def run_docker_gc_everywhere(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Run every 'Docker - Delete unused manifests and images' task on every
+    monitored server (step 1 of the two-step Docker cleanup; run Compact after
+    they finish to reclaim disk)."""
+    instances = registry.monitoring()
+
+    async def one(inst):
+        client = NexusClient(inst, timeout=get_settings().request_timeout)
+        try:
+            tasks = await client.list_tasks()
+        except NexusError as exc:
+            return {"id": inst.id, "name": inst.name, "error": exc.message}
+        gc = [t for t in tasks if _is_docker_gc(t)]
+        started = 0
+        errors = []
+        for t in gc:
+            try:
+                await client.run_task(t.id)
+                started += 1
+            except NexusError as exc:
+                errors.append(exc.message)
+        return {"id": inst.id, "name": inst.name, "tasks": len(gc),
                 "started": started, "errors": errors}
 
     return {"servers": list(await asyncio.gather(*(one(i) for i in instances)))}
