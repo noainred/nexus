@@ -886,6 +886,19 @@ function matrixColName(id) {
   return c ? c.name : id;
 }
 
+function instBaseUrl(id) {
+  const i = (state.instances || []).find((x) => x.id === id);
+  return i ? (i.base_url || "") : "";
+}
+
+// Click a cell to open that server's Nexus admin page for the repository.
+function onMatrixCellClick(instId, repo) {
+  const base = instBaseUrl(instId);
+  if (!base) return;
+  const url = `${base.replace(/\/+$/, "")}/#admin/repository/repositories:${encodeURIComponent(repo)}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 // --- Rich hover card showing a repository's full configuration -------------
 
 function escapeHtml(s) {
@@ -1216,7 +1229,17 @@ function renderMatrix() {
   columns.forEach((col) => {
     let label = col.reachable ? col.name : `${col.name} ⚠`;
     if (col.id === refId) label = `${label} (기준)`;
-    headCells.push(el("th", { class: col.id === refId ? "ref-col" : "", title: col.error || col.name }, label));
+    const base = instBaseUrl(col.id);
+    const labelNode = base
+      ? el("a", {
+          class: "col-link",
+          href: base,
+          target: "_blank",
+          rel: "noopener noreferrer",
+          title: `새 탭에서 ${col.name} Nexus 열기`,
+        }, label)
+      : label;
+    headCells.push(el("th", { class: col.id === refId ? "ref-col" : "", title: col.error || col.name }, labelNode));
   });
   const thead = el("thead", {}, el("tr", {}, headCells));
 
@@ -1264,8 +1287,9 @@ function renderMatrix() {
       ]);
       const cell = c;
       const td = el("td", {
-        class: `mdrop ${refMark}`,
+        class: `mdrop ${refMark}${present ? " clickable" : ""}`,
         draggable: present ? "true" : "false",
+        onclick: present ? () => onMatrixCellClick(col.id, row.repository) : null,
         ondragstart: (e) => onMatrixDragStart(e, row.repository, col.id, present),
         ondragover: (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; },
         ondragenter: (e) => e.currentTarget.classList.add("drop-hover"),

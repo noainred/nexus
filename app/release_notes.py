@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.39",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "매트릭스 바로가기 — 열 머리글(서버명) 클릭 시 그 서버 Nexus를, 셀 클릭 시 그 서버의 admin 저장소 설정 화면(#admin/repository/repositories:<repo>)을 새 탭으로 열기"},
+        ],
+    },
+    {
         "version": "0.8.38",
         "date": "2026-06-10",
         "changes": [
