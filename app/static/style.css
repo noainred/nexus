@@ -110,6 +110,8 @@ h3 { font-size: 14px; color: var(--muted); }
 }
 .card .name { font-weight: 600; margin-bottom: 4px; }
 .card .url { color: var(--muted); font-size: 12px; word-break: break-all; }
+.card a.url-link { display: inline-block; text-decoration: none; cursor: pointer; }
+.card a.url-link:hover { color: var(--accent); text-decoration: underline; }
 .card .metrics { margin-top: 12px; display: flex; gap: 18px; }
 .card .metric .label { color: var(--muted); font-size: 11px; }
 .card .metric .value { font-size: 18px; font-weight: 600; }

@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.28",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "changed", "text": "개요 카드의 서버 주소를 클릭하면 새 탭에서 해당 서버의 Nexus(8081)가 열리도록 링크화"},
+        ],
+    },
+    {
         "version": "0.8.27",
         "date": "2026-06-10",
         "changes": [

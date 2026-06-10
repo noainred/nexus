@@ -278,7 +278,13 @@ function makeStatusCard(s) {
 
   const card = el("div", { class: "card" }, [
     el("div", { class: "name" }, [s.name, " ", badge]),
-    el("div", { class: "url" }, s.base_url),
+    el("a", {
+      class: "url url-link",
+      href: s.base_url,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      title: "새 탭에서 이 서버의 Nexus 열기",
+    }, s.base_url),
     metrics,
   ]);
   if (!s.loading && s.error) card.append(el("div", { class: "url", style: "color:var(--red);margin-top:8px" }, s.error));
