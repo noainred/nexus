@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.37",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "changed", "text": "매트릭스에서 slave 노드(프록시 remoteUrl이 관리 서버를 가리킴)는 정상(✓)으로 표시 — drift(≠)로 보지 않고 셀에 '<마스터> Slave' 태그를 달며, 행 상태 계산에서도 정상 처리(다수 기준은 비-slave 셀로 산정)"},
+        ],
+    },
+    {
         "version": "0.8.36",
         "date": "2026-06-10",
         "changes": [

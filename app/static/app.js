@@ -749,8 +749,11 @@ function evaluateRow(row, columns, refId) {
       const status = reachable.length ? "partial" : "unknown";
       return { status, matches, refMissing: false };
     }
+    // The majority reference is taken among non-slave cells; slave cells are
+    // an intentional master/slave mirror and always count as matching.
+    const nonSlave = present.filter((c) => !cellIsSlave(c));
     const counts = {};
-    present.forEach((c) => {
+    nonSlave.forEach((c) => {
       const s = cellSignature(c);
       counts[s] = (counts[s] || 0) + 1;
     });
@@ -762,13 +765,11 @@ function evaluateRow(row, columns, refId) {
     let anyDiff = false;
     columns.forEach((col) => {
       const c = row.cells[col.id];
-      if (c && c.present) {
-        const m = cellSignature(c) === majSig;
-        matches[col.id] = m;
-        if (!m) anyDiff = true;
-      } else {
-        matches[col.id] = null;
-      }
+      if (!c || !c.present) { matches[col.id] = null; return; }
+      if (cellIsSlave(c)) { matches[col.id] = true; return; }
+      const m = cellSignature(c) === majSig;
+      matches[col.id] = m;
+      if (!m) anyDiff = true;
     });
     let status;
     if (anyDiff) status = "drift";
@@ -797,13 +798,11 @@ function evaluateRow(row, columns, refId) {
   let anyDiff = false;
   columns.forEach((col) => {
     const c = row.cells[col.id];
-    if (c && c.present) {
-      const m = cellSignature(c) === refSig;
-      matches[col.id] = m;
-      if (!m) anyDiff = true;
-    } else {
-      matches[col.id] = null;
-    }
+    if (!c || !c.present) { matches[col.id] = null; return; }
+    if (cellIsSlave(c)) { matches[col.id] = true; return; }  // master/slave is normal
+    const m = cellSignature(c) === refSig;
+    matches[col.id] = m;
+    if (!m) anyDiff = true;
   });
 
   let status;
@@ -964,6 +963,21 @@ function hostOf(u) {
 function repoNameFromRemote(u) {
   const m = /\/repository\/([^/]+)/.exec(u || "");
   return m ? decodeURIComponent(m[1]) : "";
+}
+
+// A "slave" cell is a proxy whose remote URL points at one of our managed
+// servers (its master). Such a cell is the expected master/slave setup, not a
+// configuration drift, so it is treated as normal in the matrix.
+function cellIsSlave(c) {
+  if (!c || !c.remote_url) return false;
+  const h = hostOf(c.remote_url);
+  return !!h && (state.instances || []).some((i) => hostOf(i.base_url) === h);
+}
+
+function masterNameForCell(c) {
+  const h = c && c.remote_url ? hostOf(c.remote_url) : "";
+  const m = h && (state.instances || []).find((i) => hostOf(i.base_url) === h);
+  return m ? m.name : "";
 }
 
 // True when two repo configs are identical apart from host-specific fields
@@ -1176,6 +1190,14 @@ function renderMatrix() {
 
       const refMark = col.id === refId ? "ref-col" : "";
       const present = !!c.present && !c.unknown;
+      // A slave (proxy → managed master) is the expected setup: show it as
+      // normal (✓) with a "<master> Slave" tag instead of a red ≠ remote URL.
+      if (present && cellIsSlave(c)) {
+        cls = "consistent";
+        mark = "✓";
+        const mn = masterNameForCell(c);
+        meta = `${mn ? `${mn} ` : ""}Slave`;
+      }
       const inner = el("span", { class: `mcell ${cls}` }, [
         el("span", { class: "mark" }, mark),
         meta ? el("span", { class: "meta" }, meta) : null,
