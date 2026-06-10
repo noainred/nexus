@@ -935,7 +935,7 @@ function flattenConfig(obj, prefix, out) {
   return out;
 }
 
-function renderCfgTip(repo, instName, cfg) {
+function renderCfgTip(repo, instName, cfg, slaveHtml) {
   const header =
     `<b>${escapeHtml(repo)}</b> <span class="mtip-sub">@ ${escapeHtml(instName)}` +
     ` · ${escapeHtml(cfg.format || "—")}/${escapeHtml(cfg.type || "—")}</span>`;
@@ -946,7 +946,80 @@ function renderCfgTip(repo, instName, cfg) {
   });
   if (cfg.url) flat.unshift(`url: ${cfg.url}`);
   const body = flat.length ? flat.map(escapeHtml).join("<br>") : "(추가 설정 없음)";
-  return `${header}<hr>${body}`;
+  return `${header}${slaveHtml || ""}<hr>${body}`;
+}
+
+function updateMatrixTip(html) {
+  const t = matrixTip();
+  if (!t.classList.contains("hidden")) t.innerHTML = html;
+}
+
+function hostOf(u) {
+  try {
+    const url = new URL(/^[a-zA-Z]+:\/\//.test(u) ? u : `http://${u}`);
+    return url.hostname.toLowerCase();
+  } catch (_) { return ""; }
+}
+
+function repoNameFromRemote(u) {
+  const m = /\/repository\/([^/]+)/.exec(u || "");
+  return m ? decodeURIComponent(m[1]) : "";
+}
+
+// True when two repo configs are identical apart from host-specific fields
+// (the proxy remote URL, the repo URL, and the name).
+function configsEqualExceptRemote(a, b) {
+  const norm = (cfg) => {
+    const out = [];
+    flattenConfig(cfg, "", out);
+    return out
+      .filter((l) => !l.startsWith("proxy.remoteUrl:") && !l.startsWith("url:") && !l.startsWith("name:"))
+      .sort()
+      .join("\n");
+  };
+  return norm(a) === norm(b);
+}
+
+// Detect whether a proxy repo points at another *managed* server (its master)
+// and, if so, annotate the hover card with a "<master> Slave" badge.
+async function detectSlave(repo, col, cfg, key) {
+  state.slaveCache = state.slaveCache || {};
+  const remote = cfg.proxy && cfg.proxy.remoteUrl;
+  const h = remote ? hostOf(remote) : "";
+  const master = h
+    ? (state.instances || []).find((i) => i.id !== col.id && hostOf(i.base_url) === h)
+    : null;
+  if (!master) { state.slaveCache[key] = ""; return; }
+
+  const mRepo = repoNameFromRemote(remote) || repo;
+  let suffix = "";
+  try {
+    const mKey = `${master.id}:${mRepo}`;
+    let mCfg = (state.repoCfgCache || {})[mKey];
+    if (!mCfg) {
+      mCfg = await api(
+        `/api/instances/${encodeURIComponent(master.id)}/repository-config-by-name` +
+          `?repository=${encodeURIComponent(mRepo)}`
+      );
+      state.repoCfgCache = state.repoCfgCache || {};
+      state.repoCfgCache[mKey] = mCfg;
+    }
+    suffix = configsEqualExceptRemote(cfg, mCfg)
+      ? " · 설정 동일 (remoteUrl만 다름)"
+      : " · 일부 설정 다름";
+  } catch (_) {
+    suffix = "";
+  }
+  const note =
+    `<div class="mtip-slave">` +
+    `<div class="mtip-slave-name">⛓ ${escapeHtml(master.name)}</div>` +
+    `<div class="mtip-slave-tag">Slave</div>` +
+    `<div class="mtip-sub">→ ${escapeHtml(mRepo)}${escapeHtml(suffix)}</div>` +
+    `</div>`;
+  state.slaveCache[key] = note;
+  if (state.matrixHoverKey === key) {
+    updateMatrixTip(renderCfgTip(repo, col.name, cfg, note));
+  }
 }
 
 async function onMatrixCellHover(e, repo, col, c) {
@@ -962,8 +1035,11 @@ async function onMatrixCellHover(e, repo, col, c) {
     return;
   }
   state.repoCfgCache = state.repoCfgCache || {};
+  state.slaveCache = state.slaveCache || {};
   if (state.repoCfgCache[key]) {
-    showMatrixTip(renderCfgTip(repo, col.name, state.repoCfgCache[key]), x, y);
+    const cfg = state.repoCfgCache[key];
+    showMatrixTip(renderCfgTip(repo, col.name, cfg, state.slaveCache[key]), x, y);
+    if (!(key in state.slaveCache)) detectSlave(repo, col, cfg, key);
     return;
   }
   const base =
@@ -978,6 +1054,7 @@ async function onMatrixCellHover(e, repo, col, c) {
     );
     state.repoCfgCache[key] = cfg;
     if (state.matrixHoverKey === key) showMatrixTip(renderCfgTip(repo, col.name, cfg), x, y);
+    detectSlave(repo, col, cfg, key);
   } catch (err) {
     if (state.matrixHoverKey === key) {
       showMatrixTip(`${base}<span class="mtip-sub">설정 조회 실패: ${escapeHtml(err.message)}</span>`, x, y);

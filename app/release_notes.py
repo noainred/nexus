@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.36",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "매트릭스 호버 카드에 Slave 노드 표시 — 프록시 remoteUrl이 관리 중인 다른 서버를 가리키면 그 서버명/‘Slave’를 두 줄 가운데 정렬 배지로 표시하고, remoteUrl 외 설정이 동일한지(‘설정 동일’/‘일부 설정 다름’)도 함께 표시"},
+        ],
+    },
+    {
         "version": "0.8.35",
         "date": "2026-06-10",
         "changes": [

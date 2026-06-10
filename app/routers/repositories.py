@@ -41,6 +41,27 @@ async def repository_config(
         raise _translate(exc)
 
 
+@router.get("/repository-config-by-name")
+async def repository_config_by_name(
+    instance_id: str,
+    repository: str = Query(...),
+) -> dict:
+    """Full config for a repo found by name (format/type resolved server-side).
+
+    Used by the matrix hover card to compare a proxy against the upstream
+    managed server it points at (slave-node detection).
+    """
+    client: NexusClient = get_client(instance_id)
+    try:
+        repos = await client.list_repositories()
+        match = next((r for r in repos if r.name == repository), None)
+        if match is None:
+            raise HTTPException(status_code=404, detail=f"'{repository}' 없음")
+        return await client.get_repository_config(match.format, match.type, repository)
+    except NexusError as exc:
+        raise _translate(exc)
+
+
 @router.delete("/repositories/{name}", status_code=204, response_class=Response)
 async def delete_repository(instance_id: str, name: str) -> Response:
     client: NexusClient = get_client(instance_id)

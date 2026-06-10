@@ -144,6 +144,13 @@ h3 { font-size: 14px; color: var(--muted); }
 .mtip.hidden { display: none; }
 .mtip hr { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
 .mtip .mtip-sub { color: var(--muted); font-weight: normal; }
+.mtip .mtip-slave {
+  text-align: center; margin: 6px 0 2px;
+  padding: 6px 8px; border-radius: 6px;
+  background: rgba(79,157,222,.12); border: 1px solid var(--accent);
+}
+.mtip .mtip-slave-name { font-weight: 700; color: var(--accent); }
+.mtip .mtip-slave-tag { font-weight: 700; letter-spacing: 1px; color: var(--accent); }
 .card .metrics { margin-top: 12px; display: flex; gap: 18px; }
 .card .metric .label { color: var(--muted); font-size: 11px; }
 .card .metric .value { font-size: 18px; font-weight: 600; }
