@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.29",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "비교 매트릭스에서 비교 대상 선택 기능 — 인스턴스(열)와 저장소(행)를 칩으로 골라 부분집합만 비교(저장소 전체/해제 버튼 포함). 선택한 인스턴스 기준으로 drift(설정 상이) 판정도 다시 계산"},
+        ],
+    },
+    {
         "version": "0.8.28",
         "date": "2026-06-10",
         "changes": [

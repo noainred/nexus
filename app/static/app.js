@@ -778,6 +778,64 @@ function evaluateRow(row, columns, refId) {
   return { status, matches, refMissing: false };
 }
 
+function visibleMatrixColumns() {
+  const m = state.matrix;
+  if (!m) return [];
+  return state.matrixCols ? m.columns.filter((c) => state.matrixCols.has(c.id)) : m.columns;
+}
+
+function pruneMatrixSet(prev, all) {
+  if (!prev) return new Set(all);
+  const kept = all.filter((x) => prev.has(x));
+  return new Set(kept.length ? kept : all);
+}
+
+function renderMatrixPickers() {
+  const m = state.matrix;
+  const instBox = document.getElementById("matrix-inst-pick");
+  const repoBox = document.getElementById("matrix-repo-pick");
+  if (!m || !instBox || !repoBox) return;
+  instBox.innerHTML = "";
+  m.columns.forEach((col) => {
+    const on = !state.matrixCols || state.matrixCols.has(col.id);
+    instBox.append(el("button", {
+      type: "button",
+      class: `pick-chip ${on ? "on" : ""}`,
+      onclick: () => toggleMatrixPick("matrixCols", col.id),
+    }, col.reachable ? col.name : `${col.name} ⚠`));
+  });
+  repoBox.innerHTML = "";
+  m.rows.forEach((r) => {
+    const on = !state.matrixRepos || state.matrixRepos.has(r.repository);
+    repoBox.append(el("button", {
+      type: "button",
+      class: `pick-chip ${on ? "on" : ""}`,
+      onclick: () => toggleMatrixPick("matrixRepos", r.repository),
+    }, r.repository));
+  });
+}
+
+function toggleMatrixPick(key, id) {
+  const m = state.matrix;
+  if (!m) return;
+  const all = key === "matrixCols" ? m.columns.map((c) => c.id) : m.rows.map((r) => r.repository);
+  const set = state[key] ? new Set(state[key]) : new Set(all);
+  if (set.has(id)) set.delete(id);
+  else set.add(id);
+  state[key] = set;
+  populateMatrixRef();
+  renderMatrixPickers();
+  renderMatrix();
+}
+
+function setAllMatrixRepos(on) {
+  const m = state.matrix;
+  if (!m) return;
+  state.matrixRepos = on ? new Set(m.rows.map((r) => r.repository)) : new Set();
+  renderMatrixPickers();
+  renderMatrix();
+}
+
 function renderMatrix() {
   const container = document.getElementById("matrix-table");
   container.innerHTML = "";
@@ -788,23 +846,32 @@ function renderMatrix() {
     return;
   }
 
-  const refId = state.matrixReference || "";
+  // Only the user-selected instances form the comparison (drift is recomputed
+  // over this subset), and only the selected repositories are listed.
+  const columns = visibleMatrixColumns();
+  if (!columns.length) {
+    container.append(el("div", { class: "empty" }, "비교할 인스턴스를 1개 이상 선택하세요."));
+    return;
+  }
+  const refId = columns.some((c) => c.id === state.matrixReference) ? state.matrixReference : "";
   const evals = new Map();
-  matrix.rows.forEach((r) => evals.set(r, evaluateRow(r, matrix.columns, refId)));
+  matrix.rows.forEach((r) => evals.set(r, evaluateRow(r, columns, refId)));
 
   const driftOnly = document.getElementById("drift-only").checked;
-  let rows = matrix.rows;
+  let rows = state.matrixRepos
+    ? matrix.rows.filter((r) => state.matrixRepos.has(r.repository))
+    : matrix.rows;
   if (driftOnly) rows = rows.filter((r) => evals.get(r).status !== "consistent");
 
   if (!rows.length) {
     container.append(el("div", { class: "empty" },
-      driftOnly ? "차이가 있는 저장소가 없습니다. 모두 일치합니다 ✓" : "저장소가 없습니다."));
+      driftOnly ? "차이가 있는 저장소가 없습니다. 모두 일치합니다 ✓" : "표시할 저장소가 없습니다."));
     return;
   }
 
   // Header: blank corner + one column per instance (with unreachable mark).
   const headCells = [el("th", { class: "rowhead" }, "저장소 \\ 인스턴스")];
-  matrix.columns.forEach((col) => {
+  columns.forEach((col) => {
     let label = col.reachable ? col.name : `${col.name} ⚠`;
     if (col.id === refId) label = `${label} (기준)`;
     headCells.push(el("th", { class: col.id === refId ? "ref-col" : "", title: col.error || col.name }, label));
@@ -813,9 +880,9 @@ function renderMatrix() {
 
   const body = rows.map((row) => {
     const ev = evals.get(row);
-    const refCell = referenceCell(row, matrix.columns, refId);
+    const refCell = referenceCell(row, columns, refId);
     const refLabel = refId
-      ? ((matrix.columns.find((c) => c.id === refId) || {}).name || "기준")
+      ? ((columns.find((c) => c.id === refId) || {}).name || "기준")
       : "다수 기준";
     const tds = [
       el("td", { class: "rowhead" }, [
@@ -823,7 +890,7 @@ function renderMatrix() {
         rowStatusBadge(ev.status),
       ]),
     ];
-    matrix.columns.forEach((col) => {
+    columns.forEach((col) => {
       const c = row.cells[col.id] || { present: false };
       const match = ev.matches[col.id];
       let cls, mark, meta;
@@ -858,7 +925,8 @@ function populateMatrixRef() {
   const prev = state.matrixReference || designated || "";
   sel.innerHTML = "";
   sel.append(el("option", { value: "" }, "(자동: 다수 기준)"));
-  (state.matrix ? state.matrix.columns : []).forEach((col) =>
+  // The reference must be one of the currently selected instances.
+  visibleMatrixColumns().forEach((col) =>
     sel.append(el("option", { value: col.id }, col.name))
   );
   sel.value = [...sel.options].some((o) => o.value === prev) ? prev : "";
@@ -874,11 +942,15 @@ async function loadMatrix() {
     ]);
     state.matrix = matrix;
     state.compareFields = (cf && cf.fields) || [];
+    // Keep prior selection across reloads; default to all when first seen.
+    state.matrixCols = pruneMatrixSet(state.matrixCols, matrix.columns.map((c) => c.id));
+    state.matrixRepos = pruneMatrixSet(state.matrixRepos, matrix.rows.map((r) => r.repository));
   } catch (e) {
     container.innerHTML = "";
     container.append(el("div", { class: "empty" }, `매트릭스 로드 실패: ${e.message}`));
     return;
   }
+  renderMatrixPickers();
   populateMatrixRef();
   renderMatrix();
 }
@@ -888,6 +960,8 @@ document.getElementById("matrix-ref").addEventListener("change", (e) => {
   state.matrixReference = e.target.value;
   renderMatrix();
 });
+document.getElementById("matrix-repo-all").addEventListener("click", () => setAllMatrixRepos(true));
+document.getElementById("matrix-repo-none").addEventListener("click", () => setAllMatrixRepos(false));
 
 // ---- repository config diff (deep comparison) ----------------------------
 

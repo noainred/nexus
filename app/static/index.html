@@ -109,6 +109,18 @@
           <span><i class="sw unknown"></i> 조회 불가</span>
         </div>
         <p class="hint">≠ 셀에 마우스를 올리면 <b>기준(원본) 값 ↔ 이 서버 값</b>의 차이를 볼 수 있고, 저장소 이름을 클릭하면 항목별 상세 비교가 열립니다.</p>
+        <div class="matrix-picker">
+          <div class="pick-group">
+            <span class="pick-label">인스턴스</span>
+            <div id="matrix-inst-pick" class="pick-chips"></div>
+          </div>
+          <div class="pick-group">
+            <span class="pick-label">저장소</span>
+            <button type="button" id="matrix-repo-all" class="pick-mini">전체</button>
+            <button type="button" id="matrix-repo-none" class="pick-mini">해제</button>
+            <div id="matrix-repo-pick" class="pick-chips"></div>
+          </div>
+        </div>
         <div id="matrix-table" class="matrix-wrap"></div>
       </section>
 
