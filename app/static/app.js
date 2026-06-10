@@ -1283,22 +1283,24 @@ function renderMatrix() {
       const refMark = col.id === refId ? "ref-col" : "";
       const present = !!c.present && !c.unknown;
       // A slave (proxy → managed master) is the expected setup. If only the
-      // remoteUrl differs it is normal (✓ "<master> Slave"); if other settings
-      // differ it is a real drift (≠ "<master> Slave·다름").
+      // remoteUrl differs it is normal (✓); if other settings differ it is a
+      // real drift (≠). The "Slave" tag is rendered as a readable badge.
+      let metaNode = meta ? el("span", { class: "meta" }, meta) : null;
       if (present && cellIsSlave(c)) {
         const mn = masterNameForCell(c);
         const sd = (state.slaveDiffCache || {})[`${col.id}:${row.repository}`];
-        if (sd && sd.differs) {
-          cls = "drift"; mark = "≠";
-          meta = `${mn ? `${mn} ` : ""}Slave·설정 다름`;
-        } else {
-          cls = "consistent"; mark = "✓";
-          meta = `${mn ? `${mn} ` : ""}Slave${sd && sd.unverified ? "?" : ""}`;
-        }
+        const differs = !!(sd && sd.differs);
+        if (differs) { cls = "drift"; mark = "≠"; }
+        else { cls = "consistent"; mark = "✓"; }
+        metaNode = el("span", { class: `slave-tag-cell ${differs ? "diff" : ""}` }, [
+          mn ? el("span", { class: "slave-master" }, mn) : null,
+          el("span", { class: "slave-badge" }, differs ? "Slave · 다름" : "Slave"),
+          sd && sd.unverified ? el("span", { class: "slave-master" }, "?") : null,
+        ]);
       }
       const inner = el("span", { class: `mcell ${cls}` }, [
         el("span", { class: "mark" }, mark),
-        meta ? el("span", { class: "meta" }, meta) : null,
+        metaNode,
       ]);
       const cell = c;
       const td = el("td", {
@@ -1433,9 +1435,33 @@ function renderRepoDiff() {
   body.innerHTML = "";
   if (!state.repoDiff) return;
   body.append(diffTable(state.repoDiff, document.getElementById("repo-diff-only").checked));
+  const open = repoOpenPanel();
+  if (open) body.append(open);
   const sync = repoSlaveSyncPanel();
   if (sync) body.append(sync);
   body.append(repoCacheSyncPanel());
+}
+
+// Buttons to open each server's Nexus admin page for this repository.
+function repoOpenPanel() {
+  const repo = state.repoDiffName;
+  const cols = (state.repoDiff && state.repoDiff.columns) || [];
+  const btns = [];
+  cols.forEach((col) => {
+    const url = adminRepoUrl(col.id, repo);
+    if (!url) return;
+    btns.push(el("button", {
+      type: "button",
+      title: `${col.name} Nexus admin에서 '${repo}' 설정 열기`,
+      onclick: () => window.open(url, "_blank", "noopener,noreferrer"),
+    }, `${col.name} ↗`));
+  });
+  if (!btns.length) return null;
+  return el("div", { class: "settings-card", style: "margin-top:14px" }, [
+    el("h3", {}, "저장소 페이지 열기 (admin)"),
+    el("p", { class: "hint" }, "각 서버의 Nexus admin에서 이 저장소 설정 화면을 새 탭으로 엽니다."),
+    el("div", { class: "form-actions", style: "justify-content:flex-start;flex-wrap:wrap;gap:8px" }, btns),
+  ]);
 }
 
 // Offer to align each slave (proxy → managed master) repo with its master,

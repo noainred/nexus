@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.47",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "changed", "text": "매트릭스 셀의 'Slave' 표기를 배지 형태로 가독성 개선(정상=초록/다름=주황)"},
+            {"type": "added", "text": "저장소 비교 팝업에 '저장소 페이지 열기' 버튼 추가 — 설정이 모두 같아도 각 서버의 admin 저장소 설정을 새 탭으로 열 수 있음"},
+        ],
+    },
+    {
         "version": "0.8.46",
         "date": "2026-06-10",
         "changes": [
