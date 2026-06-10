@@ -4,15 +4,60 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..config import get_settings
 from ..deps import InstanceRegistry, get_registry
 from ..matrix import build_matrix, build_repo_diff
 from ..models import MatrixColumn, Repository, RepositoryDiff, RepositoryMatrix
 from ..nexus_client import NexusClient, NexusError
+from .. import restore as restore_mod
 
 router = APIRouter(prefix="/api", tags=["matrix"])
+
+
+@router.post("/matrix/copy-repo")
+async def copy_repo_config(
+    repository: str = Query(..., description="Repository name to copy."),
+    source_id: str = Query(..., description="Instance to copy the config FROM."),
+    target_id: str = Query(..., description="Instance to copy the config TO."),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Copy one repository's full configuration from one instance to another.
+
+    Reads the source repo's admin config and creates (or overwrites) the same
+    repository on the target. Reuses the restore engine in overwrite mode.
+    """
+    if source_id == target_id:
+        raise HTTPException(status_code=400, detail="원본과 대상이 같습니다.")
+    src = registry.get(source_id)   # 404 if unknown
+    tgt = registry.get(target_id)   # 404 if unknown
+
+    src_client = NexusClient(src, timeout=get_settings().request_timeout)
+    try:
+        repos = await src_client.list_repositories()
+    except NexusError as exc:
+        raise HTTPException(status_code=502, detail=f"원본 저장소 목록 조회 실패: {exc.message}")
+    match = next((r for r in repos if r.name == repository), None)
+    if match is None:
+        raise HTTPException(status_code=404, detail=f"원본에 '{repository}' 저장소가 없습니다.")
+    fmt = (match.format or "").strip()
+    type_ = (match.type or "").strip()
+    if not (fmt and type_):
+        raise HTTPException(status_code=400, detail="저장소 포맷/타입을 확인할 수 없습니다.")
+    try:
+        config = await src_client.get_repository_config(fmt, type_, repository)
+    except NexusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"원본 설정 읽기 실패(권한 등): {exc.message}",
+        )
+
+    snapshot = {"sections": {"repositories": [
+        {"name": repository, "format": fmt, "type": type_, "config": config}
+    ]}}
+    tgt_client = NexusClient(tgt, timeout=get_settings().request_timeout)
+    return await restore_mod.apply(tgt_client, snapshot, {"repositories"}, "overwrite")
 
 
 async def _fetch_repos(

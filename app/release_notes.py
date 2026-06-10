@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.30",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "비교 매트릭스에서 셀 드래그&드롭으로 저장소 설정 복사 — 설정이 있는 셀을 같은 행의 다른 서버 칸에 놓으면 그 저장소 설정을 대상 서버로 복사(덮어쓰기·없으면 생성). 원본 admin 읽기/대상 쓰기 권한 필요"},
+        ],
+    },
+    {
         "version": "0.8.29",
         "date": "2026-06-10",
         "changes": [

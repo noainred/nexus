@@ -128,6 +128,10 @@ h3 { font-size: 14px; color: var(--muted); }
   border: 1px solid var(--border); border-radius: 6px;
   padding: 2px 8px; font-size: 12px; cursor: pointer;
 }
+
+.matrix td.mdrop[draggable="true"] { cursor: grab; }
+.matrix td.mdrop[draggable="true"]:active { cursor: grabbing; }
+.matrix td.drop-hover { outline: 2px dashed var(--accent); outline-offset: -2px; }
 .card .metrics { margin-top: 12px; display: flex; gap: 18px; }
 .card .metric .label { color: var(--muted); font-size: 11px; }
 .card .metric .value { font-size: 18px; font-weight: 600; }

@@ -836,6 +836,59 @@ function setAllMatrixRepos(on) {
   renderMatrix();
 }
 
+function matrixColName(id) {
+  const m = state.matrix;
+  const c = m && m.columns.find((x) => x.id === id);
+  return c ? c.name : id;
+}
+
+// Drag a present (green/≠) cell onto another cell in the SAME repository row
+// to copy that repo's config from the source instance to the target.
+function onMatrixDragStart(e, repo, inst, present) {
+  if (!present) { e.preventDefault(); return; }
+  state.matrixDrag = { repo, inst };
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = "copy";
+    try { e.dataTransfer.setData("text/plain", `${repo}@${inst}`); } catch (_) {}
+  }
+}
+
+async function onMatrixDrop(e, repo, inst) {
+  e.preventDefault();
+  e.currentTarget.classList.remove("drop-hover");
+  const src = state.matrixDrag;
+  state.matrixDrag = null;
+  if (!src) return;
+  if (src.repo !== repo) {
+    toast("같은 저장소(같은 이름) 행으로만 복사할 수 있습니다.", "err");
+    return;
+  }
+  if (src.inst === inst) return;
+  const sName = matrixColName(src.inst);
+  const tName = matrixColName(inst);
+  if (!confirm(
+    `'${repo}' 저장소 설정을 복사합니다.\n원본: ${sName}\n대상: ${tName}\n\n` +
+    `대상의 기존 '${repo}' 설정을 덮어씁니다(없으면 새로 생성). 진행할까요?`
+  )) return;
+  toast(`'${repo}' 설정 복사 중… (${sName} → ${tName})`);
+  try {
+    const r = await api(
+      `/api/matrix/copy-repo?repository=${encodeURIComponent(repo)}` +
+        `&source_id=${encodeURIComponent(src.inst)}&target_id=${encodeURIComponent(inst)}`,
+      { method: "POST" }
+    );
+    const it = (r.items && r.items[0]) || {};
+    if (it.status === "fail") {
+      toast(`복사 실패: ${it.detail || "원인 불명"}`, "err");
+    } else {
+      toast(`'${repo}' 복사 완료 — ${it.status === "update" ? "갱신" : "생성"} (${tName})`);
+    }
+    await loadMatrix();
+  } catch (err) {
+    toast(`복사 실패: ${err.message}`, "err");
+  }
+}
+
 function renderMatrix() {
   const container = document.getElementById("matrix-table");
   container.innerHTML = "";
@@ -905,11 +958,21 @@ function renderMatrix() {
         title = `기준(${refLabel}): ${cellValueText(refCell)}\n이 서버(${col.name}): ${cellValueText(c)}`;
       }
       const refMark = col.id === refId ? "ref-col" : "";
+      const present = !!c.present && !c.unknown;
       const inner = el("span", { class: `mcell ${cls}`, title }, [
         el("span", { class: "mark" }, mark),
         meta ? el("span", { class: "meta" }, meta) : null,
       ]);
-      tds.push(el("td", { class: refMark }, inner));
+      const td = el("td", {
+        class: `mdrop ${refMark}`,
+        draggable: present ? "true" : "false",
+        ondragstart: (e) => onMatrixDragStart(e, row.repository, col.id, present),
+        ondragover: (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; },
+        ondragenter: (e) => e.currentTarget.classList.add("drop-hover"),
+        ondragleave: (e) => e.currentTarget.classList.remove("drop-hover"),
+        ondrop: (e) => onMatrixDrop(e, row.repository, col.id),
+      }, inner);
+      tds.push(td);
     });
     return el("tr", {}, tds);
   });
