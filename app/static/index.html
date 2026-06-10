@@ -19,7 +19,6 @@
       <button class="tab" data-tab="blobstore">Blob Store</button>
       <button class="tab" data-tab="metrics">JVM / 리소스</button>
       <button class="tab" data-tab="infra">인프라 체크</button>
-      <button class="tab" data-tab="throughput">네트워크 속도</button>
       <button class="tab" data-tab="topology">토폴로지</button>
       <button class="tab" data-tab="matrix">비교 매트릭스</button>
       <button class="tab" data-tab="compare">저장소 1:1 비교</button>
@@ -88,32 +87,6 @@
           <span><i class="sw" style="border-top:2px dashed var(--muted);background:transparent"></i> 평소(중앙값)</span>
         </div>
         <div id="infra-charts"></div>
-      </section>
-
-      <section id="throughput" class="panel">
-        <div class="matrix-header">
-          <h2>네트워크 속도 (서버 처리량)</h2>
-          <div class="matrix-controls">
-            <div id="tp-range" class="infra-range">
-              <button data-days="1">1일</button>
-              <button data-days="7">7일</button>
-              <button data-days="30">30일</button>
-              <button data-days="90">90일</button>
-              <button data-days="365">365일</button>
-            </div>
-            <button id="tp-run">지금 측정</button>
-            <button id="tp-refresh">새로고침</button>
-          </div>
-        </div>
-        <p class="hint">Spine 서버를 기준으로, 각 Leaf 서버의 프록시가 Spine에서 공통 자산(30~50MB)을 끌어오게 해 <b>Spine→Leaf 전송 속도(Mbps)</b>를 측정하고 1년간 누적합니다(8081 포트만 사용). 대륙 간 회선 속도 추세를 봅니다. 평소(중앙값) 대비 <b>-20% 노랑, -50% 빨강</b>(느릴수록 경고)으로 표시됩니다. 설정은 <b>서버 설정 › 네트워크 속도 측정 설정</b>에서 합니다.</p>
-        <div class="legend">
-          <span><i class="sw" style="background:var(--accent)"></i> 정상</span>
-          <span><i class="sw" style="background:var(--amber)"></i> <span id="tp-warn-label">-20% 이하</span></span>
-          <span><i class="sw" style="background:var(--red)"></i> <span id="tp-crit-label">-50% 이하</span></span>
-          <span><i class="sw" style="border-top:2px dashed var(--muted);background:transparent"></i> 평소(중앙값)</span>
-        </div>
-        <p id="tp-status" class="hint"></p>
-        <div id="tp-charts"></div>
       </section>
 
       <section id="matrix" class="panel">
@@ -350,44 +323,6 @@
           </form>
         </div>
 
-        <div class="settings-card">
-          <h3>네트워크 속도 측정 설정 (Spine→Leaf)</h3>
-          <p class="hint"><b>Spine 서버 1대</b>를 기준으로 정하면 나머지는 모두 <b>Leaf</b>가 됩니다. 각 Leaf의 프록시 저장소가 Spine에서 자산을 끌어오는 시간을 재 <b>Spine→Leaf</b> 전송 속도를 측정합니다(8081만 사용).</p>
-          <p class="hint">순서: <b>① Spine 서버 선택 → ② 측정 크기 입력 → ③ 후보 파일 찾기</b>. 지정한 크기 <b>이상</b>의 파일을 Spine에서 찾아 목록으로 보여주며, 측정 시 그 크기만큼 전송합니다.</p>
-          <form id="tp-form" class="form">
-            <label>① Spine 서버 (기준)
-              <select name="spine_id" id="tp-spine"></select>
-            </label>
-            <label>② 측정 크기 (MB, 이 크기 이상 파일 탐색) <input name="size_mb" id="tp-size-mb" type="number" min="1" step="1" /></label>
-            <div class="form-actions" style="justify-content:flex-start">
-              <button type="button" id="tp-autoconfig">③ 자동 설정 (공통 자산 추천)</button>
-              <button type="button" id="tp-find-assets">직접 찾기</button>
-              <span id="tp-find-status" class="hint" style="margin:0"></span>
-            </div>
-            <label>측정 자산 (Spine의 공통 모듈)
-              <select name="asset_pick" id="tp-asset"><option value="">— 후보 파일 찾기를 먼저 실행 —</option></select>
-            </label>
-            <div class="form-actions" style="justify-content:flex-start">
-              <button type="button" id="tp-find-more" style="display:none">더 찾기 (+5)</button>
-            </div>
-            <label>Spine 저장소 <input name="spine_repo" id="tp-spine-repo" type="text" placeholder="maven-central" /></label>
-            <label>자산 경로 (저장소 내 경로) <input name="path" id="tp-path" type="text" placeholder="org/.../artifact.jar" /></label>
-            <div class="form-actions" style="justify-content:flex-start">
-              <button type="button" id="tp-test">Spine 연결 테스트</button>
-              <span id="tp-test-status" class="hint" style="margin:0"></span>
-            </div>
-            <div id="tp-test-result"></div>
-            <div class="form-actions" style="justify-content:flex-start">
-              <button type="button" id="tp-provision">측정 저장소 자동 구성 (파일 생성)</button>
-              <span id="tp-provision-status" class="hint" style="margin:0"></span>
-            </div>
-            <div id="tp-provision-result"></div>
-            <label>측정 시각 (HH:MM) <input name="time" type="text" placeholder="03:00" /></label>
-            <label>노랑 임계치 (평소 대비 -%) <input name="warn_pct" type="number" min="0" step="1" /></label>
-            <label>빨강 임계치 (평소 대비 -%) <input name="crit_pct" type="number" min="0" step="1" /></label>
-            <div class="form-actions"><button type="submit">저장</button></div>
-          </form>
-        </div>
       </section>
 
       <section id="about" class="panel">
@@ -403,16 +338,6 @@
         </div>
       </section>
     </main>
-
-    <div id="tp-progress-modal" class="modal hidden">
-      <div class="modal-box">
-        <div class="modal-head">
-          <h3>네트워크 속도 측정 진행</h3>
-          <button id="tp-progress-close" title="닫기">✕</button>
-        </div>
-        <div id="tp-progress-body" class="modal-body"></div>
-      </div>
-    </div>
 
     <div id="status-modal" class="modal hidden">
       <div class="modal-box">

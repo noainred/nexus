@@ -12,7 +12,6 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__
 from .alerts import run_loop
 from .pingmon import run_loop as ping_run_loop
-from .throughput import run_loop as throughput_run_loop
 from .routers import (
     alerts,
     cleanup,
@@ -34,11 +33,10 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 @contextlib.asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """Run the background alert + ping + throughput loops for the app's lifetime."""
+    """Run the background alert + ping loops for the app's lifetime."""
     tasks = [
         asyncio.create_task(run_loop()),
         asyncio.create_task(ping_run_loop()),
-        asyncio.create_task(throughput_run_loop()),
     ]
     try:
         yield

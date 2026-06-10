@@ -66,9 +66,6 @@ class Settings(BaseSettings):
     ping_file: str = "ping-history.csv"
     ping_interval: float = 60.0
 
-    # Network throughput monitoring.
-    throughput_file: str = "throughput-history.csv"
-
 
 class InstancesDocument(BaseModel):
     """Schema of the instances YAML file."""
@@ -81,14 +78,6 @@ class InstancesDocument(BaseModel):
     ping_interval: float = 60.0
     ping_warn_pct: float = 20.0
     ping_crit_pct: float = 50.0
-    throughput_spine_id: str = ""
-    throughput_spine_repo: str = ""
-    throughput_path: str = ""
-    throughput_time: str = "03:00"
-    throughput_size_mb: int = 30
-    throughput_warn_pct: float = 20.0
-    throughput_crit_pct: float = 50.0
-    throughput_targets: List[str] = Field(default_factory=list)
 
 
 @lru_cache
@@ -141,7 +130,6 @@ def instances_to_dict(
     group_order: Optional[List[str]] = None,
     compare_fields: Optional[List[str]] = None,
     ping: Optional[dict] = None,
-    throughput: Optional[dict] = None,
 ) -> dict:
     """Serialise instances to the plain dict written to YAML / exported."""
     data: dict = {
@@ -169,15 +157,6 @@ def instances_to_dict(
         data["ping_interval"] = ping.get("interval", 60.0)
         data["ping_warn_pct"] = ping.get("warn_pct", 20.0)
         data["ping_crit_pct"] = ping.get("crit_pct", 50.0)
-    if throughput:
-        data["throughput_spine_id"] = throughput.get("spine_id", "")
-        data["throughput_spine_repo"] = throughput.get("spine_repo", "")
-        data["throughput_path"] = throughput.get("path", "")
-        data["throughput_time"] = throughput.get("time", "03:00")
-        data["throughput_size_mb"] = throughput.get("size_mb", 30)
-        data["throughput_warn_pct"] = throughput.get("warn_pct", 20.0)
-        data["throughput_crit_pct"] = throughput.get("crit_pct", 50.0)
-        data["throughput_targets"] = list(throughput.get("targets", []))
     return data
 
 
@@ -186,10 +165,9 @@ def instances_to_yaml(
     group_order: Optional[List[str]] = None,
     compare_fields: Optional[List[str]] = None,
     ping: Optional[dict] = None,
-    throughput: Optional[dict] = None,
 ) -> str:
     return yaml.safe_dump(
-        instances_to_dict(instances, group_order, compare_fields, ping, throughput),
+        instances_to_dict(instances, group_order, compare_fields, ping),
         allow_unicode=True,
         sort_keys=False,
     )
@@ -206,7 +184,6 @@ def save_instances(
     group_order: Optional[List[str]] = None,
     compare_fields: Optional[List[str]] = None,
     ping: Optional[dict] = None,
-    throughput: Optional[dict] = None,
     settings: Optional[Settings] = None,
 ) -> None:
     """Persist the managed instances (and view prefs) back to the YAML file."""
@@ -214,6 +191,6 @@ def save_instances(
     path = _instance_path(settings)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        instances_to_yaml(instances, group_order, compare_fields, ping, throughput),
+        instances_to_yaml(instances, group_order, compare_fields, ping),
         encoding="utf-8",
     )

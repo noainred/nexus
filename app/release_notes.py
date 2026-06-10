@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.26",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "removed", "text": "네트워크 속도 측정(Spine→Leaf 처리량) 기능 전체 삭제 — '네트워크 속도' 탭/차트, 측정 설정·자동구성·speedtest 저장소 생성, 관련 API/백그라운드 측정 루프 제거"},
+        ],
+    },
+    {
         "version": "0.8.25",
         "date": "2026-06-09",
         "changes": [
