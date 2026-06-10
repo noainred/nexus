@@ -97,42 +97,49 @@ function el(tag, props = {}, children = []) {
 
 // ---- tabs ----------------------------------------------------------------
 
+// Activate a tab by name + run its lazy loader. Shared by clicks, the URL
+// hash (so a page refresh stays on the same screen), and back/forward.
+function selectTab(name) {
+  const tab = document.querySelector(`.tab[data-tab="${name}"]`);
+  const panel = document.getElementById(name);
+  if (!tab || !panel) return false;
+  document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
+  tab.classList.add("active");
+  panel.classList.add("active");
+  // Lazy-load tabs that need it (downloads is started manually via 시작).
+  if (name === "tasks" && !state.tasksLoaded) { state.tasksLoaded = true; loadTasks(); }
+  if (name === "security" && !state.securityLoaded) { state.securityLoaded = true; loadSecurity(); }
+  if (name === "alerts") loadAlerts();
+  if (name === "content" && !state.contentSetup) { state.contentSetup = true; setupContent(); }
+  if (name === "settings") loadSettings();
+  if (name === "topology" && !state.topologyLoaded) { state.topologyLoaded = true; loadTopology(); }
+  if (name === "blobstore") loadBlobstores();
+  if (name === "metrics") loadMetrics();
+  if (name === "infra") loadInfra();
+  if (name === "overview") loadOverview();
+  if (name === "about") renderHistory();
+  return true;
+}
+
 document.querySelectorAll(".tab").forEach((tab) => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-    document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
-    tab.classList.add("active");
-    document.getElementById(tab.dataset.tab).classList.add("active");
-    // Lazy-load tabs that need it (downloads is started manually via 시작).
-    if (tab.dataset.tab === "tasks" && !state.tasksLoaded) {
-      state.tasksLoaded = true;
-      loadTasks();
-    }
-    if (tab.dataset.tab === "security" && !state.securityLoaded) {
-      state.securityLoaded = true;
-      loadSecurity();
-    }
-    if (tab.dataset.tab === "alerts") {
-      loadAlerts();
-    }
-    if (tab.dataset.tab === "content" && !state.contentSetup) {
-      state.contentSetup = true;
-      setupContent();
-    }
-    if (tab.dataset.tab === "settings") {
-      loadSettings();
-    }
-    if (tab.dataset.tab === "topology" && !state.topologyLoaded) {
-      state.topologyLoaded = true;
-      loadTopology();
-    }
-    if (tab.dataset.tab === "blobstore") loadBlobstores();
-    if (tab.dataset.tab === "metrics") loadMetrics();
-    if (tab.dataset.tab === "infra") loadInfra();
-    if (tab.dataset.tab === "overview") loadOverview();
-    if (tab.dataset.tab === "about") renderHistory();
+    const name = tab.dataset.tab;
+    if (location.hash !== `#${name}`) history.replaceState(null, "", `#${name}`);
+    selectTab(name);
   });
 });
+
+window.addEventListener("hashchange", () => {
+  const name = (location.hash || "").replace(/^#/, "");
+  if (name) selectTab(name);
+});
+
+// On load, restore the tab from the URL hash so refresh keeps the screen.
+function restoreActiveTab() {
+  const name = (location.hash || "").replace(/^#/, "");
+  if (name) selectTab(name);
+}
 
 // ---- overview ------------------------------------------------------------
 
@@ -3114,6 +3121,8 @@ async function init() {
   setupReleaseNotes();
   loadOverview();
   loadMatrix();
+  // Keep the current screen across a page refresh (URL hash).
+  restoreActiveTab();
 }
 
 init();

@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.46",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "changed", "text": "현재 탭을 URL 해시로 저장 — 어느 메뉴에서 새로고침해도 그 화면이 유지되고, 뒤로/앞으로 가기도 동작"},
+        ],
+    },
+    {
         "version": "0.8.45",
         "date": "2026-06-10",
         "changes": [
