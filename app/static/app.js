@@ -867,8 +867,8 @@ async function onMatrixDrop(e, repo, inst) {
   const sName = matrixColName(src.inst);
   const tName = matrixColName(inst);
   if (!confirm(
-    `'${repo}' 저장소 설정을 복사합니다.\n원본: ${sName}\n대상: ${tName}\n\n` +
-    `대상의 기존 '${repo}' 설정을 덮어씁니다(없으면 새로 생성). 진행할까요?`
+    `'${tName}'의 '${repo}' 설정을 '${sName}' 기준으로 덮어써서 설정을 업데이트 하시겠습니까?\n\n` +
+    `원본: ${sName}\n대상: ${tName}\n(대상에 '${repo}'가 없으면 새로 생성됩니다.)`
   )) return;
   toast(`'${repo}' 설정 복사 중… (${sName} → ${tName})`);
   try {

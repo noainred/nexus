@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.31",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "changed", "text": "매트릭스 드래그 복사 시 확인 창 문구를 '…설정을 업데이트 하시겠습니까?'로 명확화(덮어쓰기 경고 강조)"},
+        ],
+    },
+    {
         "version": "0.8.30",
         "date": "2026-06-10",
         "changes": [
