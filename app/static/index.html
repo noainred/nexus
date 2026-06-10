@@ -335,6 +335,22 @@
           </form>
         </div>
 
+        <div class="settings-card">
+          <h3>서버 설정 백업</h3>
+          <p class="hint">관리 중인 모든 Nexus 서버의 구성(저장소·blob·정책·보안·작업 등)을 지정한 시각에 매일 자동 백업합니다. 서버가 소실되거나 데이터가 지워져도, 백업 JSON을 서버 행의 <b>복구 ↑</b>로 가져와 신속히 복구할 수 있습니다. (설정 구성만 백업 — 아티팩트/blob 실데이터는 제외)</p>
+          <form id="backup-form" class="form">
+            <label class="chk"><input type="checkbox" id="backup-enabled" /> 자동 백업 사용</label>
+            <label>백업 시각 (HH:MM) <input id="backup-time" type="text" placeholder="02:00" /></label>
+            <label>보관 개수 (오래된 것부터 삭제) <input id="backup-keep" type="number" min="1" step="1" /></label>
+            <div class="form-actions" style="justify-content:flex-start">
+              <button type="submit">저장</button>
+              <button type="button" id="backup-now">지금 백업</button>
+              <span id="backup-status" class="hint" style="margin:0"></span>
+            </div>
+          </form>
+          <div id="backup-list"></div>
+        </div>
+
       </section>
 
       <section id="about" class="panel">

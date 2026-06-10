@@ -2405,6 +2405,7 @@ async function loadSettings() {
   loadGroupOrder();
   loadCompareFields();
   loadPingConfig();
+  loadBackupConfig();
 }
 
 function downloadInstanceConfig(inst) {
@@ -2511,6 +2512,70 @@ async function loadPingConfig() {
   }
 }
 
+async function loadBackupConfig() {
+  const form = document.getElementById("backup-form");
+  if (!form) return;
+  try {
+    const c = await api("/api/backup-config");
+    document.getElementById("backup-enabled").checked = !!c.enabled;
+    document.getElementById("backup-time").value = c.time || "02:00";
+    document.getElementById("backup-keep").value = c.keep != null ? c.keep : 14;
+  } catch (e) {
+    /* non-fatal */
+  }
+  loadBackupList();
+}
+
+async function loadBackupList() {
+  const box = document.getElementById("backup-list");
+  if (!box) return;
+  box.innerHTML = "";
+  let runs;
+  try {
+    runs = await api("/api/backups");
+  } catch (e) {
+    return;
+  }
+  if (!runs.length) {
+    box.append(el("p", { class: "hint" }, "아직 백업이 없습니다. ‘지금 백업’으로 첫 백업을 만들 수 있습니다."));
+    return;
+  }
+  const rows = [];
+  runs.forEach((run) => {
+    run.files.forEach((f, idx) => {
+      rows.push(el("tr", {}, [
+        el("td", {}, idx === 0 ? run.timestamp : ""),
+        el("td", {}, [
+          el("a", {
+            href: `/api/backups/${encodeURIComponent(run.timestamp)}/${encodeURIComponent(f.name)}`,
+          }, f.name),
+        ]),
+        el("td", { class: "num" }, fmtBytes(f.size)),
+      ]));
+    });
+  });
+  box.append(buildTable(["시각", "파일(서버)", "크기"], rows));
+}
+
+async function runBackupNow() {
+  const status = document.getElementById("backup-status");
+  status.textContent = "백업 중…";
+  try {
+    const r = await api("/api/backup-run", { method: "POST" });
+    status.textContent = `백업 완료 · ${r.timestamp} · 성공 ${r.ok}/${r.total}`;
+    const failed = (r.items || []).filter((i) => !i.ok);
+    if (failed.length) {
+      toast(`백업 일부 실패: ${failed.map((i) => i.name).join(", ")}`, "err");
+    } else {
+      toast("백업 완료");
+    }
+    loadBackupList();
+  } catch (e) {
+    status.textContent = `백업 실패: ${e.message}`;
+    toast(`백업 실패: ${e.message}`, "err");
+  }
+}
+
 async function setReference(inst) {
   try {
     await api(`/api/instances/${encodeURIComponent(inst.id)}/reference`, { method: "POST" });
@@ -2586,6 +2651,24 @@ function setupSettings() {
       toast(e.message, "err");
     }
   });
+  document.getElementById("backup-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    try {
+      await api("/api/backup-config", {
+        method: "PUT",
+        body: JSON.stringify({
+          enabled: document.getElementById("backup-enabled").checked,
+          time: String(document.getElementById("backup-time").value || "02:00").trim(),
+          keep: Number(document.getElementById("backup-keep").value) || 14,
+        }),
+      });
+      toast("백업 설정 저장됨");
+      loadBackupConfig();
+    } catch (e) {
+      toast(e.message, "err");
+    }
+  });
+  document.getElementById("backup-now").addEventListener("click", runBackupNow);
   // "새 서버 추가" button reveals the form (add mode); 취소 hides it.
   document.getElementById("settings-add-toggle").addEventListener("click", () => {
     settingsResetForm();

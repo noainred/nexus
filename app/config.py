@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     ping_file: str = "ping-history.csv"
     ping_interval: float = 60.0
 
+    # Scheduled configuration backups.
+    backup_dir: str = "backups"
+
 
 class InstancesDocument(BaseModel):
     """Schema of the instances YAML file."""
@@ -78,6 +81,9 @@ class InstancesDocument(BaseModel):
     ping_interval: float = 60.0
     ping_warn_pct: float = 20.0
     ping_crit_pct: float = 50.0
+    backup_enabled: bool = False
+    backup_time: str = "02:00"
+    backup_keep: int = 14
 
 
 @lru_cache
@@ -130,6 +136,7 @@ def instances_to_dict(
     group_order: Optional[List[str]] = None,
     compare_fields: Optional[List[str]] = None,
     ping: Optional[dict] = None,
+    backup: Optional[dict] = None,
 ) -> dict:
     """Serialise instances to the plain dict written to YAML / exported."""
     data: dict = {
@@ -157,6 +164,10 @@ def instances_to_dict(
         data["ping_interval"] = ping.get("interval", 60.0)
         data["ping_warn_pct"] = ping.get("warn_pct", 20.0)
         data["ping_crit_pct"] = ping.get("crit_pct", 50.0)
+    if backup:
+        data["backup_enabled"] = bool(backup.get("enabled", False))
+        data["backup_time"] = backup.get("time", "02:00")
+        data["backup_keep"] = int(backup.get("keep", 14))
     return data
 
 
@@ -165,9 +176,10 @@ def instances_to_yaml(
     group_order: Optional[List[str]] = None,
     compare_fields: Optional[List[str]] = None,
     ping: Optional[dict] = None,
+    backup: Optional[dict] = None,
 ) -> str:
     return yaml.safe_dump(
-        instances_to_dict(instances, group_order, compare_fields, ping),
+        instances_to_dict(instances, group_order, compare_fields, ping, backup),
         allow_unicode=True,
         sort_keys=False,
     )
@@ -184,6 +196,7 @@ def save_instances(
     group_order: Optional[List[str]] = None,
     compare_fields: Optional[List[str]] = None,
     ping: Optional[dict] = None,
+    backup: Optional[dict] = None,
     settings: Optional[Settings] = None,
 ) -> None:
     """Persist the managed instances (and view prefs) back to the YAML file."""
@@ -191,6 +204,6 @@ def save_instances(
     path = _instance_path(settings)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        instances_to_yaml(instances, group_order, compare_fields, ping),
+        instances_to_yaml(instances, group_order, compare_fields, ping, backup),
         encoding="utf-8",
     )

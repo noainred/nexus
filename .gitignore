@@ -31,3 +31,5 @@ ver_*.md
 .vscode/
 .DS_Store
 *.log
+
+backups/

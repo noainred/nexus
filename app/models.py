@@ -89,6 +89,14 @@ class PingHistory(BaseModel):
     series: List[PingSeries] = Field(default_factory=list)
 
 
+class BackupConfig(BaseModel):
+    """Scheduled configuration-backup settings."""
+
+    enabled: bool = False
+    time: str = "02:00"        # daily HH:MM (local time)
+    keep: int = 14             # how many backup runs to retain
+
+
 class InstanceTestRequest(BaseModel):
     """Connection-test payload (does not persist anything)."""
 

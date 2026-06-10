@@ -31,6 +31,22 @@ class InstanceRegistry:
         self._ping_interval: float = document.ping_interval
         self._ping_warn_pct: float = document.ping_warn_pct
         self._ping_crit_pct: float = document.ping_crit_pct
+        self._backup_enabled: bool = document.backup_enabled
+        self._backup_time: str = document.backup_time
+        self._backup_keep: int = document.backup_keep
+
+    def backup_config(self) -> dict:
+        return {
+            "enabled": self._backup_enabled,
+            "time": self._backup_time,
+            "keep": self._backup_keep,
+        }
+
+    def set_backup_config(self, enabled: bool, time: str, keep: int) -> None:
+        self._backup_enabled = bool(enabled)
+        self._backup_time = (time or "02:00").strip()
+        self._backup_keep = max(1, int(keep))
+        self._persist()
 
     def compare_fields(self) -> List[str]:
         return list(self._compare_fields)
@@ -142,6 +158,7 @@ class InstanceRegistry:
             self._group_order,
             self._compare_fields,
             self.ping_config(),
+            self.backup_config(),
         )
 
     def reload(self) -> None:
@@ -152,6 +169,9 @@ class InstanceRegistry:
         self._ping_interval = doc.ping_interval
         self._ping_warn_pct = doc.ping_warn_pct
         self._ping_crit_pct = doc.ping_crit_pct
+        self._backup_enabled = doc.backup_enabled
+        self._backup_time = doc.backup_time
+        self._backup_keep = doc.backup_keep
 
 
 # Singleton registry, initialised at import time from the configured file.

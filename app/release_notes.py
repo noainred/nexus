@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.41",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "서버 설정 백업 — 서버 설정 맨 아래 '서버 설정 백업' 박스 추가. 지정한 시각에 매일 모든 Nexus 서버 구성을 자동 백업(서버별 JSON, 보관 개수 초과 시 오래된 것 삭제), '지금 백업'·백업 목록 다운로드 제공. 백업 JSON은 서버 행 '복구 ↑'로 신속 복구. 신규 /api/backup-config, /api/backup-run, /api/backups"},
+        ],
+    },
+    {
         "version": "0.8.40",
         "date": "2026-06-10",
         "changes": [
