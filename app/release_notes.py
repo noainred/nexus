@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.27",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "changed", "text": "서버 추가/수정 등에서 검증 오류(422)가 '[object Object]'로 표시되던 문제 수정 — 어떤 필드가 왜 잘못됐는지 읽을 수 있는 메시지로 표시(예: 식별자(id)는 영문/숫자/._- 만 허용)"},
+        ],
+    },
+    {
         "version": "0.8.26",
         "date": "2026-06-10",
         "changes": [

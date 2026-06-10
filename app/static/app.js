@@ -31,9 +31,28 @@ async function api(path, options = {}) {
   if (res.status === 204) return null;
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(body.detail || `요청 실패 (${res.status})`);
+    throw new Error(formatApiError(body.detail, res.status));
   }
   return body;
+}
+
+// FastAPI returns `detail` as a string (HTTPException) or a list of
+// validation-error objects (422). Turn either into a readable message so
+// toasts never show "[object Object]".
+function formatApiError(detail, status) {
+  if (typeof detail === "string" && detail) return detail;
+  if (Array.isArray(detail)) {
+    const parts = detail.map((e) => {
+      const loc = Array.isArray(e.loc) ? e.loc.filter((x) => x !== "body").join(".") : "";
+      const msg = e.msg || (typeof e === "string" ? e : JSON.stringify(e));
+      return loc ? `${loc}: ${msg}` : msg;
+    });
+    if (parts.length) return parts.join("; ");
+  }
+  if (detail && typeof detail === "object") {
+    return detail.msg || JSON.stringify(detail);
+  }
+  return `요청 실패 (${status})`;
 }
 
 function toast(message, kind = "ok") {
