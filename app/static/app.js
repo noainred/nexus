@@ -485,7 +485,45 @@ function usageCell(b) {
   return el("td", { class: `num ${cls}`, title: `사용 ${fmtBytes(b.total_size_bytes)} / 전체 ${fmtBytes(b.total_size_bytes + b.available_space_bytes)}` }, `${pct.toFixed(0)}%`);
 }
 
+async function loadDiskForecast(sample = false) {
+  const table = document.getElementById("df-table");
+  const status = document.getElementById("df-status");
+  if (!table) return;
+  if (sample) status.textContent = "수집 중…";
+  let r;
+  try {
+    r = await api(`/api/disk-forecast${sample ? "?sample=true" : ""}`);
+  } catch (e) {
+    status.textContent = `조회 실패: ${e.message}`;
+    return;
+  }
+  const c = r.counts || {};
+  status.textContent = `위험 ${c.crit || 0} · 주의 ${c.warn || 0} · 정상 ${c.ok || 0}`;
+  table.innerHTML = "";
+  const rows = (r.stores || []).map((s) => {
+    const badge = { crit: ["down", "위험"], warn: ["warn", "주의"], ok: ["up", "정상"] }[s.state] || ["warn", s.state];
+    const eta = s.days_to_90 == null
+      ? (s.growth_per_day != null && s.growth_per_day <= 0 ? "증가 없음" : "표본 부족")
+      : s.days_to_90 <= 0 ? "도달" : `약 ${Math.round(s.days_to_90)}일 후`;
+    return el("tr", {}, [
+      el("td", {}, s.instance_name),
+      el("td", {}, s.store),
+      el("td", { class: "num" }, `${fmtBytes(s.used_bytes)} / ${fmtBytes(s.total_bytes)}`),
+      el("td", { class: "num" }, `${s.pct}%`),
+      el("td", { class: "num" }, s.growth_per_day == null ? "—" : `${fmtBytes(s.growth_per_day)}/일`),
+      el("td", {}, eta),
+      el("td", {}, el("span", { class: `badge ${badge[0]}` }, badge[1])),
+    ]);
+  });
+  if (!rows.length) {
+    table.append(el("div", { class: "empty" }, "아직 수집된 표본이 없습니다. '지금 수집 + 갱신'을 눌러 첫 표본을 만드세요."));
+    return;
+  }
+  table.append(buildTable(["서버", "Blob store", "사용/전체", "사용률", "일일 증가", "90% 도달", "상태"], rows));
+}
+
 async function loadBlobstores() {
+  loadDiskForecast();
   const container = document.getElementById("blobstore-table");
   container.innerHTML = "";
   let sites = [];
@@ -3542,6 +3580,7 @@ async function init() {
   setupAlerts();
   setupInfra();
   setupSearch();
+  document.getElementById("df-refresh").addEventListener("click", () => loadDiskForecast(true));
   setupReleaseNotes();
   loadOverview();
   loadMatrix();

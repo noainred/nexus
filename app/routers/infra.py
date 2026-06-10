@@ -1,13 +1,29 @@
-"""Infrastructure ping history endpoints."""
+"""Infrastructure ping history + disk-saturation forecast endpoints."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
-from .. import pingmon
+from .. import diskmon, pingmon
+from ..config import get_settings
 from ..deps import InstanceRegistry, get_registry
 from ..models import PingHistory
 
 router = APIRouter(prefix="/api", tags=["infra"])
+
+
+@router.get("/disk-forecast")
+async def disk_forecast(
+    sample: bool = Query(False, description="Take a fresh sample first."),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Blob-store usage forecast: growth per day and days until 90% full."""
+    if sample:
+        await diskmon.sample_once(registry, get_settings())
+    rows = diskmon.forecast(registry, get_settings())
+    counts = {"crit": 0, "warn": 0, "ok": 0}
+    for r in rows:
+        counts[r["state"]] = counts.get(r["state"], 0) + 1
+    return {"counts": counts, "stores": rows}
 
 
 @router.get("/ping-history", response_model=PingHistory)

@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     # Scheduled configuration backups.
     backup_dir: str = "backups"
 
+    # Blob-store disk usage sampling (saturation forecast).
+    disk_file: str = "disk-history.csv"
+
 
 class InstancesDocument(BaseModel):
     """Schema of the instances YAML file."""

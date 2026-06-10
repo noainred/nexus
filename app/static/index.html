@@ -88,6 +88,17 @@
 
       <section id="blobstore" class="panel">
         <h2>Blob Store 사용량</h2>
+
+        <div class="settings-card">
+          <h3>디스크 포화 예측</h3>
+          <p class="hint">6시간마다 자동 수집한 사용량 추세로 각 blob store가 <b>90%에 도달할 시점</b>을 예측합니다. 빨강(7일 이내/90% 이상)·노랑(21일 이내/80% 이상)은 정리(Cleanup·Compact)나 증설이 필요합니다. 표본이 2개 이상 쌓여야 증가율이 계산됩니다.</p>
+          <div class="form-actions" style="justify-content:flex-start;gap:8px">
+            <button type="button" id="df-refresh">지금 수집 + 갱신</button>
+            <span id="df-status" class="hint" style="margin:0"></span>
+          </div>
+          <div id="df-table"></div>
+        </div>
+
         <div id="blobstore-table"></div>
       </section>
 

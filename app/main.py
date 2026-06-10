@@ -13,6 +13,7 @@ from . import __version__
 from .alerts import run_loop
 from .pingmon import run_loop as ping_run_loop
 from .backup import run_loop as backup_run_loop
+from .diskmon import run_loop as disk_run_loop
 from .routers.sync import run_loop as sync_run_loop
 from .routers import (
     alerts,
@@ -44,6 +45,7 @@ async def lifespan(_app: FastAPI):
         asyncio.create_task(ping_run_loop()),
         asyncio.create_task(backup_run_loop()),
         asyncio.create_task(sync_run_loop()),
+        asyncio.create_task(disk_run_loop()),
     ]
     try:
         yield

@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.55",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "added", "text": "디스크 포화 예측 — Blob Store 탭에 예측 보드 추가. 6시간마다 전 서버 blob 사용량을 자동 수집해 일일 증가율로 90% 도달 시점을 예측(위험 7일/90%·주의 21일/80%), '지금 수집 + 갱신' 버튼. 신규 GET /api/disk-forecast"},
+        ],
+    },
+    {
         "version": "0.8.54",
         "date": "2026-06-10",
         "changes": [
