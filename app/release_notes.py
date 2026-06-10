@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.25",
+        "date": "2026-06-09",
+        "changes": [
+            {"type": "changed", "text": "개요 카드의 '저장소' 라벨을 'Repository'로 변경하고 그 숫자를 가운데 정렬"},
+        ],
+    },
+    {
         "version": "0.8.24",
         "date": "2026-06-09",
         "changes": [

@@ -253,8 +253,8 @@ function makeStatusCard(s) {
       el("div", { class: "value" }, s.loading ? "…" : (s.response_ms != null ? `${s.response_ms} ms` : "—")),
     ]),
     el("div", { class: "metric" }, [
-      el("div", { class: "label" }, "저장소"),
-      el("div", { class: "value" }, s.loading ? "…" : (s.repository_count != null ? s.repository_count : "—")),
+      el("div", { class: "label" }, "Repository"),
+      el("div", { class: "value", style: "text-align:center" }, s.loading ? "…" : (s.repository_count != null ? s.repository_count : "—")),
     ]),
   ]);
 
