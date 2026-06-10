@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.34",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "changed", "text": "매트릭스 드래그 복사에서 그룹 저장소 복사 시 대상에 없는 멤버 저장소(재귀)도 먼저 생성 — 'Member repository does not exist' 400 오류 해결(멤버는 없을 때만 생성, 그룹 자체는 덮어쓰기)"},
+        ],
+    },
+    {
         "version": "0.8.33",
         "date": "2026-06-10",
         "changes": [

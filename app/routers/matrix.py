@@ -38,26 +38,62 @@ async def copy_repo_config(
         repos = await src_client.list_repositories()
     except NexusError as exc:
         raise HTTPException(status_code=502, detail=f"원본 저장소 목록 조회 실패: {exc.message}")
-    match = next((r for r in repos if r.name == repository), None)
-    if match is None:
+    by_name = {r.name: r for r in repos}
+    if repository not in by_name:
         raise HTTPException(status_code=404, detail=f"원본에 '{repository}' 저장소가 없습니다.")
-    fmt = (match.format or "").strip()
-    type_ = (match.type or "").strip()
-    if not (fmt and type_):
-        raise HTTPException(status_code=400, detail="저장소 포맷/타입을 확인할 수 없습니다.")
-    try:
-        config = await src_client.get_repository_config(fmt, type_, repository)
-    except NexusError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"원본 설정 읽기 실패(권한 등): {exc.message}",
-        )
 
-    snapshot = {"sections": {"repositories": [
-        {"name": repository, "format": fmt, "type": type_, "config": config}
-    ]}}
+    # Gather the repo's config plus, for group repos, the configs of every
+    # member repository (recursively) so missing members can be created on the
+    # target first — otherwise the group create fails ("Member ... does not
+    # exist").
+    collected: Dict[str, Optional[dict]] = {}
+
+    async def gather(name: str) -> None:
+        if name in collected:
+            return
+        r = by_name.get(name)
+        if r is None:
+            collected[name] = None  # member missing on source
+            return
+        fmt = (r.format or "").strip()
+        type_ = (r.type or "").strip()
+        try:
+            cfg = await src_client.get_repository_config(fmt, type_, name)
+        except NexusError as exc:
+            collected[name] = {"name": name, "_error": exc.message}
+            return
+        collected[name] = {"name": name, "format": fmt, "type": type_, "config": cfg}
+        for member in (cfg.get("group") or {}).get("memberNames") or []:
+            await gather(member)
+
+    await gather(repository)
+
+    main = collected.pop(repository)
+    if not main or "config" not in main:
+        reason = (main or {}).get("_error", "포맷/설정 확인 불가")
+        raise HTTPException(status_code=502, detail=f"원본 설정 읽기 실패(권한 등): {reason}")
+
+    members = [e for e in collected.values() if e and "config" in e]
     tgt_client = NexusClient(tgt, timeout=get_settings().request_timeout)
-    return await restore_mod.apply(tgt_client, snapshot, {"repositories"}, "overwrite")
+
+    items: List[dict] = []
+    # 1) Ensure member repos exist (create only what is missing).
+    if members:
+        dep = await restore_mod.apply(
+            tgt_client, {"sections": {"repositories": members}}, {"repositories"}, "merge"
+        )
+        items.extend(dep.get("items", []))
+    # 2) Create/overwrite the dragged repo itself.
+    res = await restore_mod.apply(
+        tgt_client, {"sections": {"repositories": [main]}}, {"repositories"}, "overwrite"
+    )
+    # Put the dragged repo's result first so the UI surfaces it.
+    items = res.get("items", []) + items
+
+    summary = {"ok": 0, "update": 0, "skip": 0, "fail": 0}
+    for it in items:
+        summary[it["status"]] = summary.get(it["status"], 0) + 1
+    return {"items": items, "summary": summary, "mode": "overwrite"}
 
 
 async def _fetch_repos(
