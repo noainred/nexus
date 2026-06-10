@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.50",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "added", "text": "일괄 적용(Bulk push) — 저장소 비교 팝업에서 원본 서버의 설정을 선택한 여러 서버에 한 번에 적용(덮어쓰기·없으면 생성, 그룹 멤버 포함)"},
+            {"type": "added", "text": "드리프트 자동 감시 — NEXUS_MANAGER_ALERT_DRIFT=true 설정 시 알림 점검에서 저장소 구성 드리프트(서버 간 설정 상이)를 감지해 알림/Webhook으로 통지"},
+        ],
+    },
+    {
         "version": "0.8.49",
         "date": "2026-06-10",
         "changes": [

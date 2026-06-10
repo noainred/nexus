@@ -1515,7 +1515,69 @@ function renderRepoDiff() {
   if (open) body.append(open);
   const sync = repoSlaveSyncPanel();
   if (sync) body.append(sync);
+  body.append(repoBulkPanel());
   body.append(repoCacheSyncPanel());
+}
+
+// Apply one server's repo config to several other servers at once.
+function repoBulkPanel() {
+  const repo = state.repoDiffName;
+  const cols = (state.repoDiff && state.repoDiff.columns) || [];
+  if (cols.length < 2) return el("div", {});
+  const src = el("select", { id: "bulk-src" }, cols.map((c) => el("option", { value: c.id }, c.name)));
+  const targetBox = el("div", { class: "pick-chips", id: "bulk-targets" });
+  const renderTargets = () => {
+    targetBox.innerHTML = "";
+    cols.forEach((c) => {
+      if (c.id === src.value) return;
+      const cb = el("input", { type: "checkbox", class: "bulk-tgt", "data-id": c.id });
+      targetBox.append(el("label", { class: "chk" }, [cb, ` ${c.name}`]));
+    });
+  };
+  src.addEventListener("change", renderTargets);
+  renderTargets();
+  const status = el("span", { class: "hint", style: "margin:0" });
+  const btn = el("button", {
+    type: "button",
+    onclick: () => runBulkPush(repo, src, status),
+  }, "선택 서버에 적용");
+  return el("div", { class: "settings-card", style: "margin-top:14px" }, [
+    el("h3", {}, "일괄 적용 (여러 서버에 설정 복사)"),
+    el("p", { class: "hint" },
+      "원본 서버의 이 저장소 설정을 선택한 서버들에 한 번에 적용(덮어쓰기·없으면 생성)합니다. 그룹이면 누락 멤버도 함께 생성됩니다."),
+    el("div", { class: "form-actions", style: "justify-content:flex-start;gap:10px;align-items:flex-start;flex-wrap:wrap" }, [
+      el("label", { class: "ref-pick" }, ["원본 ", src]),
+      el("label", { class: "ref-pick", style: "align-items:flex-start" }, ["대상 ", targetBox]),
+      btn, status,
+    ]),
+  ]);
+}
+
+async function runBulkPush(repo, srcSel, status) {
+  const sourceId = srcSel.value;
+  const sName = srcSel.options[srcSel.selectedIndex].text;
+  const targets = [...document.querySelectorAll(".bulk-tgt:checked")].map((c) => c.getAttribute("data-id"));
+  if (!targets.length) { toast("적용할 대상 서버를 선택하세요.", "err"); return; }
+  if (!confirm(
+    `'${sName}'의 '${repo}' 설정을 ${targets.length}개 서버에 적용(덮어쓰기·없으면 생성)합니다.\n진행할까요?`
+  )) return;
+  let ok = 0, fail = 0;
+  for (let i = 0; i < targets.length; i++) {
+    status.textContent = `적용 중… ${i + 1}/${targets.length}`;
+    try {
+      const r = await api(
+        `/api/matrix/copy-repo?repository=${encodeURIComponent(repo)}` +
+          `&source_id=${encodeURIComponent(sourceId)}&target_id=${encodeURIComponent(targets[i])}`,
+        { method: "POST" }
+      );
+      const it = (r.items && r.items[0]) || {};
+      if (it.status === "fail") fail++; else ok++;
+    } catch (e) { fail++; }
+  }
+  status.textContent = `완료 · 성공 ${ok} / 실패 ${fail}`;
+  toast(`일괄 적용 완료 — 성공 ${ok} / 실패 ${fail}`, fail ? "err" : "ok");
+  state.slaveDiffCache = {}; state.repoCfgCache = {};
+  if (state.matrix) renderMatrix();
 }
 
 // Buttons to open each server's Nexus admin page for this repository.

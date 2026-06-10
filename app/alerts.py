@@ -54,7 +54,46 @@ async def _current_alerts(registry, settings: Settings) -> List[Alert]:
                     key=f"disk:{b.id}:{store.name}", severity="warning", node=b.name,
                     message=f"{b.name} / {store.name} 디스크 사용률 {pct:.0f}%",
                 ))
+
+    if settings.alert_drift:
+        alerts.extend(await _drift_alerts(registry, settings))
     return alerts
+
+
+async def _drift_alerts(registry, settings: Settings) -> List[Alert]:
+    """Alert when a repository's configuration drifts across instances."""
+    from .matrix import build_matrix
+    from .models import MatrixColumn
+    from .nexus_client import NexusClient, NexusError
+
+    nodes = [i for i in registry.comparison()]
+    if len(nodes) < 2:
+        return []
+
+    async def fetch(inst):
+        col = MatrixColumn(id=inst.id, name=inst.name)
+        client = NexusClient(inst, timeout=settings.request_timeout)
+        try:
+            repos = await client.list_repositories()
+        except NexusError as exc:
+            col.reachable = False
+            col.error = exc.message
+            return col, None
+        return col, repos
+
+    results = await asyncio.gather(*(fetch(i) for i in nodes))
+    columns = [c for c, _ in results]
+    repos_by_instance = {c.id: r for c, r in results}
+    matrix = build_matrix(columns, repos_by_instance)
+
+    out: List[Alert] = []
+    for row in matrix.rows:
+        if row.status == "drift":
+            out.append(Alert(
+                key=f"drift:{row.repository}", severity="warning", node="비교",
+                message=f"구성 드리프트: 저장소 '{row.repository}' 설정이 서버 간 상이",
+            ))
+    return out
 
 
 async def _send(webhook: str, text: str) -> None:
