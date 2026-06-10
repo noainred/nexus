@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.35",
+        "date": "2026-06-10",
+        "changes": [
+            {"type": "changed", "text": "매트릭스 '자동(다수 기준)' 모드에서 행 상태(설정 상이/일부 누락/일치)와 셀 ≠ 표시를 선택한 인스턴스 부분집합 기준으로 재계산 — 인스턴스를 골라 비교하면 그 선택만 반영"},
+        ],
+    },
+    {
         "version": "0.8.34",
         "date": "2026-06-10",
         "changes": [

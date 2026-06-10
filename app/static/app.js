@@ -735,11 +735,46 @@ function referenceCell(row, columns, refId) {
 function evaluateRow(row, columns, refId) {
   const matches = {};
   if (!refId) {
+    // Auto "majority" reference, recomputed over the *selected* columns so the
+    // row status and cell ≠ marks reflect the current instance selection.
+    const present = columns
+      .map((col) => row.cells[col.id])
+      .filter((c) => c && c.present);
+    const reachable = columns.filter((col) => {
+      const c = row.cells[col.id];
+      return c && !c.unknown;
+    });
+    if (!present.length) {
+      columns.forEach((col) => { matches[col.id] = null; });
+      const status = reachable.length ? "partial" : "unknown";
+      return { status, matches, refMissing: false };
+    }
+    const counts = {};
+    present.forEach((c) => {
+      const s = cellSignature(c);
+      counts[s] = (counts[s] || 0) + 1;
+    });
+    let majSig = null;
+    let majN = -1;
+    Object.entries(counts).forEach(([s, n]) => {
+      if (n > majN) { majN = n; majSig = s; }
+    });
+    let anyDiff = false;
     columns.forEach((col) => {
       const c = row.cells[col.id];
-      matches[col.id] = c && c.present ? !!c.matches_reference : null;
+      if (c && c.present) {
+        const m = cellSignature(c) === majSig;
+        matches[col.id] = m;
+        if (!m) anyDiff = true;
+      } else {
+        matches[col.id] = null;
+      }
     });
-    return { status: row.status, matches, refMissing: false };
+    let status;
+    if (anyDiff) status = "drift";
+    else if (present.length < reachable.length) status = "partial";
+    else status = "consistent";
+    return { status, matches, refMissing: false };
   }
 
   const reachable = columns.filter((col) => {
