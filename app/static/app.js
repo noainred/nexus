@@ -871,8 +871,18 @@ function renderTopoTree(data) {
   }
 
   // Tier (depth) per node: roots are the top of the hierarchy (e.g. DMZ).
+  // When every node has an internal upstream (mutual proxying / cycles),
+  // promote the most-referenced upstream(s) to be the root tier.
+  let rootIds = nodes.filter((n) => parentOf[n.id] == null).map((n) => n.id);
+  if (!rootIds.length) {
+    const indeg = {};
+    edges.forEach((e) => { indeg[e.from] = (indeg[e.from] || 0) + e.count; });
+    const top = Math.max(...Object.values(indeg));
+    rootIds = Object.keys(indeg).filter((k) => indeg[k] === top);
+    rootIds.forEach((id) => { delete parentOf[id]; });
+  }
   const depth = {};
-  nodes.forEach((n) => { if (parentOf[n.id] == null) depth[n.id] = 0; });
+  rootIds.forEach((id) => { depth[id] = 0; });
   for (let i = 0; i < 20; i++) {
     let changed = false;
     nodes.forEach((n) => {
@@ -884,16 +894,18 @@ function renderTopoTree(data) {
     });
     if (!changed) break;
   }
-  nodes.forEach((n) => { if (depth[n.id] == null) depth[n.id] = 1; });  // cycles
+  // Anything still unplaced (cycle islands) goes right below the roots.
+  nodes.forEach((n) => { if (depth[n.id] == null) depth[n.id] = 1; });
 
-  const layers = [];
+  let layers = [];
   nodes.forEach((n) => {
     const d = depth[n.id];
     (layers[d] = layers[d] || []).push(n);
   });
+  layers = layers.filter((l) => l && l.length);  // compact (no sparse holes)
 
   const NW = 150, NH = 48, HGAP = 22, VGAP = 120, PAD = 70;
-  const maxCount = Math.max(...layers.map((l) => (l ? l.length : 0)));
+  const maxCount = Math.max(...layers.map((l) => l.length));
   const width = Math.max(maxCount * (NW + HGAP) - HGAP + PAD * 2, 640);
   const height = layers.length * VGAP + 30;
   const pos = {};
@@ -913,7 +925,8 @@ function renderTopoTree(data) {
     });
   });
 
-  const tierName = (li) => (li === 0 ? "최상위" : li === 1 ? "중계(HQ)" : `계위 ${li + 1}`);
+  const tierName = (li) =>
+    li === 0 ? "최상위" : li === layers.length - 1 ? "말단(DC)" : "중계(HQ)";
   let s = "";
   // Tier guide labels on the left.
   layers.forEach((layer, li) => {
