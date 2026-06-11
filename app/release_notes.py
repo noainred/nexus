@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.64",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "changed", "text": "README 현행화 — 전체 기능 표(모니터링/비교·동기화/운영·백업), 아키텍처(라우터·백그라운드 루프 5종), 환경 변수(로그인·감사·드리프트·백업 등), 런타임 데이터 파일, 주요 API 요약, 호환성 참고를 v0.8.63 기준으로 갱신"},
+        ],
+    },
+    {
         "version": "0.8.63",
         "date": "2026-06-11",
         "changes": [
