@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.60",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "added", "text": "서버별 타임존 — 서버 설정에 타임존(IANA, 예: Europe/Berlin) 입력란 추가. 인프라 체크 차트 툴팁에 한국시간/현지시간 2줄로 표시(타임존 미입력 시 기존처럼 1줄)"},
+        ],
+    },
+    {
         "version": "0.8.59",
         "date": "2026-06-11",
         "changes": [

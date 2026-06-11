@@ -14,6 +14,7 @@ class InstanceSummary(BaseModel):
     base_url: str
     username: Optional[str] = None
     group: str = ""
+    timezone: str = ""
     verify_tls: Optional[bool] = None
     use_in_monitoring: bool = True
     use_in_comparison: bool = True
@@ -29,6 +30,7 @@ class InstanceCreate(BaseModel):
     username: str = ""
     password: str = ""
     group: str = ""
+    timezone: str = ""
     verify_tls: Optional[bool] = None
     use_in_monitoring: bool = True
     use_in_comparison: bool = True
@@ -43,6 +45,7 @@ class InstanceUpdate(BaseModel):
     # Blank password means "keep the existing one".
     password: Optional[str] = None
     group: str = ""
+    timezone: str = ""
     verify_tls: Optional[bool] = None
     use_in_monitoring: bool = True
     use_in_comparison: bool = True

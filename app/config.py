@@ -20,6 +20,10 @@ class InstanceConfig(BaseModel):
     username: str = Field(..., description="Account used for management calls.")
     password: str = Field(..., description="Password or token for the account.")
     group: str = Field(default="", description="Group label for the overview.")
+    timezone: str = Field(
+        default="",
+        description="IANA timezone of the server (e.g. Asia/Seoul); optional.",
+    )
     verify_tls: Optional[bool] = Field(
         default=None,
         description="Per-instance TLS verification override.",
@@ -155,6 +159,7 @@ def instances_to_dict(
                 "username": c.username,
                 "password": c.password,
                 "group": c.group,
+                "timezone": c.timezone,
                 "verify_tls": c.verify_tls,
                 "use_in_monitoring": c.use_in_monitoring,
                 "use_in_comparison": c.use_in_comparison,

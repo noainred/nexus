@@ -812,7 +812,19 @@ function renderInfraChart(s, opts = {}) {
     hi.setAttribute("cy", best.y);
     hi.setAttribute("stroke", pingColor(best.p.color));
     hi.style.display = "";
-    tip.textContent = `${best.p.v} ${unit} · ${new Date(best.p.t * 1000).toLocaleString()}`;
+    // With a server timezone configured, show Korea time + local time on two
+    // lines; otherwise keep the single-line browser-local timestamp.
+    const dt = new Date(best.p.t * 1000);
+    const tz = ((state.instances || []).find((i) => i.id === s.id) || {}).timezone;
+    let when = dt.toLocaleString();
+    if (tz) {
+      try {
+        const kst = dt.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
+        const loc = dt.toLocaleString("ko-KR", { timeZone: tz });
+        when = `한국 ${kst}\n현지 ${loc} (${tz})`;
+      } catch (e) { /* invalid timezone string — fall back to one line */ }
+    }
+    tip.textContent = `${best.p.v} ${unit} · ${when}`;
     tip.style.display = "block";
     const wr = wrap.getBoundingClientRect();
     let left = ev.clientX - wr.left + 12;
@@ -2850,6 +2862,7 @@ function settingsEdit(inst) {
   form.id.disabled = true;                 // id is the key; not editable
   form.name.value = inst.name;
   form.group.value = inst.group || "";
+  form.timezone.value = inst.timezone || "";
   form.base_url.value = inst.base_url;
   form.username.value = inst.username || "";
   form.password.value = "";                // blank = keep existing
@@ -3385,6 +3398,7 @@ function setupSettings() {
     const body = {
       name: fd.get("name"),
       group: fd.get("group") || "",
+      timezone: String(fd.get("timezone") || "").trim(),
       base_url: fd.get("base_url"),
       username: fd.get("username") || "",
       password: fd.get("password") || "",
