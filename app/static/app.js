@@ -1464,14 +1464,39 @@ function renderMatrixPickers() {
     }, col.reachable ? col.name : `${col.name} ⚠`));
   });
   repoBox.innerHTML = "";
+  const q = (state.matrixRepoSearch || "").trim().toLowerCase();
+  let shown = 0;
   m.rows.forEach((r) => {
+    if (q && !r.repository.toLowerCase().includes(q)) return;
+    shown++;
     const on = !state.matrixRepos || state.matrixRepos.has(r.repository);
     repoBox.append(el("button", {
       type: "button",
-      class: `pick-chip ${on ? "on" : ""}`,
+      class: `pick-chip ${on ? "on" : ""}${q ? " hit" : ""}`,
       onclick: () => toggleMatrixPick("matrixRepos", r.repository),
     }, r.repository));
   });
+  if (q && !shown) {
+    repoBox.append(el("span", { class: "pick-empty" }, `'${q}'에 맞는 저장소가 없습니다.`));
+  }
+  const total = m.rows.length;
+  const selected = state.matrixRepos ? state.matrixRepos.size : total;
+  const countEl = document.getElementById("matrix-repo-count");
+  if (countEl) {
+    countEl.textContent = q
+      ? `표시 ${shown} · 선택 ${selected}/${total}`
+      : `선택 ${selected}/${total}`;
+  }
+}
+
+// Repos currently matching the search box (all repos when the box is empty).
+function filteredMatrixRepos() {
+  const m = state.matrix;
+  if (!m) return [];
+  const q = (state.matrixRepoSearch || "").trim().toLowerCase();
+  return m.rows
+    .map((r) => r.repository)
+    .filter((name) => !q || name.toLowerCase().includes(q));
 }
 
 function toggleMatrixPick(key, id) {
@@ -1490,7 +1515,13 @@ function toggleMatrixPick(key, id) {
 function setAllMatrixRepos(on) {
   const m = state.matrix;
   if (!m) return;
-  state.matrixRepos = on ? new Set(m.rows.map((r) => r.repository)) : new Set();
+  // Scope 전체/해제 to the current search: with a query, only the matching
+  // repos are turned on/off so you can e.g. "yum → 전체" select just those.
+  const all = m.rows.map((r) => r.repository);
+  const scope = filteredMatrixRepos();
+  const cur = new Set(state.matrixRepos || all);
+  scope.forEach((name) => { if (on) cur.add(name); else cur.delete(name); });
+  state.matrixRepos = cur;
   renderMatrixPickers();
   renderMatrix();
 }
@@ -2009,6 +2040,10 @@ document.getElementById("matrix-ref").addEventListener("change", (e) => {
 });
 document.getElementById("matrix-repo-all").addEventListener("click", () => setAllMatrixRepos(true));
 document.getElementById("matrix-repo-none").addEventListener("click", () => setAllMatrixRepos(false));
+document.getElementById("matrix-repo-search").addEventListener("input", (ev) => {
+  state.matrixRepoSearch = ev.target.value;
+  renderMatrixPickers();   // filter chips only; the matrix table is unaffected
+});
 
 // ---- repository config diff (deep comparison) ----------------------------
 

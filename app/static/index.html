@@ -192,9 +192,11 @@
           </div>
           <div class="pick-group">
             <span class="pick-label">저장소</span>
+            <input type="text" id="matrix-repo-search" class="pick-search" placeholder="🔍 저장소 빠른 찾기 (예: yum, rocky)" />
             <button type="button" id="matrix-repo-all" class="pick-mini">전체</button>
             <button type="button" id="matrix-repo-none" class="pick-mini">해제</button>
-            <div id="matrix-repo-pick" class="pick-chips"></div>
+            <span id="matrix-repo-count" class="pick-count"></span>
+            <div id="matrix-repo-pick" class="pick-chips scrollable"></div>
           </div>
         </div>
         <div id="matrix-table" class="matrix-wrap"></div>
