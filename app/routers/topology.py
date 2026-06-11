@@ -66,10 +66,15 @@ async def topology(
     instances = registry.all()
     results = await asyncio.gather(*(_fetch_node(i) for i in instances))
 
-    # Map host:port -> node id for internal-link matching.
+    # Map host:port -> node id for internal-link matching. A server may be
+    # referenced by IP in one proxy and by FQDN in another, so the optional
+    # alt_url is registered too (base_url keys win on collision).
     host_to_id: Dict[Tuple[str, Optional[int]], str] = {}
     for inst in instances:
         host_to_id[_host_key(inst.base_url)] = inst.id
+    for inst in instances:
+        if inst.alt_url:
+            host_to_id.setdefault(_host_key(inst.alt_url), inst.id)
     node_reachable = {node.id: node.reachable for node, _ in results}
 
     nodes: List[TopologyNode] = []
@@ -83,7 +88,9 @@ async def topology(
                 if not remote:
                     continue
                 key = _host_key(remote)
-                target_id = host_to_id.get(key)
+                # Exact host:port first; fall back to a port-less registration
+                # (e.g. alt_url entered as a bare hostname).
+                target_id = host_to_id.get(key) or host_to_id.get((key[0], None))
                 link = ProxyLink(
                     repository=repo.name,
                     remote_url=remote,

@@ -17,6 +17,13 @@ class InstanceConfig(BaseModel):
     id: str = Field(..., description="Unique, URL-safe identifier.")
     name: str = Field(..., description="Human friendly label.")
     base_url: str = Field(..., description="Root URL of the Nexus instance.")
+    alt_url: str = Field(
+        default="",
+        description=(
+            "Alternate URL/host of the same server (e.g. FQDN when base_url "
+            "is an IP). Used so proxies pointing at either form are matched."
+        ),
+    )
     username: str = Field(..., description="Account used for management calls.")
     password: str = Field(..., description="Password or token for the account.")
     group: str = Field(default="", description="Group label for the overview.")
@@ -162,6 +169,7 @@ def instances_to_dict(
                 "id": c.id,
                 "name": c.name,
                 "base_url": c.base_url,
+                "alt_url": c.alt_url,
                 "username": c.username,
                 "password": c.password,
                 "group": c.group,

@@ -1535,18 +1535,25 @@ function repoNameFromRemote(u) {
   return m ? decodeURIComponent(m[1]) : "";
 }
 
+// Hostnames an instance answers to: base_url plus the optional alt_url
+// (보조 주소). Proxies may point at a master by IP or by FQDN — matching
+// either one means "same server".
+function instHosts(i) {
+  return [hostOf(i.base_url || ""), hostOf(i.alt_url || "")].filter(Boolean);
+}
+
 // A "slave" cell is a proxy whose remote URL points at one of our managed
 // servers (its master). Such a cell is the expected master/slave setup, not a
 // configuration drift, so it is treated as normal in the matrix.
 function cellIsSlave(c) {
   if (!c || !c.remote_url) return false;
   const h = hostOf(c.remote_url);
-  return !!h && (state.instances || []).some((i) => hostOf(i.base_url) === h);
+  return !!h && (state.instances || []).some((i) => instHosts(i).includes(h));
 }
 
 function masterNameForCell(c) {
   const h = c && c.remote_url ? hostOf(c.remote_url) : "";
-  const m = h && (state.instances || []).find((i) => hostOf(i.base_url) === h);
+  const m = h && (state.instances || []).find((i) => instHosts(i).includes(h));
   return m ? m.name : "";
 }
 
@@ -1582,7 +1589,7 @@ async function ensureSlaveInfo(repo, col, c) {
   if (key in state.slaveDiffCache) return state.slaveDiffCache[key];
   const h = c && c.remote_url ? hostOf(c.remote_url) : "";
   const master = h
-    ? (state.instances || []).find((i) => i.id !== col.id && hostOf(i.base_url) === h)
+    ? (state.instances || []).find((i) => i.id !== col.id && instHosts(i).includes(h))
     : null;
   if (!master) { state.slaveDiffCache[key] = { master: null }; return state.slaveDiffCache[key]; }
   const mRepo = repoNameFromRemote(c.remote_url) || repo;
@@ -2087,7 +2094,7 @@ function repoSlaveSyncPanel() {
     const remote = fmap["proxy.remoteUrl"] ? fmap["proxy.remoteUrl"][col.id] : null;
     if (!remote) return;
     const h = hostOf(remote);
-    const master = (state.instances || []).find((i) => i.id !== col.id && hostOf(i.base_url) === h);
+    const master = (state.instances || []).find((i) => i.id !== col.id && instHosts(i).includes(h));
     if (!master) return;
     let diffN = null;
     if (colIds.has(master.id)) {
@@ -3035,6 +3042,7 @@ function settingsEdit(inst) {
   form.group.value = inst.group || "";
   form.timezone.value = inst.timezone || "";
   form.base_url.value = inst.base_url;
+  form.alt_url.value = inst.alt_url || "";
   form.username.value = inst.username || "";
   form.password.value = "";                // blank = keep existing
   form.verify_tls.checked = inst.verify_tls === true;
@@ -3058,7 +3066,9 @@ async function toggleFlag(inst, field) {
   const body = {
     name: inst.name,
     group: inst.group || "",
+    timezone: inst.timezone || "",
     base_url: inst.base_url,
+    alt_url: inst.alt_url || "",
     username: inst.username || "",
     password: "",                       // blank keeps the stored password
     verify_tls: inst.verify_tls,
@@ -3098,7 +3108,7 @@ async function loadSettings() {
       el("td", {}, i.name),
       el("td", {}, i.id),
       el("td", {}, i.group || "—"),
-      el("td", {}, i.base_url),
+      el("td", {}, i.alt_url ? `${i.base_url} (별칭: ${i.alt_url})` : i.base_url),
       el("td", {}, i.username || "—"),
       el("td", {}, flagToggle(i, "use_in_monitoring")),
       el("td", {}, flagToggle(i, "use_in_comparison")),
@@ -3604,6 +3614,7 @@ function setupSettings() {
       group: fd.get("group") || "",
       timezone: String(fd.get("timezone") || "").trim(),
       base_url: fd.get("base_url"),
+      alt_url: String(fd.get("alt_url") || "").trim(),
       username: fd.get("username") || "",
       password: fd.get("password") || "",
       verify_tls: form.verify_tls.checked,

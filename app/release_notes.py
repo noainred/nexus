@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.71",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "added", "text": "서버 설정에 보조 주소(alt_url) 입력 추가 — 같은 서버를 IP와 FQDN 두 표기로 등록 가능. 프록시 remoteUrl 비교(슬레이브 인식·토폴로지 내부 링크)에서 둘 중 하나만 맞아도 동일 서버로 처리"},
+            {"type": "changed", "text": "모니터링/비교 사용 토글 시 저장된 타임존이 지워지던 문제 수정 (토글 요청에 timezone 미포함이던 버그)"},
+        ],
+    },
+    {
         "version": "0.8.70",
         "date": "2026-06-11",
         "changes": [

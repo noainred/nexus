@@ -12,6 +12,7 @@ class InstanceSummary(BaseModel):
     id: str
     name: str
     base_url: str
+    alt_url: str = ""
     username: Optional[str] = None
     group: str = ""
     timezone: str = ""
@@ -27,6 +28,7 @@ class InstanceCreate(BaseModel):
     id: str = Field(..., min_length=1, pattern=r"^[A-Za-z0-9_.-]+$")
     name: str = Field(..., min_length=1)
     base_url: str = Field(..., min_length=1)
+    alt_url: str = ""
     username: str = ""
     password: str = ""
     group: str = ""
@@ -41,6 +43,7 @@ class InstanceUpdate(BaseModel):
 
     name: str = Field(..., min_length=1)
     base_url: str = Field(..., min_length=1)
+    alt_url: str = ""
     username: str = ""
     # Blank password means "keep the existing one".
     password: Optional[str] = None
