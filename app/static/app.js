@@ -905,19 +905,17 @@ function renderInfraChart(s, opts = {}) {
     hi.setAttribute("cy", best.y);
     hi.setAttribute("stroke", pingColor(best.p.color));
     hi.style.display = "";
-    // With a server timezone configured, show Korea time + local time on two
-    // lines; otherwise keep the single-line browser-local timestamp.
+    // Labelled lines: 응답속도 / 한국시간 / 로컬시간 (the last only when the
+    // server has a timezone configured).
     const dt = new Date(best.p.t * 1000);
     const tz = ((state.instances || []).find((i) => i.id === s.id) || {}).timezone;
-    let when = dt.toLocaleString();
+    let when = `한국시간: ${dt.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`;
     if (tz) {
       try {
-        const kst = dt.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
-        const loc = dt.toLocaleString("ko-KR", { timeZone: tz });
-        when = `한국 ${kst}\n현지 ${loc} (${tz})`;
-      } catch (e) { /* invalid timezone string — fall back to one line */ }
+        when += `\n로컬시간: ${dt.toLocaleString("ko-KR", { timeZone: tz })} (${tz})`;
+      } catch (e) { /* invalid timezone string — keep Korea time only */ }
     }
-    tip.textContent = `${best.p.v} ${unit} · ${when}`;
+    tip.textContent = `응답속도: ${best.p.v} ${unit}\n${when}`;
     tip.style.display = "block";
     const wr = wrap.getBoundingClientRect();
     let left = ev.clientX - wr.left + 12;

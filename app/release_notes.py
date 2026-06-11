@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.72",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "changed", "text": "인프라 체크 차트 툴팁을 '응답속도: / 한국시간: / 로컬시간:' 세 줄 라벨 형식으로 변경 (타임존 미설정 서버는 한국시간까지만 표시)"},
+        ],
+    },
+    {
         "version": "0.8.71",
         "date": "2026-06-11",
         "changes": [
