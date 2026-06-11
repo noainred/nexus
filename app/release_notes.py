@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.65",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "changed", "text": "계위 상황판을 개요 탭 상단으로 이동 — 첫 화면에서 전체 계위(드래그 배치·배치 초기화 포함)를 바로 확인. 토폴로지 탭에는 노드별 링크 상세와 프록시 상태 보드 유지"},
+        ],
+    },
+    {
         "version": "0.8.64",
         "date": "2026-06-11",
         "changes": [

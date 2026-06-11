@@ -63,14 +63,7 @@
         </div>
         <p class="hint">각 프록시 저장소의 원격 주소로 노드 간 부모↔자식 관계를 도출합니다. 상위 노드가 다운된 끊긴 링크는 빨갛게 표시되며, 해당 프록시는 Auto-block 위험이 있습니다.</p>
         <div id="topo-summary" class="cards"></div>
-        <div class="legend" style="margin-top:6px">
-          <span><i class="sw" style="background:var(--green)"></i> 정상 노드</span>
-          <span><i class="sw" style="background:var(--red)"></i> 다운 노드</span>
-          <span><i class="sw" style="border-top:2px solid var(--red);background:transparent"></i> 끊긴 링크</span>
-          <span class="hint" style="margin:0">노드를 클릭하면 그 서버의 Nexus가 새 탭으로 열리고, <b>드래그하면 원하는 위치로 배치</b>됩니다(자동 저장)</span>
-          <button type="button" id="topo-reset" class="pick-mini">배치 초기화</button>
-        </div>
-        <div id="topo-tree" class="topo-tree-wrap"></div>
+        <p class="hint">계위 상황판(트리 다이어그램)은 <b>개요</b> 탭에 있습니다. 아래는 노드별 프록시 링크 상세입니다.</p>
         <div id="topo-body"></div>
 
         <div class="matrix-header" style="margin-top:24px">
@@ -89,6 +82,20 @@
       </section>
 
       <section id="overview" class="panel active">
+        <div class="matrix-header">
+          <h2>계위 상황판</h2>
+          <div class="matrix-controls">
+            <button type="button" id="topo-reset" class="pick-mini">배치 초기화</button>
+          </div>
+        </div>
+        <div class="legend" style="margin-top:6px">
+          <span><i class="sw" style="background:var(--green)"></i> 정상 노드</span>
+          <span><i class="sw" style="background:var(--red)"></i> 다운 노드</span>
+          <span><i class="sw" style="border-top:2px solid var(--red);background:transparent"></i> 끊긴 링크</span>
+          <span class="hint" style="margin:0">노드를 클릭하면 그 서버의 Nexus가 새 탭으로 열리고, <b>드래그하면 원하는 위치로 배치</b>됩니다(자동 저장)</span>
+        </div>
+        <div id="topo-tree" class="topo-tree-wrap"></div>
+
         <h2>인스턴스 상태</h2>
         <div id="status-cards"></div>
       </section>

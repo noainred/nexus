@@ -422,7 +422,21 @@ document.getElementById("status-modal").addEventListener("click", (ev) => {
   if (ev.target.id === "status-modal") ev.currentTarget.classList.add("hidden");
 });
 
+// The tier wallboard lives on the overview tab; it draws from /api/topology.
+async function loadOverviewTree() {
+  const wrap = document.getElementById("topo-tree");
+  if (!wrap) return;
+  try {
+    const data = await api("/api/topology");
+    renderTopoTree(data);
+  } catch (e) {
+    wrap.innerHTML = "";
+    wrap.append(el("p", { class: "hint" }, `상황판 로드 실패: ${e.message}`));
+  }
+}
+
 async function loadOverview() {
+  loadOverviewTree();
   const cards = document.getElementById("status-cards");
 
   // 1) Instantly render skeleton cards from the known instance list, so the
@@ -913,7 +927,7 @@ function setupTopology() {
   document.getElementById("topo-reset").addEventListener("click", () => {
     localStorage.removeItem("topoPos");
     toast("배치를 초기화했습니다 (자동 배치)");
-    loadTopology();
+    loadOverviewTree();
   });
 }
 
@@ -1137,8 +1151,6 @@ async function loadTopology() {
     body.append(el("div", { class: "empty" }, "노드가 없습니다."));
     return;
   }
-
-  renderTopoTree(data);
 
   data.nodes.forEach((node) => {
     const statusBadge = node.reachable
