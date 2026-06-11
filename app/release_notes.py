@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.69",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "changed", "text": "계위 상황판 단계(tier) 기본 이름 변경 — 최상위→'외부 인터넷', 말단(DC)→'Region'"},
+            {"type": "added", "text": "서버 설정 탭에 '계위 상황판 단계 이름' 메뉴 추가 — 최상위/중계/말단 단계 라벨을 원하는 단어로 수정·저장(브라우저별 보관)·기본값 복원 가능"},
+        ],
+    },
+    {
         "version": "0.8.68",
         "date": "2026-06-11",
         "changes": [
