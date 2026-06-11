@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.61",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "added", "text": "플릿 기능 테스트 13종 추가 — 예약 동기화·구성 백업(실행/다운로드/경로 탈출 방지)·디스크 예측 수치·DR 점검(정상/누락/일괄 실행)·정리 점검·프록시 차단 보드·통합 검색·복사 검증 (총 67개 테스트)"},
+        ],
+    },
+    {
         "version": "0.8.60",
         "date": "2026-06-11",
         "changes": [
