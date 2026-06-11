@@ -31,6 +31,7 @@
 
     <nav class="tabs">
       <button class="tab active" data-tab="overview">개요</button>
+      <button class="tab" data-tab="instances-status">인스턴스 상태</button>
       <button class="tab" data-tab="search">통합 검색</button>
       <button class="tab" data-tab="blobstore">Blob Store</button>
       <button class="tab" data-tab="metrics">JVM / 리소스</button>
@@ -95,7 +96,9 @@
           <span class="hint" style="margin:0">노드를 클릭하면 그 서버의 Nexus가 새 탭으로 열리고, <b>드래그하면 원하는 위치로 배치</b>됩니다(자동 저장)</span>
         </div>
         <div id="topo-tree" class="topo-tree-wrap"></div>
+      </section>
 
+      <section id="instances-status" class="panel">
         <h2>인스턴스 상태</h2>
         <div id="status-cards"></div>
       </section>

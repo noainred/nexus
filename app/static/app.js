@@ -180,7 +180,8 @@ function selectTab(name) {
   if (name === "blobstore") loadBlobstores();
   if (name === "metrics") loadMetrics();
   if (name === "infra") loadInfra();
-  if (name === "overview") loadOverview();
+  if (name === "overview") loadOverviewTree();
+  if (name === "instances-status") loadOverview();
   if (name === "about") renderHistory();
   return true;
 }
@@ -435,8 +436,8 @@ async function loadOverviewTree() {
   }
 }
 
+// Loads the status cards on the 인스턴스 상태 tab (the wallboard is on 개요).
 async function loadOverview() {
-  loadOverviewTree();
   const cards = document.getElementById("status-cards");
 
   // 1) Instantly render skeleton cards from the known instance list, so the
@@ -3994,7 +3995,8 @@ async function init() {
   setupSearch();
   document.getElementById("df-refresh").addEventListener("click", () => loadDiskForecast(true));
   setupReleaseNotes();
-  loadOverview();
+  loadOverviewTree();   // 개요 (계위 상황판)
+  loadOverview();       // 인스턴스 상태 카드
   loadMatrix();
   // Keep the current screen across a page refresh (URL hash).
   restoreActiveTab();

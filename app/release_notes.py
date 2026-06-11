@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.66",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "changed", "text": "'인스턴스 상태'를 별도 메뉴로 분리 — 개요 탭은 계위 상황판 전용, 새 '인스턴스 상태' 탭에 플릿 요약 막대+그룹별 서버 카드 표시"},
+        ],
+    },
+    {
         "version": "0.8.65",
         "date": "2026-06-11",
         "changes": [
