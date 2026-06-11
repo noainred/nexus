@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.63",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "added", "text": "계위 상황판 드래그 배치 — 노드를 끌어 원하는 위치에 배치(연결선 실시간 추적, 브라우저에 자동 저장). 클릭은 기존대로 Nexus 열기, '배치 초기화' 버튼으로 자동 배치 복귀"},
+        ],
+    },
+    {
         "version": "0.8.62",
         "date": "2026-06-11",
         "changes": [

@@ -910,6 +910,11 @@ function setupTopology() {
   document.getElementById("topo-probe").addEventListener("change", loadTopology);
   document.getElementById("pxs-refresh").addEventListener("click", loadProxyStatus);
   document.getElementById("pxs-problem-only").addEventListener("change", renderProxyStatus);
+  document.getElementById("topo-reset").addEventListener("click", () => {
+    localStorage.removeItem("topoPos");
+    toast("배치를 초기화했습니다 (자동 배치)");
+    loadTopology();
+  });
 }
 
 // Hierarchical status board: tiers derived from internal proxy links
@@ -981,8 +986,8 @@ function renderTopoTree(data) {
 
   const NW = 150, NH = 48, HGAP = 22, VGAP = 120, PAD = 70;
   const maxCount = Math.max(...layers.map((l) => l.length));
-  const width = Math.max(maxCount * (NW + HGAP) - HGAP + PAD * 2, 640);
-  const height = layers.length * VGAP + 30;
+  let width = Math.max(maxCount * (NW + HGAP) - HGAP + PAD * 2, 640);
+  let height = layers.length * VGAP + 30;
   const pos = {};
   layers.forEach((layer, li) => {
     if (!layer) return;
@@ -1000,6 +1005,19 @@ function renderTopoTree(data) {
     });
   });
 
+  // User-arranged positions (drag & drop) override the automatic layout.
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem("topoPos") || "{}"); } catch (e) { saved = {}; }
+  nodes.forEach((n) => {
+    const sp = saved[n.id];
+    if (sp && typeof sp.x === "number" && typeof sp.y === "number") pos[n.id] = { x: sp.x, y: sp.y };
+  });
+  nodes.forEach((n) => {
+    const p = pos[n.id];
+    width = Math.max(width, p.x + NW + 20);
+    height = Math.max(height, p.y + NH + 20);
+  });
+
   const tierName = (li) =>
     li === 0 ? "최상위" : li === layers.length - 1 ? "말단(DC)" : "중계(HQ)";
   let s = "";
@@ -1008,16 +1026,20 @@ function renderTopoTree(data) {
     if (!layer) return;
     s += `<text x="10" y="${26 + li * VGAP + NH / 2 + 4}" class="tt-tier">${escapeHtml(tierName(li))}</text>`;
   });
-  // Edges (parent bottom → child top).
-  edges.forEach((e) => {
+  // Edges (parent bottom → child top), tagged so dragging can re-route them.
+  const edgeD = (e) => {
     const a = pos[e.from], b = pos[e.to];
-    if (!a || !b) return;
     const x1 = a.x + NW / 2, y1 = a.y + NH;
     const x2 = b.x + NW / 2, y2 = b.y;
     const my = (y1 + y2) / 2;
+    return { d: `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`, lx: (x1 + x2) / 2, ly: my - 4 };
+  };
+  edges.forEach((e, i) => {
+    if (!pos[e.from] || !pos[e.to]) return;
+    const g = edgeD(e);
     const cls = e.broken ? "tt-edge broken" : "tt-edge";
-    s += `<path class="${cls}" d="M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}"/>` +
-      (e.count > 1 ? `<text x="${(x1 + x2) / 2}" y="${my - 4}" class="tt-count">${e.count}</text>` : "");
+    s += `<path class="${cls}" data-ei="${i}" d="${g.d}"/>` +
+      (e.count > 1 ? `<text x="${g.lx}" y="${g.ly}" class="tt-count" data-ei="${i}">${e.count}</text>` : "");
   });
   // Nodes.
   nodes.forEach((n) => {
@@ -1034,10 +1056,55 @@ function renderTopoTree(data) {
 
   wrap.innerHTML =
     `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+
+  // Drag & drop arrangement: drag a node anywhere; edges follow live and the
+  // position is remembered (localStorage). A plain click still opens Nexus.
+  const svg = wrap.querySelector("svg");
+  const refreshEdges = () => {
+    edges.forEach((e, i) => {
+      if (!pos[e.from] || !pos[e.to]) return;
+      const g = edgeD(e);
+      const path = svg.querySelector(`path[data-ei="${i}"]`);
+      if (path) path.setAttribute("d", g.d);
+      const label = svg.querySelector(`text[data-ei="${i}"]`);
+      if (label) { label.setAttribute("x", g.lx); label.setAttribute("y", g.ly); }
+    });
+  };
   wrap.querySelectorAll("g.tt-node").forEach((g) => {
-    g.addEventListener("click", () => {
-      const n = byId[g.getAttribute("data-id")];
-      if (n) window.open(n.base_url, "_blank", "noopener,noreferrer");
+    const id = g.getAttribute("data-id");
+    let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
+    g.addEventListener("pointerdown", (ev) => {
+      dragging = true; moved = false;
+      const rect = svg.getBoundingClientRect();
+      const scale = rect.width ? width / rect.width : 1;
+      sx = ev.clientX * scale; sy = ev.clientY * scale;
+      ox = pos[id].x; oy = pos[id].y;
+      g.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+    });
+    g.addEventListener("pointermove", (ev) => {
+      if (!dragging) return;
+      const rect = svg.getBoundingClientRect();
+      const scale = rect.width ? width / rect.width : 1;
+      const dx = ev.clientX * scale - sx, dy = ev.clientY * scale - sy;
+      if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+      pos[id].x = Math.max(0, ox + dx);
+      pos[id].y = Math.max(0, oy + dy);
+      g.setAttribute("transform", `translate(${pos[id].x},${pos[id].y})`);
+      refreshEdges();
+    });
+    g.addEventListener("pointerup", () => {
+      if (!dragging) return;
+      dragging = false;
+      if (moved) {
+        let store = {};
+        try { store = JSON.parse(localStorage.getItem("topoPos") || "{}"); } catch (e) { store = {}; }
+        store[id] = { x: Math.round(pos[id].x), y: Math.round(pos[id].y) };
+        localStorage.setItem("topoPos", JSON.stringify(store));
+      } else {
+        const n = byId[id];
+        if (n) window.open(n.base_url, "_blank", "noopener,noreferrer");
+      }
     });
   });
 }
