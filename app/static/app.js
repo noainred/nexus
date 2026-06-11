@@ -30,10 +30,73 @@ async function api(path, options = {}) {
   });
   if (res.status === 204) return null;
   const body = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    showLoginOverlay();
+    throw new Error(formatApiError(body.detail, res.status));
+  }
   if (!res.ok) {
     throw new Error(formatApiError(body.detail, res.status));
   }
   return body;
+}
+
+// ---- manager login ---------------------------------------------------------
+
+function showLoginOverlay() {
+  const ov = document.getElementById("login-overlay");
+  if (ov) ov.classList.remove("hidden");
+}
+
+function setupAuth() {
+  const form = document.getElementById("login-form");
+  if (form) {
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const status = document.getElementById("login-status");
+      try {
+        await api("/api/login", {
+          method: "POST",
+          body: JSON.stringify({ password: document.getElementById("login-pw").value }),
+        });
+        location.reload();
+      } catch (e) {
+        status.textContent = e.message;
+      }
+    });
+  }
+  const out = document.getElementById("logout-btn");
+  if (out) {
+    out.addEventListener("click", async () => {
+      try { await api("/api/logout", { method: "POST" }); } catch (e) { /* ignore */ }
+      location.reload();
+    });
+  }
+  const audit = document.getElementById("audit-refresh");
+  if (audit) audit.addEventListener("click", loadAudit);
+}
+
+async function loadAudit() {
+  const table = document.getElementById("audit-table");
+  table.innerHTML = "";
+  let items;
+  try {
+    items = await api("/api/audit?limit=200");
+  } catch (e) {
+    table.append(el("div", { class: "empty" }, `조회 실패: ${e.message}`));
+    return;
+  }
+  if (!items.length) {
+    table.append(el("div", { class: "empty" }, "기록이 없습니다."));
+    return;
+  }
+  const rows = items.map((a) => el("tr", {}, [
+    el("td", {}, a.ts || ""),
+    el("td", {}, a.ip || ""),
+    el("td", {}, a.method || ""),
+    el("td", { class: "url" }, `${a.path}${a.query ? `?${a.query}` : ""}`),
+    el("td", { class: "num" }, String(a.status ?? "")),
+  ]));
+  table.append(buildTable(["시각(UTC)", "IP", "메서드", "경로", "결과"], rows));
 }
 
 // FastAPI returns `detail` as a string (HTTPException) or a list of
@@ -3827,6 +3890,12 @@ async function moveGroupOrder(groups, idx, delta) {
 // ---- bootstrap -----------------------------------------------------------
 
 async function init() {
+  setupAuth();
+  try {
+    const st = await api("/api/auth-status");
+    if (st.required && !st.authenticated) { showLoginOverlay(); return; }
+    if (st.required) document.getElementById("logout-btn").classList.remove("hidden");
+  } catch (e) { /* auth-status unavailable — proceed */ }
   try {
     state.instances = await api("/api/instances");
   } catch (e) {

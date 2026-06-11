@@ -34,3 +34,4 @@ ver_*.md
 *.log
 
 backups/
+audit.log

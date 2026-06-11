@@ -77,6 +77,12 @@ class Settings(BaseSettings):
     # Blob-store disk usage sampling (saturation forecast).
     disk_file: str = "disk-history.csv"
 
+    # Manager access control + audit trail.
+    # When admin_password is set (NEXUS_MANAGER_ADMIN_PASSWORD), every /api
+    # call requires login; write operations are appended to audit_file.
+    admin_password: str = ""
+    audit_file: str = "audit.log"
+
 
 class InstancesDocument(BaseModel):
     """Schema of the instances YAML file."""

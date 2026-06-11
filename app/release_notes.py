@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.62",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "added", "text": "관리자 로그인 + 감사 로그 — NEXUS_MANAGER_ADMIN_PASSWORD 설정 시 모든 API에 로그인 필요(세션 쿠키), 화면에 로그인/로그아웃 추가. 모든 쓰기 작업(POST/PUT/DELETE)을 audit.log에 기록하고 About 탭에서 조회(시각/IP/메서드/경로/결과). 테스트 3종 포함(총 70개)"},
+        ],
+    },
+    {
         "version": "0.8.61",
         "date": "2026-06-11",
         "changes": [

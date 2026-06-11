@@ -5,18 +5,22 @@ import asyncio
 import contextlib
 from pathlib import Path
 
+from datetime import datetime, timezone
+
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
 from .alerts import run_loop
+from .config import get_settings
 from .pingmon import run_loop as ping_run_loop
 from .backup import run_loop as backup_run_loop
 from .diskmon import run_loop as disk_run_loop
 from .routers.sync import run_loop as sync_run_loop
 from .routers import (
     alerts,
+    auth,
     backup,
     cleanup,
     content,
@@ -68,6 +72,43 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Auth gate + audit trail. Auth activates only when admin_password is set;
+# every write (POST/PUT/DELETE) to /api is appended to the audit log.
+_AUTH_EXEMPT = {"/api/login", "/api/auth-status"}
+
+
+@app.middleware("http")
+async def auth_and_audit(request: Request, call_next):
+    settings = get_settings()
+    path = request.url.path
+    if (
+        settings.admin_password
+        and path.startswith("/api")
+        and path not in _AUTH_EXEMPT
+        and not auth.is_authenticated(request, settings)
+    ):
+        return JSONResponse({"detail": "로그인이 필요합니다."}, status_code=401)
+    response = await call_next(request)
+    if (
+        request.method in ("POST", "PUT", "DELETE")
+        and path.startswith("/api")
+        and path not in ("/api/login", "/api/logout")
+    ):
+        try:
+            auth.write_audit(settings, {
+                "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "ip": request.client.host if request.client else "",
+                "method": request.method,
+                "path": path,
+                "query": str(request.url.query or ""),
+                "status": response.status_code,
+            })
+        except Exception:  # noqa: BLE001 - auditing must never break a request
+            pass
+    return response
+
+
+app.include_router(auth.router)
 app.include_router(instances.router)
 app.include_router(repositories.router)
 app.include_router(cleanup.router)

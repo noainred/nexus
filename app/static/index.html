@@ -11,8 +11,23 @@
       <div class="title-wrap">
         <h1>Nexus Repository 통합 관리</h1>
         <button id="app-version" class="version-badge" title="릴리스 노트 보기">v…</button>
+        <button id="logout-btn" class="version-badge hidden" title="로그아웃">로그아웃</button>
       </div>
     </header>
+
+    <div id="login-overlay" class="modal hidden">
+      <div class="modal-box" style="max-width:360px">
+        <div class="modal-head"><h3>관리자 로그인</h3></div>
+        <div class="modal-body">
+          <p class="hint">이 매니저는 비밀번호로 보호되어 있습니다.</p>
+          <form id="login-form" class="form">
+            <label>비밀번호 <input id="login-pw" type="password" autocomplete="current-password" /></label>
+            <div class="form-actions"><button type="submit">로그인</button>
+              <span id="login-status" class="hint" style="margin:0"></span></div>
+          </form>
+        </div>
+      </div>
+    </div>
 
     <nav class="tabs">
       <button class="tab active" data-tab="overview">개요</button>
@@ -457,6 +472,15 @@
           <p><b>Nexus Repository 통합 관리</b> <span id="about-version" class="version-badge"></span></p>
           <p class="hint">여러 Sonatype Nexus Repository 인스턴스를 한곳에서 모니터링·비교·관리하는 대시보드입니다.</p>
         </div>
+        <div class="settings-card">
+          <h3>감사 로그 (변경 작업 기록)</h3>
+          <p class="hint">이 매니저로 수행한 쓰기 작업(설정 복사·복구·일괄 실행 등)의 기록입니다. 시각은 UTC입니다.</p>
+          <div class="form-actions" style="justify-content:flex-start">
+            <button type="button" id="audit-refresh">불러오기</button>
+          </div>
+          <div id="audit-table"></div>
+        </div>
+
         <div class="settings-card">
           <h3>변경 이력 (History)</h3>
           <p class="hint">프로그램이 수정·업데이트될 때마다 버전을 올리고 여기에 기록합니다.</p>
