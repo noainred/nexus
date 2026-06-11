@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.73",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "added", "text": "'일괄 적용' 메뉴 신설 — 서버를 선택하면 모든 저장소의 설정값을 항목별(값 분포·저장소 수)로 묶어 보여주고, 새 값을 입력해 그 항목을 가진 모든 저장소에 한 번에 적용 (예: httpClient.autoBlock 일괄 on/off). 항목이 없는 저장소는 자동 건너뜀, 결과는 변경/건너뜀/실패로 집계"},
+        ],
+    },
+    {
         "version": "0.8.72",
         "date": "2026-06-11",
         "changes": [

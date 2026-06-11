@@ -22,6 +22,7 @@ from .routers import (
     alerts,
     auth,
     backup,
+    bulk,
     cleanup,
     content,
     downloads,
@@ -124,6 +125,7 @@ app.include_router(infra.router)
 app.include_router(sync.router)
 app.include_router(search.router)
 app.include_router(backup.router)
+app.include_router(bulk.router)
 app.include_router(cleanup.fleet_router)
 app.include_router(meta.router)
 

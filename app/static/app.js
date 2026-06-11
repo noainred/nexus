@@ -182,6 +182,7 @@ function selectTab(name) {
   if (name === "infra") loadInfra();
   if (name === "overview") loadOverviewTree();
   if (name === "instances-status") loadOverview();
+  if (name === "bulk") fillBulkInstances();
   if (name === "about") renderHistory();
   return true;
 }
@@ -4037,6 +4038,147 @@ async function moveGroupOrder(groups, idx, delta) {
   }
 }
 
+// ---- bulk apply (저장소 설정 일괄 변경) ------------------------------------
+
+function fillBulkInstances() {
+  const sel = document.getElementById("bulk-inst");
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = "";
+  (state.instances || []).forEach((i) => sel.append(el("option", { value: i.id }, i.name)));
+  if (cur && [...sel.options].some((o) => o.value === cur)) sel.value = cur;
+}
+
+async function loadBulkFields() {
+  const sel = document.getElementById("bulk-inst");
+  const status = document.getElementById("bulk-status");
+  const table = document.getElementById("bulk-table");
+  document.getElementById("bulk-result").innerHTML = "";
+  if (!sel.value) { toast("서버를 선택하세요.", "err"); return; }
+  status.textContent = "모든 저장소 설정 읽는 중…";
+  table.innerHTML = "";
+  try {
+    const r = await api(`/api/bulk/fields?instance_id=${encodeURIComponent(sel.value)}`);
+    state.bulkFields = r;
+    const errN = Object.keys(r.errors || {}).length;
+    status.textContent =
+      `저장소 ${r.loaded}/${r.repos}개 읽음 · 설정 항목 ${r.fields.length}개` +
+      (errN ? ` · 읽기 실패 ${errN}` : "");
+    renderBulkTable();
+  } catch (e) {
+    status.textContent = "";
+    table.append(el("div", { class: "empty" }, `설정 읽기 실패: ${e.message}`));
+  }
+}
+
+// Booleans get a true/false select; everything else a free-text input.
+// The input is JSON-parsed on apply, so numbers/true/false/plain text all work.
+function bulkValueEditor(f) {
+  if (f.all_bool) {
+    return el("select", {}, [
+      el("option", { value: "true" }, "true"),
+      el("option", { value: "false" }, "false"),
+    ]);
+  }
+  const common = Object.entries(f.values || {}).sort((a, b) => b[1] - a[1])[0];
+  return el("input", {
+    type: "text",
+    placeholder: common ? common[0] : "",
+    style: "min-width:140px",
+  });
+}
+
+function renderBulkTable() {
+  const table = document.getElementById("bulk-table");
+  if (!table) return;
+  table.innerHTML = "";
+  const data = state.bulkFields;
+  if (!data) return;
+  const q = (document.getElementById("bulk-filter").value || "").trim().toLowerCase();
+  let fields = data.fields || [];
+  if (q) fields = fields.filter((f) => f.key.toLowerCase().includes(q));
+  if (!fields.length) {
+    table.append(el("div", { class: "empty" }, "표시할 설정 항목이 없습니다."));
+    return;
+  }
+  const thead = el("thead", {}, el("tr", {}, [
+    el("th", {}, "설정 항목"),
+    el("th", {}, "현재 값 분포"),
+    el("th", {}, "저장소 수"),
+    el("th", {}, "새 값"),
+    el("th", {}, ""),
+  ]));
+  const rows = fields.map((f) => {
+    const dist = Object.entries(f.values || {}).sort((a, b) => b[1] - a[1]);
+    const shown =
+      dist.slice(0, 4).map(([v, c]) => `${v} ×${c}`).join(" · ") +
+      (dist.length > 4 ? ` · 외 ${dist.length - 4}종` : "");
+    const editor = bulkValueEditor(f);
+    const btn = el("button", {
+      type: "button",
+      onclick: () => applyBulkField(f, editor.value),
+    }, "적용");
+    return el("tr", {}, [
+      el("td", {}, el("code", {}, f.key)),
+      el("td", {}, shown),
+      el("td", {}, String(f.repos)),
+      el("td", {}, editor),
+      el("td", {}, btn),
+    ]);
+  });
+  table.append(el("table", {}, [thead, el("tbody", {}, rows)]));
+}
+
+async function applyBulkField(f, raw) {
+  if (String(raw).trim() === "") { toast("새 값을 입력하세요.", "err"); return; }
+  const sel = document.getElementById("bulk-inst");
+  const inst = (state.instances || []).find((i) => i.id === sel.value);
+  const name = inst ? inst.name : sel.value;
+  let value;
+  try { value = JSON.parse(raw); } catch (_) { value = raw; }
+  if (!confirm(
+    `'${name}' 서버에서 이 항목을 가진 모든 저장소(${f.repos}개)에 적용합니다.\n\n` +
+    `${f.key} = ${JSON.stringify(value)}\n\n진행할까요?`
+  )) return;
+  const status = document.getElementById("bulk-status");
+  status.textContent = `적용 중… (${f.key})`;
+  try {
+    const r = await api("/api/bulk/apply", {
+      method: "POST",
+      body: JSON.stringify({ instance_id: sel.value, key: f.key, value }),
+    });
+    const c = r.counts || {};
+    toast(
+      `일괄 적용 완료 — 변경 ${c.ok || 0} · 건너뜀 ${c.skip || 0} · 실패 ${c.fail || 0}`,
+      c.fail ? "err" : "ok"
+    );
+    await loadBulkFields();   // refresh the value distribution
+    renderBulkResult(r);
+    // Server configs changed — invalidate matrix-derived caches.
+    state.slaveDiffCache = {}; state.repoCfgCache = {}; state.slaveCache = {};
+  } catch (e) {
+    status.textContent = "";
+    toast(`일괄 적용 실패: ${e.message}`, "err");
+  }
+}
+
+function renderBulkResult(r) {
+  const box = document.getElementById("bulk-result");
+  box.innerHTML = "";
+  const fails = (r.items || []).filter((it) => it.status === "fail");
+  if (!fails.length) return;
+  box.append(el("div", { class: "settings-card", style: "margin:10px 0" }, [
+    el("h3", {}, `실패 ${fails.length}건 — ${r.key}`),
+    ...fails.map((it) =>
+      el("p", { class: "site-error", style: "margin:2px 0" }, `${it.repository}: ${it.detail}`)),
+  ]));
+}
+
+function setupBulk() {
+  document.getElementById("bulk-load").addEventListener("click", loadBulkFields);
+  document.getElementById("bulk-filter").addEventListener("input", renderBulkTable);
+}
+
 // ---- bootstrap -----------------------------------------------------------
 
 async function init() {
@@ -4060,6 +4202,7 @@ async function init() {
   setupSecurity();
   setupSettings();
   setupTierLabels();
+  setupBulk();
   setupTopology();
   setupAlerts();
   setupInfra();

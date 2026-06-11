@@ -46,6 +46,7 @@
       <button class="tab" data-tab="alerts">알림</button>
       <button class="tab" data-tab="content">콘텐츠 동기화</button>
       <button class="tab" data-tab="cleanup">정리 정책</button>
+      <button class="tab" data-tab="bulk">일괄 적용</button>
       <button class="tab" data-tab="settings">서버 설정</button>
       <button class="tab" data-tab="about">About</button>
     </nav>
@@ -347,6 +348,19 @@
         <p class="hint">
           ※ 최소 한 개 이상의 기준(N일)을 입력해야 합니다.
         </p>
+      </section>
+
+      <section id="bulk" class="panel">
+        <h2>일괄 적용 (저장소 설정 일괄 변경)</h2>
+        <p class="hint">서버를 선택해 <b>설정 읽기</b>를 누르면 그 서버 모든 저장소의 설정값을 항목별로 묶어 보여줍니다. 새 값을 입력하고 적용하면 <b>그 항목을 가진 모든 저장소</b>에 한 번에 반영됩니다. (예: <code>httpClient.autoBlock</code> 일괄 끄기/켜기) 항목이 없는 저장소(예: hosted에 proxy 설정)는 자동으로 건너뜁니다.</p>
+        <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap;gap:8px">
+          <label class="ref-pick">서버 <select id="bulk-inst"></select></label>
+          <button type="button" id="bulk-load">설정 읽기</button>
+          <input id="bulk-filter" type="text" placeholder="항목 필터 (예: autoBlock)" style="min-width:240px" />
+          <span id="bulk-status" class="hint" style="margin:0"></span>
+        </div>
+        <div id="bulk-result"></div>
+        <div id="bulk-table"></div>
       </section>
 
       <section id="settings" class="panel">
