@@ -999,7 +999,7 @@ function renderTopoTree(data) {
   });
   layers = layers.filter((l) => l && l.length);  // compact (no sparse holes)
 
-  const NW = 150, NH = 48, HGAP = 22, VGAP = 120, PAD = 70;
+  const NW = 150, NH = 48, HGAP = 22, VGAP = 100, PAD = 70;
   const maxCount = Math.max(...layers.map((l) => l.length));
   let width = Math.max(maxCount * (NW + HGAP) - HGAP + PAD * 2, 640);
   let height = layers.length * VGAP + 30;
@@ -1027,19 +1027,24 @@ function renderTopoTree(data) {
     const sp = saved[n.id];
     if (sp && typeof sp.x === "number" && typeof sp.y === "number") pos[n.id] = { x: sp.x, y: sp.y };
   });
-  nodes.forEach((n) => {
-    const p = pos[n.id];
-    width = Math.max(width, p.x + NW + 20);
-    height = Math.max(height, p.y + NH + 20);
-  });
+
+  // Fit the canvas to the actual content (no dead margins), leaving room for
+  // the tier labels on the left.
+  const labelRoom = 96;
+  const dx = labelRoom - Math.min(...nodes.map((n) => pos[n.id].x));
+  const dy = 24 - Math.min(...nodes.map((n) => pos[n.id].y));
+  nodes.forEach((n) => { pos[n.id].x += dx; pos[n.id].y += dy; });
+  width = Math.max(...nodes.map((n) => pos[n.id].x)) + NW + 20;
+  height = Math.max(...nodes.map((n) => pos[n.id].y)) + NH + 20;
 
   const tierName = (li) =>
     li === 0 ? "최상위" : li === layers.length - 1 ? "말단(DC)" : "중계(HQ)";
   let s = "";
-  // Tier guide labels on the left.
+  // Tier guide labels follow each tier's (possibly dragged) average row.
   layers.forEach((layer, li) => {
-    if (!layer) return;
-    s += `<text x="10" y="${26 + li * VGAP + NH / 2 + 4}" class="tt-tier">${escapeHtml(tierName(li))}</text>`;
+    if (!layer || !layer.length) return;
+    const avgY = layer.reduce((a, n) => a + pos[n.id].y, 0) / layer.length;
+    s += `<text x="12" y="${avgY + NH / 2 + 4}" class="tt-tier">${escapeHtml(tierName(li))}</text>`;
   });
   // Edges (parent bottom → child top), tagged so dragging can re-route them.
   const edgeD = (e) => {
@@ -1056,16 +1061,17 @@ function renderTopoTree(data) {
     s += `<path class="${cls}" data-ei="${i}" d="${g.d}"/>` +
       (e.count > 1 ? `<text x="${g.lx}" y="${g.ly}" class="tt-count" data-ei="${i}">${e.count}</text>` : "");
   });
-  // Nodes.
+  // Nodes: card with a status dot in the corner.
   nodes.forEach((n) => {
     const p = pos[n.id];
     if (!p) return;
     const cls = n.reachable ? "tt-node up" : "tt-node down";
     const host = hostOf(n.base_url) || n.base_url;
     s += `<g class="${cls}" data-id="${escapeHtml(n.id)}" transform="translate(${p.x},${p.y})">` +
-      `<rect width="${NW}" height="${NH}" rx="9"/>` +
-      `<text x="${NW / 2}" y="19" class="tt-name">${escapeHtml(n.name)}</text>` +
-      `<text x="${NW / 2}" y="36" class="tt-host">${escapeHtml(host)}</text>` +
+      `<rect width="${NW}" height="${NH}" rx="11"/>` +
+      `<circle class="tt-dot" cx="${NW - 13}" cy="13" r="4"/>` +
+      `<text x="${NW / 2}" y="20" class="tt-name">${escapeHtml(n.name)}</text>` +
+      `<text x="${NW / 2}" y="37" class="tt-host">${escapeHtml(host)}</text>` +
       `<title>${escapeHtml(n.name)} · ${escapeHtml(n.base_url)}${n.reachable ? "" : " · 연결 불가"}</title></g>`;
   });
 

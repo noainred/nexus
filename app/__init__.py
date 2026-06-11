@@ -1,3 +1,3 @@
 """Sonatype Nexus integrated management application."""
 
-__version__ = "0.8.66"
+__version__ = "0.8.67"

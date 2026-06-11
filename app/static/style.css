@@ -186,17 +186,33 @@ h3 { font-size: 14px; color: var(--muted); }
 /* Hierarchical topology status board (SVG tree) */
 .topo-tree-wrap {
   overflow-x: auto; margin: 14px 0;
-  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-  padding: 8px;
+  background: var(--panel);
+  background-image: radial-gradient(circle, rgba(255,255,255,.045) 1px, transparent 1px);
+  background-size: 22px 22px;
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px 12px;
 }
-.topo-tree-wrap .tt-tier { fill: var(--muted); font-size: 12px; font-weight: 700; }
-.topo-tree-wrap .tt-edge { fill: none; stroke: var(--border); stroke-width: 1.6; }
-.topo-tree-wrap .tt-edge.broken { stroke: var(--red); stroke-width: 2; stroke-dasharray: 5 4; }
-.topo-tree-wrap .tt-count { fill: var(--muted); font-size: 10px; text-anchor: middle; }
-.topo-tree-wrap g.tt-node { cursor: pointer; }
-.topo-tree-wrap g.tt-node rect { fill: var(--panel-2); stroke: var(--green); stroke-width: 1.6; }
-.topo-tree-wrap g.tt-node.down rect { stroke: var(--red); fill: rgba(248,81,73,.10); }
-.topo-tree-wrap g.tt-node:hover rect { stroke: var(--accent); }
+.topo-tree-wrap .tt-tier {
+  fill: var(--muted); font-size: 11px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.topo-tree-wrap .tt-edge {
+  fill: none; stroke: rgba(79,157,222,.45); stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.topo-tree-wrap .tt-edge.broken { stroke: var(--red); stroke-width: 2.2; stroke-dasharray: 6 5; }
+.topo-tree-wrap .tt-count {
+  fill: var(--muted); font-size: 10px; font-weight: 700; text-anchor: middle;
+  paint-order: stroke; stroke: var(--panel); stroke-width: 4px;
+}
+.topo-tree-wrap g.tt-node { cursor: pointer; filter: drop-shadow(0 3px 8px rgba(0,0,0,.38)); }
+.topo-tree-wrap g.tt-node rect {
+  fill: var(--panel-2); stroke: rgba(63,185,80,.75); stroke-width: 1.5;
+}
+.topo-tree-wrap g.tt-node .tt-dot { fill: var(--green); }
+.topo-tree-wrap g.tt-node.down rect { stroke: rgba(248,81,73,.85); fill: rgba(248,81,73,.10); }
+.topo-tree-wrap g.tt-node.down .tt-dot { fill: var(--red); }
+.topo-tree-wrap g.tt-node:hover rect { stroke: var(--accent); stroke-width: 2; }
 .topo-tree-wrap .tt-name { fill: var(--text); font-size: 13px; font-weight: 700; text-anchor: middle; }
 .topo-tree-wrap .tt-host { fill: var(--muted); font-size: 10px; text-anchor: middle; }
 .card .metrics { margin-top: 12px; display: flex; gap: 18px; }
