@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.68",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "changed", "text": "계위 상황판 패널이 다이어그램 크기에 딱 맞게 줄어들고 가운데 정렬되도록 수정 — 오른쪽의 큰 빈 공간 제거"},
+        ],
+    },
+    {
         "version": "0.8.67",
         "date": "2026-06-11",
         "changes": [

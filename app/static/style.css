@@ -185,13 +185,15 @@ h3 { font-size: 14px; color: var(--muted); }
 
 /* Hierarchical topology status board (SVG tree) */
 .topo-tree-wrap {
-  overflow-x: auto; margin: 14px 0;
+  overflow-x: auto; margin: 14px auto;
+  width: fit-content; max-width: 100%;
   background: var(--panel);
   background-image: radial-gradient(circle, rgba(255,255,255,.045) 1px, transparent 1px);
   background-size: 22px 22px;
   border: 1px solid var(--border); border-radius: 12px;
   padding: 10px 12px;
 }
+.topo-tree-wrap svg { display: block; }
 .topo-tree-wrap .tt-tier {
   fill: var(--muted); font-size: 11px; font-weight: 700;
   letter-spacing: 1px; text-transform: uppercase;
