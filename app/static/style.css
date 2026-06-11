@@ -185,6 +185,7 @@ h3 { font-size: 14px; color: var(--muted); }
 
 /* Hierarchical topology status board (SVG tree) */
 .topo-tree-wrap {
+  position: relative;
   overflow-x: auto; margin: 14px auto;
   width: fit-content; max-width: 100%;
   background: var(--panel);
@@ -203,9 +204,23 @@ h3 { font-size: 14px; color: var(--muted); }
   stroke-linecap: round;
 }
 .topo-tree-wrap .tt-edge.broken { stroke: var(--red); stroke-width: 2.2; stroke-dasharray: 6 5; }
+.topo-tree-wrap .tt-edge.hover { stroke: var(--accent); stroke-width: 2.8; }
+.topo-tree-wrap .tt-edge-hit {
+  fill: none; stroke: #000; stroke-opacity: 0; stroke-width: 14;
+  pointer-events: stroke; cursor: pointer;
+}
+.topo-tree-wrap .tt-arrow-head { fill: rgba(79,157,222,.7); }
+.topo-tree-wrap .tt-arrow-head.broken { fill: var(--red); }
 .topo-tree-wrap .tt-count {
   fill: var(--muted); font-size: 10px; font-weight: 700; text-anchor: middle;
   paint-order: stroke; stroke: var(--panel); stroke-width: 4px;
+  cursor: pointer;
+}
+.topo-tip {
+  position: absolute; display: none; pointer-events: none; z-index: 6;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 8px; font-size: 12px; white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,.45);
 }
 .topo-tree-wrap g.tt-node { cursor: pointer; filter: drop-shadow(0 3px 8px rgba(0,0,0,.38)); }
 .topo-tree-wrap g.tt-node rect {

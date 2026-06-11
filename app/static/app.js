@@ -964,14 +964,19 @@ function renderTopoTree(data) {
   nodes.forEach((n) => {
     const counts = {};
     const broken = {};
+    const linkRepos = {};
     (n.proxies || []).forEach((p) => {
       if (p.internal && p.target_id && byId[p.target_id] && p.target_id !== n.id) {
         counts[p.target_id] = (counts[p.target_id] || 0) + 1;
         if (p.broken) broken[p.target_id] = true;
+        (linkRepos[p.target_id] = linkRepos[p.target_id] || []).push(p);
       }
     });
     const ids = Object.keys(counts);
-    ids.forEach((pid) => edges.push({ from: pid, to: n.id, count: counts[pid], broken: !!broken[pid] }));
+    ids.forEach((pid) => edges.push({
+      from: pid, to: n.id, count: counts[pid], broken: !!broken[pid],
+      repos: linkRepos[pid] || [],
+    }));
     if (ids.length) parentOf[n.id] = ids.sort((a, b) => counts[b] - counts[a])[0];
   });
   if (!edges.length) {
@@ -1061,19 +1066,27 @@ function renderTopoTree(data) {
     const avgY = layer.reduce((a, n) => a + pos[n.id].y, 0) / layer.length;
     s += `<text x="12" y="${avgY + NH / 2 + 4}" class="tt-tier">${escapeHtml(tierName(li))}</text>`;
   });
-  // Edges (parent bottom → child top), tagged so dragging can re-route them.
+  // Arrowheads: the proxy direction is child → upstream(parent), so paths are
+  // drawn child-top → parent-bottom with a marker-end pointing at the parent.
+  s += `<defs>` +
+    `<marker id="tt-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="tt-arrow-head" d="M0,0L10,5L0,10z"/></marker>` +
+    `<marker id="tt-arrow-broken" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="tt-arrow-head broken" d="M0,0L10,5L0,10z"/></marker>` +
+    `</defs>`;
+  // Edges, tagged so dragging can re-route them (visible line + a wide
+  // invisible twin that makes hovering for the tooltip easy).
   const edgeD = (e) => {
     const a = pos[e.from], b = pos[e.to];
     const x1 = a.x + NW / 2, y1 = a.y + NH;
     const x2 = b.x + NW / 2, y2 = b.y;
     const my = (y1 + y2) / 2;
-    return { d: `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`, lx: (x1 + x2) / 2, ly: my - 4 };
+    return { d: `M${x2},${y2} C${x2},${my} ${x1},${my} ${x1},${y1}`, lx: (x1 + x2) / 2, ly: my - 4 };
   };
   edges.forEach((e, i) => {
     if (!pos[e.from] || !pos[e.to]) return;
     const g = edgeD(e);
     const cls = e.broken ? "tt-edge broken" : "tt-edge";
-    s += `<path class="${cls}" data-ei="${i}" d="${g.d}"/>` +
+    s += `<path class="${cls}" data-ei="${i}" marker-end="url(#${e.broken ? "tt-arrow-broken" : "tt-arrow"})" d="${g.d}"/>` +
+      `<path class="tt-edge-hit" data-ei="${i}" d="${g.d}"/>` +
       (e.count > 1 ? `<text x="${g.lx}" y="${g.ly}" class="tt-count" data-ei="${i}">${e.count}</text>` : "");
   });
   // Nodes: card with a status dot in the corner.
@@ -1100,12 +1113,67 @@ function renderTopoTree(data) {
     edges.forEach((e, i) => {
       if (!pos[e.from] || !pos[e.to]) return;
       const g = edgeD(e);
-      const path = svg.querySelector(`path[data-ei="${i}"]`);
-      if (path) path.setAttribute("d", g.d);
+      svg.querySelectorAll(`path[data-ei="${i}"]`).forEach((p) => p.setAttribute("d", g.d));
       const label = svg.querySelector(`text[data-ei="${i}"]`);
       if (label) { label.setAttribute("x", g.lx); label.setAttribute("y", g.ly); }
     });
   };
+
+  // Click on an edge (or its count) → list the proxy repositories that make
+  // up that link, in the shared repo modal. Repo names jump to the deep diff.
+  const showEdgeRepos = (e) => {
+    const from = byId[e.from], to = byId[e.to];
+    document.getElementById("repo-modal-title").textContent =
+      `프록시 링크 — ${to.name} → ${from.name} (저장소 ${e.count}개)`;
+    const body = document.getElementById("repo-modal-body");
+    body.innerHTML = "";
+    const thead = el("thead", {}, el("tr", {}, [
+      el("th", {}, "저장소"), el("th", {}, "원격 URL"), el("th", {}, "상태"),
+    ]));
+    const rows = (e.repos || []).map((p) => el("tr", {}, [
+      el("td", {}, el("a", {
+        href: "#",
+        title: "이 저장소의 서버 간 설정 비교 열기",
+        onclick: (ev) => { ev.preventDefault(); openRepoDiff(p.repository); },
+      }, p.repository)),
+      el("td", {}, p.remote_url || ""),
+      el("td", {}, el("span", { class: `badge ${p.broken ? "down" : "up"}` }, p.broken ? "끊김" : "정상")),
+    ]));
+    body.append(el("table", {}, [thead, el("tbody", {}, rows)]));
+    document.getElementById("repo-modal").classList.remove("hidden");
+  };
+
+  // Edge hover tooltip ("OC2a → DMZ1 · 프록시 74개") + highlight.
+  const tip = el("div", { class: "topo-tip" });
+  wrap.append(tip);
+  wrap.querySelectorAll("path.tt-edge-hit, text.tt-count").forEach((elm) => {
+    const i = Number(elm.getAttribute("data-ei"));
+    const e = edges[i];
+    if (!e || !byId[e.from] || !byId[e.to]) return;
+    const label =
+      `${byId[e.to].name} → ${byId[e.from].name} · 프록시 ${e.count}개` +
+      (e.broken ? " · 끊김" : "") + " — 클릭: 저장소 목록";
+    const vis = () => svg.querySelector(`path.tt-edge[data-ei="${i}"]`);
+    elm.addEventListener("mousemove", (ev) => {
+      const v = vis();
+      if (v) v.classList.add("hover");
+      tip.textContent = label;
+      tip.style.display = "block";
+      const wr = wrap.getBoundingClientRect();
+      let left = ev.clientX - wr.left + wrap.scrollLeft + 12;
+      if (left + tip.offsetWidth > wrap.scrollLeft + wr.width - 4) {
+        left = ev.clientX - wr.left + wrap.scrollLeft - tip.offsetWidth - 12;
+      }
+      tip.style.left = `${Math.max(2, left)}px`;
+      tip.style.top = `${Math.max(2, ev.clientY - wr.top - 30)}px`;
+    });
+    elm.addEventListener("mouseleave", () => {
+      const v = vis();
+      if (v) v.classList.remove("hover");
+      tip.style.display = "none";
+    });
+    elm.addEventListener("click", () => showEdgeRepos(e));
+  });
   wrap.querySelectorAll("g.tt-node").forEach((g) => {
     const id = g.getAttribute("data-id");
     let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
