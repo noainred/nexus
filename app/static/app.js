@@ -1910,6 +1910,11 @@ async function loadMatrix() {
     ]);
     state.matrix = matrix;
     state.compareFields = (cf && cf.fields) || [];
+    // A fresh matrix load means server configs may have changed — drop the
+    // derived caches so hover tooltips/badges don't show stale slave-diff info.
+    state.slaveDiffCache = {};
+    state.repoCfgCache = {};
+    state.slaveCache = {};
     // Keep prior selection across reloads; default to all when first seen.
     state.matrixCols = pruneMatrixSet(state.matrixCols, matrix.columns.map((c) => c.id));
     state.matrixRepos = pruneMatrixSet(state.matrixRepos, matrix.rows.map((r) => r.repository));
@@ -2041,7 +2046,7 @@ async function runBulkPush(repo, srcSel, status) {
   }
   status.textContent = `완료 · 성공 ${ok} / 실패 ${fail}`;
   toast(`일괄 적용 완료 — 성공 ${ok} / 실패 ${fail}`, fail ? "err" : "ok");
-  state.slaveDiffCache = {}; state.repoCfgCache = {};
+  state.slaveDiffCache = {}; state.repoCfgCache = {}; state.slaveCache = {};
   if (state.matrix) renderMatrix();
 }
 
@@ -2125,6 +2130,7 @@ async function syncSlaveConfig(repo, slaveId, masterId, sName, mName) {
     toast(`'${sName}' 설정을 '${mName}'에 맞췄습니다 (remoteUrl 유지)`);
     state.slaveDiffCache = {};
     state.repoCfgCache = {};
+    state.slaveCache = {};
     if (state.matrix) renderMatrix();
     openRepoDiff(repo);  // refresh the popup
   } catch (e) {

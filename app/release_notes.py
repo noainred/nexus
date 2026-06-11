@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.70",
+        "date": "2026-06-11",
+        "changes": [
+            {"type": "changed", "text": "버그 수정 — '슬레이브 설정 맞추기'(또는 설정 복사) 이후 매트릭스 셀 호버 팝업이 옛 'Slave · 설정 다름' 정보를 계속 보여주던 문제 수정. 호버 툴팁 캐시(slaveCache)를 함께 무효화하고, 매트릭스 새로고침 시 파생 캐시를 모두 초기화하도록 변경"},
+        ],
+    },
+    {
         "version": "0.8.69",
         "date": "2026-06-11",
         "changes": [
