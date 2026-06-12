@@ -456,21 +456,6 @@ document.getElementById("status-modal").addEventListener("click", (ev) => {
   if (ev.target.id === "status-modal") ev.currentTarget.classList.add("hidden");
 });
 
-// Tier guide labels for the wallboard. Stored per-browser in localStorage
-// (like the drag positions in topoPos) so each operator can rename the tiers
-// shown on the left of the 계위 상황판 without touching server config.
-const TIER_LABEL_DEFAULTS = { top: "외부 인터넷", mid: "중계(HQ)", leaf: "Region" };
-
-function getTierLabels() {
-  let v = {};
-  try { v = JSON.parse(localStorage.getItem("topoTierLabels") || "{}"); } catch (e) { v = {}; }
-  return {
-    top: (v && typeof v.top === "string" && v.top.trim()) ? v.top : TIER_LABEL_DEFAULTS.top,
-    mid: (v && typeof v.mid === "string" && v.mid.trim()) ? v.mid : TIER_LABEL_DEFAULTS.mid,
-    leaf: (v && typeof v.leaf === "string" && v.leaf.trim()) ? v.leaf : TIER_LABEL_DEFAULTS.leaf,
-  };
-}
-
 // The tier wallboard lives on the overview tab; it draws from /api/topology.
 async function loadOverviewTree() {
   const wrap = document.getElementById("topo-tree");
@@ -1079,25 +1064,15 @@ function renderTopoTree(data) {
     if (sp && typeof sp.x === "number" && typeof sp.y === "number") pos[n.id] = { x: sp.x, y: sp.y };
   });
 
-  // Fit the canvas to the actual content (no dead margins), leaving room for
-  // the tier labels on the left.
-  const labelRoom = 96;
+  // Fit the canvas to the actual content (no dead margins).
+  const labelRoom = 24;
   const dx = labelRoom - Math.min(...nodes.map((n) => pos[n.id].x));
   const dy = 24 - Math.min(...nodes.map((n) => pos[n.id].y));
   nodes.forEach((n) => { pos[n.id].x += dx; pos[n.id].y += dy; });
   width = Math.max(...nodes.map((n) => pos[n.id].x)) + NW + 20;
   height = Math.max(...nodes.map((n) => pos[n.id].y)) + NH + 20;
 
-  const TL = getTierLabels();
-  const tierName = (li) =>
-    li === 0 ? TL.top : li === layers.length - 1 ? TL.leaf : TL.mid;
   let s = "";
-  // Tier guide labels follow each tier's (possibly dragged) average row.
-  layers.forEach((layer, li) => {
-    if (!layer || !layer.length) return;
-    const avgY = layer.reduce((a, n) => a + pos[n.id].y, 0) / layer.length;
-    s += `<text x="12" y="${avgY + NH / 2 + 4}" class="tt-tier">${escapeHtml(tierName(li))}</text>`;
-  });
   // Arrowheads: the proxy direction is child → upstream(parent), so paths are
   // drawn child-top → parent-bottom with a marker-end pointing at the parent.
   s += `<defs>` +
@@ -3637,39 +3612,6 @@ async function importSettings(file) {
   }
 }
 
-// Tier-label editor on the settings tab: persist to localStorage and redraw
-// the overview wallboard so the rename is visible immediately.
-function setupTierLabels() {
-  const form = document.getElementById("tier-label-form");
-  if (!form) return;
-  const fill = () => {
-    const TL = getTierLabels();
-    form.elements.top.value = TL.top;
-    form.elements.mid.value = TL.mid;
-    form.elements.leaf.value = TL.leaf;
-  };
-  fill();
-  form.addEventListener("submit", (ev) => {
-    ev.preventDefault();
-    const fd = new FormData(form);
-    const next = {
-      top: (fd.get("top") || "").trim() || TIER_LABEL_DEFAULTS.top,
-      mid: (fd.get("mid") || "").trim() || TIER_LABEL_DEFAULTS.mid,
-      leaf: (fd.get("leaf") || "").trim() || TIER_LABEL_DEFAULTS.leaf,
-    };
-    localStorage.setItem("topoTierLabels", JSON.stringify(next));
-    fill();
-    toast("단계 이름을 저장했습니다");
-    loadOverviewTree();
-  });
-  document.getElementById("tier-label-reset").addEventListener("click", () => {
-    localStorage.removeItem("topoTierLabels");
-    fill();
-    toast("단계 이름을 기본값으로 되돌렸습니다");
-    loadOverviewTree();
-  });
-}
-
 function setupSettings() {
   const form = document.getElementById("settings-form");
   document.getElementById("ping-form").addEventListener("submit", async (ev) => {
@@ -4342,7 +4284,6 @@ async function init() {
   setupTasks();
   setupSecurity();
   setupSettings();
-  setupTierLabels();
   setupBulk();
   setupTopology();
   setupAlerts();

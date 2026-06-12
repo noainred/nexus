@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.0.2",
+        "date": "2026-06-12",
+        "changes": [
+            {"type": "removed", "text": "계위 상황판의 단계(tier) 라벨(외부 인터넷/중계/Region) 및 관련 설정 메뉴 제거 — 노드를 자유 배치하면 라벨 위치가 무의미해 혼란만 주던 문제 해소. 왼쪽 여백도 함께 축소"},
+        ],
+    },
+    {
         "version": "1.0.1",
         "date": "2026-06-12",
         "changes": [
