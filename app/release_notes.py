@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "0.8.76",
+        "date": "2026-06-12",
+        "changes": [
+            {"type": "changed", "text": "프록시 차단 진단/수정(proxy-status diagnose·fix)에서 상위 서버 조회 실패 시 NameError(500)로 터지던 잠복 버그 수정 — topology.py에 HTTPException import 누락. 이제 의도대로 502/404 반환. 회귀 테스트 2건 추가"},
+        ],
+    },
+    {
         "version": "0.8.75",
         "date": "2026-06-11",
         "changes": [

@@ -193,6 +193,33 @@ def test_proxy_status_blocked(http_client):
     assert "SocketTimeout" in item["detail"]
 
 
+@respx.mock
+def test_proxy_fix_repo_list_error_returns_502(http_client):
+    """When the repo listing fails, proxy-status/fix must return a clean 502.
+
+    Regression: topology.py used HTTPException without importing it, so this
+    error path raised NameError (HTTP 500) instead of the intended 502.
+    """
+    respx.get(f"{API}/repositories").mock(
+        return_value=httpx.Response(500, text="boom")
+    )
+    r = http_client.post(
+        "/api/proxy-status/fix?instance_id=test&repository=x&action=reset"
+    )
+    assert r.status_code == 502
+    assert "저장소 조회 실패" in r.json()["detail"]
+
+
+@respx.mock
+def test_proxy_fix_unknown_repo_returns_404(http_client):
+    """A missing repository must surface as 404 (also exercises HTTPException)."""
+    respx.get(f"{API}/repositories").mock(return_value=httpx.Response(200, json=[]))
+    r = http_client.post(
+        "/api/proxy-status/fix?instance_id=test&repository=ghost&action=reset"
+    )
+    assert r.status_code == 404
+
+
 # -- fleet search -----------------------------------------------------------------
 
 @respx.mock
