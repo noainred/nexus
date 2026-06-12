@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.0.1",
+        "date": "2026-06-12",
+        "changes": [
+            {"type": "added", "text": "한 줄 systemd 설치 스크립트 deploy/install-service.sh 추가 — venv 생성(오프라인 wheelhouse 지원)·전용 계정·서비스 등록·기동까지 자동, 재실행 시 코드만 업그레이드(instances.yaml/.env 보존)"},
+            {"type": "changed", "text": "systemd 유닛(nexus-manager.service)이 .env를 EnvironmentFile로 읽도록 변경 — 관리자 비밀번호 등 설정 반영. .env.example에 NEXUS_MANAGER_ADMIN_PASSWORD/AUDIT_FILE 항목 추가"},
+        ],
+    },
+    {
         "version": "1.0.0",
         "date": "2026-06-12",
         "changes": [

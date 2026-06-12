@@ -12,6 +12,9 @@ Group=nexusmgr
 # Directory that contains app/, .venv/, instances.yaml
 WorkingDirectory=/opt/nexus-manager
 
+# Load settings (admin password, webhook, timeouts...) from .env if present.
+EnvironmentFile=-/opt/nexus-manager/.env
+
 # Where the manager reads its instance list from (absolute path is safest).
 Environment=NEXUS_MANAGER_INSTANCES_FILE=/opt/nexus-manager/instances.yaml
 

@@ -1,5 +1,19 @@
 # 폐쇄망(오프라인) 배포 가이드
 
+> **한 줄 설치 (서비스 등록까지 자동)**
+> 오프라인 zip을 푼 폴더에서 아래 한 줄이면 venv 생성·전용 계정·systemd 등록·기동까지 끝납니다.
+> ```bash
+> sudo bash deploy/install-service.sh
+> # 포트/경로 변경:  sudo PORT=8081 INSTALL_DIR=/opt/nexus-manager bash deploy/install-service.sh
+> ```
+> 다시 실행하면 코드만 업그레이드되고 `instances.yaml`/`.env`는 보존됩니다.
+> 공개 모드(비로그인 현황 열람)를 쓰려면 설치 후 `/opt/nexus-manager/.env`의
+> `NEXUS_MANAGER_ADMIN_PASSWORD`를 설정하고 `systemctl restart nexus-manager` 하세요.
+>
+> 아래는 수동 절차 및 패키지 확보 방법 설명입니다.
+
+---
+
 인터넷이 안 되는 폐쇄망 서버에 이 대시보드를 배포하는 방법입니다.
 핵심은 **"파이썬 패키지를 어떻게 가져오느냐"** 하나뿐이며, 두 가지 방법이 있습니다.
 
