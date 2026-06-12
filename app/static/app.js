@@ -42,9 +42,35 @@ async function api(path, options = {}) {
 
 // ---- manager login ---------------------------------------------------------
 
+// Tabs visible without login (status/monitoring). Everything else needs auth
+// and is hidden in public mode — mirrors the server's public-read allowlist.
+const PUBLIC_TABS = new Set([
+  "overview", "instances-status", "blobstore", "metrics",
+  "infra", "topology", "alerts", "about",
+]);
+
 function showLoginOverlay() {
   const ov = document.getElementById("login-overlay");
   if (ov) ov.classList.remove("hidden");
+}
+
+function hideLoginOverlay() {
+  const ov = document.getElementById("login-overlay");
+  if (ov) ov.classList.add("hidden");
+}
+
+// Public (not-logged-in) mode: show only status tabs + a 로그인 button; the
+// protected tabs/loaders are hidden so no protected endpoint is hit.
+function enterPublicMode() {
+  state.publicMode = true;
+  document.querySelectorAll(".tab").forEach((t) => {
+    if (!PUBLIC_TABS.has(t.dataset.tab)) t.classList.add("hidden");
+  });
+  const lb = document.getElementById("login-btn");
+  if (lb) lb.classList.remove("hidden");
+  // If the saved hash points at a now-hidden tab, fall back to the overview.
+  const cur = (location.hash || "").replace(/^#/, "");
+  if (cur && !PUBLIC_TABS.has(cur)) history.replaceState(null, "", "#overview");
 }
 
 function setupAuth() {
@@ -71,6 +97,10 @@ function setupAuth() {
       location.reload();
     });
   }
+  const inb = document.getElementById("login-btn");
+  if (inb) inb.addEventListener("click", showLoginOverlay);
+  const close = document.getElementById("login-close");
+  if (close) close.addEventListener("click", hideLoginOverlay);
   const audit = document.getElementById("audit-refresh");
   if (audit) audit.addEventListener("click", loadAudit);
 }
@@ -166,6 +196,8 @@ function selectTab(name) {
   const tab = document.querySelector(`.tab[data-tab="${name}"]`);
   const panel = document.getElementById(name);
   if (!tab || !panel) return false;
+  // In public mode, protected tabs prompt for login instead of switching.
+  if (state.publicMode && !PUBLIC_TABS.has(name)) { showLoginOverlay(); return false; }
   document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
   document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
   tab.classList.add("active");
@@ -4286,16 +4318,22 @@ function setupBulk() {
 
 async function init() {
   setupAuth();
+  let publicMode = false;
   try {
     const st = await api("/api/auth-status");
-    if (st.required && !st.authenticated) { showLoginOverlay(); return; }
-    if (st.required) document.getElementById("logout-btn").classList.remove("hidden");
+    if (st.required && !st.authenticated) publicMode = true;
+    else if (st.required) document.getElementById("logout-btn").classList.remove("hidden");
   } catch (e) { /* auth-status unavailable — proceed */ }
-  try {
-    state.instances = await api("/api/instances");
-  } catch (e) {
-    toast(`인스턴스 목록 로드 실패: ${e.message}`, "err");
-    return;
+  state.publicMode = publicMode;
+  if (publicMode) {
+    enterPublicMode();
+  } else {
+    try {
+      state.instances = await api("/api/instances");
+    } catch (e) {
+      toast(`인스턴스 목록 로드 실패: ${e.message}`, "err");
+      return;
+    }
   }
   setupRepositories();
   setupCleanup();
@@ -4314,7 +4352,7 @@ async function init() {
   setupReleaseNotes();
   loadOverviewTree();   // 개요 (계위 상황판)
   loadOverview();       // 인스턴스 상태 카드
-  loadMatrix();
+  if (!publicMode) loadMatrix();   // /api/matrix needs auth
   // Keep the current screen across a page refresh (URL hash).
   restoreActiveTab();
 }

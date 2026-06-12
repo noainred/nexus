@@ -452,11 +452,13 @@ td.usage-crit { color: var(--red); font-weight: 700; background: rgba(248,81,73,
   border-bottom: 1px solid var(--border);
 }
 .modal-head h3 { margin: 0; flex: 1; font-size: 15px; }
-.modal-head #repo-modal-close {
+.modal-head #repo-modal-close,
+.modal-head .modal-x {
   background: transparent;
   border: none;
   font-size: 18px;
   color: var(--muted);
+  cursor: pointer;
 }
 .modal-body { overflow: auto; padding: 0 18px 18px; }
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import re
 from pathlib import Path
 
 from datetime import datetime, timezone
@@ -77,6 +78,32 @@ app = FastAPI(
 # every write (POST/PUT/DELETE) to /api is appended to the audit log.
 _AUTH_EXEMPT = {"/api/login", "/api/auth-status"}
 
+# Public read-only "service status" surface: even when a password is set, these
+# GET endpoints stay open so a global health/monitoring view needs no login.
+# Default-deny — anything not matched here (and every write) requires auth.
+# Sensitive reads (credentials export, config dumps, audit, security posture,
+# repo config, search/downloads) are deliberately NOT listed.
+_PUBLIC_READ_RE = re.compile(
+    r"^/api/(?:"
+    r"status"
+    r"|topology"
+    r"|proxy-status"
+    r"|metrics"
+    r"|blobstores"
+    r"|disk-forecast"
+    r"|ping-history"
+    r"|alerts"
+    r"|release-notes"
+    r"|instances/group-order"
+    r"|instances/[^/]+/(?:status|blobstores)"
+    r")$"
+)
+
+
+def _is_public_read(method: str, path: str) -> bool:
+    """A GET to an allowlisted status/monitoring endpoint needs no auth."""
+    return method == "GET" and _PUBLIC_READ_RE.fullmatch(path) is not None
+
 
 @app.middleware("http")
 async def auth_and_audit(request: Request, call_next):
@@ -86,6 +113,7 @@ async def auth_and_audit(request: Request, call_next):
         settings.admin_password
         and path.startswith("/api")
         and path not in _AUTH_EXEMPT
+        and not _is_public_read(request.method, path)
         and not auth.is_authenticated(request, settings)
     ):
         return JSONResponse({"detail": "로그인이 필요합니다."}, status_code=401)
