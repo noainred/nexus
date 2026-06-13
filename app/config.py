@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -89,6 +89,19 @@ class Settings(BaseSettings):
     # call requires login; write operations are appended to audit_file.
     admin_password: str = ""
     audit_file: str = "audit.log"
+
+    @field_validator("admin_password")
+    @classmethod
+    def _clean_admin_password(cls, v: str) -> str:
+        """Tolerate the common .env footgun where the password picks up a
+        trailing newline, surrounding whitespace, or wrapping quotes — these
+        would otherwise make every login fail with a "correct" password."""
+        if not isinstance(v, str):
+            return v
+        v = v.strip()
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in ("'", '"'):
+            v = v[1:-1]
+        return v
 
 
 class InstancesDocument(BaseModel):

@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.0.3",
+        "date": "2026-06-13",
+        "changes": [
+            {"type": "changed", "text": "로그인 안정화 — .env의 관리자 비밀번호에 끝 공백·개행·감싼 따옴표가 섞여 있어도 정상 인증되도록 설정값을 정리(strip). '정확한 비밀번호인데 로그인 창이 안 닫히는' 문제 해결. 회귀 테스트 추가"},
+        ],
+    },
+    {
         "version": "1.0.2",
         "date": "2026-06-12",
         "changes": [

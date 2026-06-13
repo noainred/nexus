@@ -74,6 +74,16 @@ def test_public_read_endpoints_open_when_auth_required(client, monkeypatch, tmp_
     assert client.put("/api/sync-jobs", json={"jobs": []}).status_code == 401
 
 
+@pytest.mark.parametrize("stored", ["pw123", " pw123 ", "pw123\n", '"pw123"', "'pw123'"])
+def test_login_tolerates_env_whitespace_and_quotes(client, monkeypatch, tmp_path, stored):
+    """A password configured with stray whitespace/newline/quotes in .env must
+    still accept the clean password (common deployment footgun)."""
+    s = Settings(admin_password=stored, audit_file=str(tmp_path / "audit.log"))
+    monkeypatch.setattr(main_mod, "get_settings", lambda: s)
+    monkeypatch.setattr("app.routers.auth.get_settings", lambda: s)
+    assert client.post("/api/login", json={"password": "pw123"}).status_code == 200
+
+
 def test_audit_records_writes(client, monkeypatch, tmp_path):
     s = Settings(audit_file=str(tmp_path / "audit.log"))
     monkeypatch.setattr(main_mod, "get_settings", lambda: s)
