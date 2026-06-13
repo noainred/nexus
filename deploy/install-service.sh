@@ -18,6 +18,7 @@
 #   SERVICE_USER (default nexusmgr)
 #   PORT         (default 8000)
 #   PYTHON       (default python3)
+#   WITH_AUTOUPDATE (default 1 — install a folder-watch auto-update timer)
 #
 set -euo pipefail
 
@@ -25,6 +26,7 @@ INSTALL_DIR="${INSTALL_DIR:-/opt/nexus-manager}"
 SERVICE_USER="${SERVICE_USER:-nexusmgr}"
 PORT="${PORT:-8000}"
 PYTHON="${PYTHON:-python3}"
+WITH_AUTOUPDATE="${WITH_AUTOUPDATE:-1}"
 UNIT="/etc/systemd/system/nexus-manager.service"
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -112,12 +114,53 @@ systemctl enable --now nexus-manager
 sleep 1
 systemctl --no-pager --full status nexus-manager | head -n 12 || true
 
+# 6) Optional folder-watch auto-updater (systemd timer). Drop a newer bundle
+#    zip into $INSTALL_DIR/updates and it self-upgrades. Runs as root because
+#    it rebuilds the venv and restarts the service.
+if [ "$WITH_AUTOUPDATE" != "0" ]; then
+  echo "==> 자동 업데이트 타이머 등록 (감시 폴더: $INSTALL_DIR/updates)"
+  mkdir -p "$INSTALL_DIR/updates"
+  chmod +x "$INSTALL_DIR/deploy/auto-update.sh" 2>/dev/null || true
+  cat > /etc/systemd/system/nexus-manager-update.service <<UPDEOF
+[Unit]
+Description=Nexus Manager auto-update (folder watch)
+After=network.target
+
+[Service]
+Type=oneshot
+Environment=INSTALL_DIR=$INSTALL_DIR
+Environment=PYTHON=$PYTHON
+Environment=PORT=$PORT
+ExecStart=/usr/bin/env bash $INSTALL_DIR/deploy/auto-update.sh
+UPDEOF
+  cat > /etc/systemd/system/nexus-manager-update.timer <<UPTEOF
+[Unit]
+Description=Check for Nexus Manager updates periodically
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UPTEOF
+  systemctl daemon-reload
+  systemctl enable --now nexus-manager-update.timer
+fi
+
 echo ""
 echo "==> 완료."
 echo "    상태:   systemctl status nexus-manager"
 echo "    로그:   journalctl -u nexus-manager -f"
 echo "    재시작: systemctl restart nexus-manager   (코드 업데이트 후)"
 echo "    접속:   http://<서버IP>:$PORT"
+if [ "$WITH_AUTOUPDATE" != "0" ]; then
+echo ""
+echo "  ※ 자동 업데이트: 새 zip을  $INSTALL_DIR/updates/  에 넣으면 5분 내 자동 업그레이드"
+echo "      즉시 적용:  sudo systemctl start nexus-manager-update.service"
+echo "      로그:       tail -f $INSTALL_DIR/auto-update.log"
+fi
 echo ""
 echo "  ※ 방화벽이 켜져 있으면 포트를 여세요:"
 echo "      firewall-cmd --add-port=${PORT}/tcp --permanent && firewall-cmd --reload"

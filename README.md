@@ -14,9 +14,9 @@
 | --- | --- |
 | **개요 — 계위 상황판** | 프록시 연결로 계위(외부→HQ→DC)를 자동 도출한 SVG 트리. 노드 색(정상/권한경고/다운), 끊긴 링크 빨간 점선·방향 **화살표**, 간선 호버 시 `A → B · 프록시 N개` **툴팁**, 간선/숫자 클릭 시 **그 링크의 프록시 저장소 목록 팝업**. **노드 드래그 배치**(가장자리로 끌면 캔버스 자동 확장, 자동 저장·새로고침 후 유지, 배치 초기화), 노드 클릭 시 Nexus 새 탭 |
 | **인스턴스 상태** | 전체 요약 막대(서버 수·정상/주의/다운·저장소 합계·평균 응답) + 그룹별 인스턴스 상태 카드. 카드 주소 클릭 시 해당 Nexus 새 탭 |
-| **토폴로지(상세)** | 노드별 프록시 링크 상세 + **프록시 원격 상태 보드**: 전 서버 프록시의 **Remote Auto Blocked**/오프라인 상태를 한 표로. 문제 행 '진단' 클릭 → 원격 프로브+현재 설정+권장 조치, 원클릭 **차단 초기화 / 타임아웃 60초 상향 / auto-block 해제** |
+| **토폴로지(상세)** | 노드별 프록시 링크 상세 + **프록시 원격 상태 보드**: 전 서버 프록시의 **Remote Auto Blocked**/오프라인 상태를 한 표로. 문제 행 '진단' 클릭 → 원격 프로브+현재 설정+권장 조치, 원클릭 **차단 초기화 / 타임아웃 60초 상향 / auto-block 해제**, **차단 전체 초기화**(전 서버 일괄) |
 | **인프라 체크(ping)** | 주기적 응답시간 기록(1일~365일 그래프), 평소(중앙값) 대비 노랑/빨강 임계치. 툴팁은 `응답속도 / 한국시간 / 로컬시간(타임존 설정 시)` 라벨 형식 |
-| **Blob Store / 디스크 예측** | 사용량(80%/90% 경고) + 6시간마다 자동 수집한 추세로 **90% 도달 시점 예측**(위험 ≤7일, 주의 ≤21일) |
+| **Blob Store / 디스크 예측** | 사용량(80%/90% 경고) + 6시간마다 자동 수집한 추세로 **90% 도달 시점 예측**(위험 ≤7일, 주의 ≤21일) + **사용량 추세 차트**(blob store별 사용률% 변화, 80/90% 경고선) |
 | **JVM / 리소스** | 노드별 힙/스레드/업타임 메트릭 |
 | **알림** | 노드 다운·Heap·디스크 임계치 + (옵션) **구성 드리프트** 주기 점검, Slack 호환 Webhook 푸시 |
 
@@ -28,7 +28,7 @@
 
 | 영역 | 설명 |
 | --- | --- |
-| **비교 매트릭스** | 저장소(행) × 인스턴스(열) 격자로 존재/설정 일치를 색으로 비교. **인스턴스·저장소 칩 선택**으로 부분집합 비교(드리프트 재계산), 저장소 칩은 **빠른 찾기 검색창 + 스크롤 박스 + 선택 개수**로 정리. 셀 호버 시 **전체 설정 카드**, 슬레이브(프록시→관리 서버) 자동 인식(✓ Slave 배지 / 설정 다르면 ≠) |
+| **비교 매트릭스** | 저장소(행) × 인스턴스(열) 격자로 존재/설정 일치를 색으로 비교. **인스턴스·저장소 칩 선택**으로 부분집합 비교(드리프트 재계산), 저장소 칩은 **빠른 찾기 검색창 + 스크롤 박스 + 선택 개수**로 정리. **인스턴스 칩 드래그로 열 순서 지정**(자동 저장). 셀 호버 시 **전체 설정 카드**, 슬레이브(프록시→관리 서버) 자동 인식(✓ Slave 배지 / 설정 다르면 ≠) |
 | **설정 복사** | 셀을 같은 행의 다른 서버 칸으로 **드래그**하면 설정 복사(덮어쓰기·없으면 생성, 그룹이면 멤버도 생성). 비교 팝업의 **일괄 적용**으로 여러 서버에 한 번에, **슬레이브 설정 맞추기**(proxy URL 유지)로 마스터와 정렬 |
 | **저장소 1:1 비교** | 서로 다른 서버·다른 이름의 저장소를 자유 선택해 항목별 diff |
 | **콘텐츠 동기화(비교)** | 사이트 간 실제 컴포넌트 존재 비교로 콘텐츠 드리프트 탐지 |
@@ -41,6 +41,7 @@
 | --- | --- |
 | **저장소 관리** | 저장소 목록·삭제, 컴포넌트 탐색·삭제(페이지네이션) |
 | **다운로드 현황** | 서버/저장소별 실제 다운로드된 자산·용량 집계 |
+| **정리 후보** | 서버 선택 → 저장소별 **한 번도/오랫동안(30·90·180·365일+) 미다운로드 휴면 자산**을 용량 순 집계(가장 큰 휴면 자산 표시). Cleanup 정책·증설 근거 |
 | **작업(Tasks)** | 스케줄 작업 상태·결과 확인, 실행/중지 |
 | **일괄 적용** | 서버 하나를 골라 **모든 저장소의 설정값을 항목별로 수집**(값 분포·저장소 수)하고, 새 값을 입력해 **그 항목을 가진 모든 저장소에 한 번에 적용**(예: `httpClient.autoBlock` 일괄 on/off). 항목이 없거나 이미 같은 값인 저장소는 자동 건너뜀, 결과는 변경/건너뜀/실패로 집계 |
 | **정리 정책 / 플릿 정리 점검** | 전 서버 cleanup 위생 일괄 점검(정책 수·정책 없는 저장소·**Docker GC**·Compact 작업 유무·마지막 실행). **Docker 정리(GC) 전체 실행 → Compact 전체 실행** 2단계 일괄, 정책을 원본에서 전 서버로 복사 |
@@ -164,6 +165,24 @@ sudo bash deploy/install-service.sh
 완전 격리망 통합 가이드는 [`deploy/README.md`](deploy/README.md),
 [`deploy/ROCKY.md`](deploy/ROCKY.md), [`deploy/AIRGAP.md`](deploy/AIRGAP.md) 참고.
 
+#### 폴더 감시 자동 업그레이드
+
+설치 시 **자동 업데이트 타이머**(`nexus-manager-update.timer`, 5분 주기)가 함께
+등록됩니다. 새 오프라인 번들 zip을 **감시 폴더에 넣기만 하면** 더 높은 버전을
+감지해 자동으로 venv 재빌드·서비스 재시작까지 수행합니다(다운그레이드는 안 함,
+설치 실패 시 기존 버전 유지).
+
+```bash
+# 새 버전 zip을 감시 폴더에 복사 → 5분 내 자동 업그레이드
+cp nexus-manager-offline-v1.2.0.zip /opt/nexus-manager/updates/
+# 즉시 적용하려면:
+sudo systemctl start nexus-manager-update.service
+tail -f /opt/nexus-manager/auto-update.log     # 진행 로그
+```
+
+> 끄려면 설치 시 `WITH_AUTOUPDATE=0`, 또는
+> `sudo systemctl disable --now nexus-manager-update.timer`.
+
 ## 설정
 
 ### `instances.yaml`
@@ -215,6 +234,8 @@ instances:
 | `disk-history.csv` | blob 사용량 표본(디스크 포화 예측) |
 | `backups/<시각>/<서버>.json` | 예약/수동 구성 백업 |
 | `audit.log` | 쓰기 작업 감사 기록(JSON lines) |
+| `updates/` | 자동 업그레이드 감시 폴더(새 번들 zip을 여기에 투입) |
+| `auto-update.log` | 자동 업그레이드 처리 로그 |
 
 > 노드 드래그 배치(`topoPos`)는 서버가 아닌 **브라우저 localStorage**에
 > 저장됩니다(브라우저별 보관).
@@ -231,7 +252,7 @@ instances/{id}/blobstores` 입니다(그 외 GET과 모든 쓰기는 로그인 �
 | `GET` | `/api/status` · `/api/blobstores` · `/api/metrics` | 전체 인스턴스 상태/Blob/메트릭 (공개) |
 | `GET` | `/api/topology` | 프록시 토폴로지(계위 상황판 데이터, `?probe=true` 원격 실점검, 공개) |
 | `GET` | `/api/proxy-status` | 전 서버 프록시 Auto-block/오프라인 보드 (공개) |
-| `GET`/`POST` | `/api/proxy-status/diagnose` · `/fix` | 차단 프록시 진단 / 원클릭 조치 |
+| `GET`/`POST` | `/api/proxy-status/diagnose` · `/fix` · `/fix-all` | 차단 프록시 진단 / 원클릭 조치 / 전 서버 일괄 초기화 |
 | `GET` | `/api/matrix` · `/api/repository-detail` · `/api/compare` | 비교 매트릭스 / 항목별 diff / 1:1 비교 |
 | `POST` | `/api/matrix/copy-repo` · `/sync-slave-config` | 저장소 설정 복사 / 슬레이브 맞추기 |
 | `GET`/`POST` | `/api/bulk/fields` · `/api/bulk/apply` | 저장소 설정 일괄 수집 / 일괄 적용 |
@@ -242,7 +263,8 @@ instances/{id}/blobstores` 입니다(그 외 GET과 모든 쓰기는 로그인 �
 | `GET`/`PUT`/`POST` | `/api/backup-config` · `/api/backup-run` · `/api/backups…` | 예약 구성 백업 설정/즉시 실행/목록·다운로드 |
 | `GET`/`POST` | `/api/dr-audit` · `/api/dr-run-backup` | DR 준비도 점검 / DB 백업 일괄 실행 |
 | `GET`/`POST` | `/api/cleanup-audit` · `/api/cleanup-compact-run` · `/api/cleanup-docker-run` · `/api/cleanup-push-policy` | 플릿 정리 점검 / Compact·Docker GC 일괄 / 정책 복사 |
-| `GET` | `/api/disk-forecast` | 디스크 포화 예측(`?sample=true` 즉시 수집, 공개) |
+| `GET` | `/api/disk-forecast` · `/api/disk-history` | 디스크 포화 예측 / 사용량 추세 시계열 (공개) |
+| `GET` | `/api/instances/{id}/cleanup-candidates?days=` | 휴면 자산(정리 후보) 집계 |
 | `GET` | `/api/ping-history` | ping 이력 (공개) |
 | `GET` | `/api/alerts` | 현재 알림 상태 (`?refresh=true` 즉시 재평가, 공개) |
 | `POST` | `/api/login` · `/api/logout` / `GET /api/auth-status` · `/api/audit` | 로그인/로그아웃 / 인증 상태 / 감사 로그 |
@@ -251,7 +273,7 @@ instances/{id}/blobstores` 입니다(그 외 GET과 모든 쓰기는 로그인 �
 ## 테스트
 
 ```bash
-pytest        # 81개 테스트
+pytest        # 84개 테스트
 ```
 
 `respx`로 Nexus REST 응답을 모킹하여 클라이언트·API·플릿 기능(동기화,

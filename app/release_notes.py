@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.2.0",
+        "date": "2026-06-13",
+        "changes": [
+            {"type": "added", "text": "폴더 감시 자동 업그레이드 — 설치 시 systemd 타이머(5분 주기) 등록, 감시 폴더(updates/)에 더 높은 버전 번들 zip을 넣으면 자동으로 venv 재빌드·서비스 재시작(다운그레이드 안 함, 실패 시 기존 버전 유지). deploy/auto-update.sh + install-service.sh 통합(WITH_AUTOUPDATE=0으로 비활성)"},
+            {"type": "changed", "text": "README 현행화 — 매트릭스 열 순서, Blob 추세 차트, 정리 후보, 프록시 차단 일괄 초기화, 자동 업그레이드, 신규 API 반영(테스트 84개)"},
+        ],
+    },
+    {
         "version": "1.1.0",
         "date": "2026-06-13",
         "changes": [
