@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.0.4",
+        "date": "2026-06-13",
+        "changes": [
+            {"type": "changed", "text": "로그인 성공 시 페이지 리로드에만 의존하던 것을 보완 — 인증 즉시 로그인 창을 닫고 전체 메뉴를 드러내도록 변경. '로그인 됐는데 로그인 창이 안 닫히는' 문제 해결"},
+        ],
+    },
+    {
         "version": "1.0.3",
         "date": "2026-06-13",
         "changes": [
