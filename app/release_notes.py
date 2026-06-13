@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.0.7",
+        "date": "2026-06-13",
+        "changes": [
+            {"type": "changed", "text": "README 현행화 — 공개 모드(상태 무인증 열람+선택 로그인), 일괄 적용, 계위 상황판 개편(화살표·툴팁·저장소 목록 팝업·드래그 자동확장·수동 계위 tier·권한경고), 보조 주소(alt_url), 한 줄 systemd 설치, 공개 읽기 API 목록, 테스트 81개 등 현재 기능 반영"},
+        ],
+    },
+    {
         "version": "1.0.6",
         "date": "2026-06-13",
         "changes": [
