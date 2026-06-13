@@ -7,6 +7,15 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.1.0",
+        "date": "2026-06-13",
+        "changes": [
+            {"type": "added", "text": "Blob Store 탭에 '사용량 추세 차트' 추가 — 자동 수집 표본으로 blob store별 사용률(%) 변화를 80/90% 경고선과 함께 시각화(기간 14/30/60/200일)"},
+            {"type": "added", "text": "'정리 후보' 탭 신설 — 서버를 선택하면 각 저장소에서 한 번도/오랫동안(30·90·180·365일+) 다운로드되지 않은 휴면 자산을 용량 순으로 집계(가장 큰 휴면 자산 표시). Cleanup 정책·증설 판단 근거"},
+            {"type": "added", "text": "프록시 원격 상태 보드에 '차단 전체 초기화' 추가 — 차단(Remote Auto Blocked)된 모든 프록시를 전 서버에서 한 번에 차단 초기화(원격/경로 복구 후 사용), 성공/실패 집계"},
+        ],
+    },
+    {
         "version": "1.0.9",
         "date": "2026-06-13",
         "changes": [

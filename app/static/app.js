@@ -216,7 +216,8 @@ function selectTab(name) {
   if (name === "content" && !state.contentSetup) { state.contentSetup = true; setupContent(); }
   if (name === "settings") loadSettings();
   if (name === "topology" && !state.topologyLoaded) { state.topologyLoaded = true; loadTopology(); }
-  if (name === "blobstore") loadBlobstores();
+  if (name === "blobstore") { loadBlobstores(); loadDiskCharts(); }
+  if (name === "cleanup-candidates") fillCleanupInstances();
   if (name === "metrics") loadMetrics();
   if (name === "infra") loadInfra();
   if (name === "overview") loadOverviewTree();
@@ -246,6 +247,19 @@ function restoreActiveTab() {
 }
 
 // ---- proxy remote-status board --------------------------------------------
+
+async function fixAllBlockedProxies() {
+  if (!confirm("차단(Remote Auto Blocked)된 모든 프록시를 한 번에 차단 초기화합니다.\n원격/네트워크 경로가 복구된 뒤에 사용하세요. 진행할까요?")) return;
+  const summary = document.getElementById("pxs-summary");
+  summary.textContent = "차단된 프록시 일괄 초기화 중…";
+  try {
+    const r = await api("/api/proxy-status/fix-all", { method: "POST" });
+    toast(`차단 초기화 — 성공 ${r.reset || 0} · 실패 ${r.failed || 0}`, r.failed ? "err" : "ok");
+  } catch (e) {
+    toast(`일괄 초기화 실패: ${e.message}`, "err");
+  }
+  loadProxyStatus();
+}
 
 async function loadProxyStatus() {
   const table = document.getElementById("pxs-table");
@@ -703,6 +717,126 @@ async function loadDiskForecast(sample = false) {
   table.append(buildTable(["서버", "Blob store", "사용/전체", "사용률", "일일 증가", "90% 도달", "상태"], rows));
 }
 
+// ---- blob usage trend charts (feature) -----------------------------------
+
+function renderDiskChart(series) {
+  // usage% (0~100) over time, with 80/90% guide lines. Pure SVG (no library).
+  const W = 520, H = 150, padL = 34, padR = 10, padT = 10, padB = 22;
+  const pts = series.points || [];
+  const wrap = el("div", { class: "infra-chart" });
+  wrap.append(el("div", { class: "infra-chart-head" }, [
+    el("span", { class: "infra-name" }, `${series.instance_name} · ${series.store}`),
+    el("span", { class: "url" }, pts.length ? `${pts[pts.length - 1].pct}% (표본 ${pts.length})` : "표본 없음"),
+  ]));
+  if (pts.length < 2) {
+    wrap.append(el("div", { class: "empty" }, "표본이 부족합니다(2개 이상 필요)."));
+    return wrap;
+  }
+  const ts = pts.map((p) => p.t);
+  const tmin = Math.min(...ts), tmax = Math.max(...ts), tspan = Math.max(tmax - tmin, 1);
+  const xOf = (t) => padL + ((t - tmin) / tspan) * (W - padL - padR);
+  const yOf = (pct) => H - padB - (Math.max(0, Math.min(100, pct)) / 100) * (H - padT - padB);
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "infra-svg" });
+  svg.append(svgEl("line", { x1: padL, y1: H - padB, x2: W - padR, y2: H - padB, class: "axis" }));
+  svg.append(svgEl("line", { x1: padL, y1: padT, x2: padL, y2: H - padB, class: "axis" }));
+  [[90, "var(--red)"], [80, "var(--amber)"]].forEach(([lvl, col]) => {
+    const y = yOf(lvl);
+    svg.append(svgEl("line", { x1: padL, y1: y, x2: W - padR, y2: y, stroke: col, "stroke-dasharray": "5 4", "stroke-width": 1 }));
+    svg.append(svgEl("text", { x: padL + 2, y: y - 2, class: "axis-label" }, `${lvl}%`));
+  });
+  const d = pts.map((p, i) => `${i ? "L" : "M"}${xOf(p.t).toFixed(1)} ${yOf(p.pct).toFixed(1)}`).join(" ");
+  svg.append(svgEl("path", { d, class: "infra-line", fill: "none", stroke: "var(--accent)", "stroke-width": 1.6 }));
+  svg.append(svgEl("text", { x: padL, y: H - 6, class: "axis-label" }, new Date(tmin * 1000).toLocaleDateString()));
+  svg.append(svgEl("text", { x: W - padR, y: H - 6, class: "axis-label", "text-anchor": "end" }, new Date(tmax * 1000).toLocaleDateString()));
+  wrap.append(svg);
+  return wrap;
+}
+
+async function loadDiskCharts() {
+  const box = document.getElementById("disk-charts");
+  const status = document.getElementById("dc-status");
+  if (!box) return;
+  const days = Number(document.getElementById("dc-days").value) || 60;
+  status.textContent = "불러오는 중…";
+  let r;
+  try {
+    r = await api(`/api/disk-history?days=${days}`);
+  } catch (e) {
+    status.textContent = `조회 실패: ${e.message}`;
+    return;
+  }
+  const stores = r.stores || [];
+  status.textContent = `blob store ${stores.length}개`;
+  box.innerHTML = "";
+  if (!stores.length) {
+    box.append(el("div", { class: "empty" }, "아직 수집된 표본이 없습니다(6시간마다 자동 수집)."));
+    return;
+  }
+  const grid = el("div", { class: "infra-grid" });
+  stores.forEach((s) => grid.append(renderDiskChart(s)));
+  box.append(grid);
+}
+
+// ---- 정리 후보(휴면 아티팩트) (feature) -----------------------------------
+
+function fillCleanupInstances() {
+  const sel = document.getElementById("cc-inst");
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = "";
+  (state.instances || []).forEach((i) => sel.append(el("option", { value: i.id }, i.name)));
+  if (cur && [...sel.options].some((o) => o.value === cur)) sel.value = cur;
+}
+
+async function loadCleanupCandidates() {
+  const sel = document.getElementById("cc-inst");
+  const status = document.getElementById("cc-status");
+  const table = document.getElementById("cc-table");
+  const summary = document.getElementById("cc-summary");
+  if (!sel || !sel.value) { toast("서버를 선택하세요.", "err"); return; }
+  const days = Number(document.getElementById("cc-days").value) || 90;
+  status.textContent = "스캔 중… (저장소가 많으면 시간이 걸립니다)";
+  table.innerHTML = ""; summary.innerHTML = "";
+  let r;
+  try {
+    r = await api(`/api/instances/${encodeURIComponent(sel.value)}/cleanup-candidates?days=${days}`);
+  } catch (e) {
+    status.textContent = `스캔 실패: ${e.message}`;
+    return;
+  }
+  status.textContent = "";
+  summary.append(
+    summaryCard("휴면 자산", (r.dormant_assets || 0).toLocaleString()),
+    summaryCard("휴면 용량", fmtBytes(r.dormant_size_bytes || 0)),
+    summaryCard(`기준`, `${r.days}일+ 미사용`)
+  );
+  const repos = (r.repositories || []).filter((x) => (x.dormant_assets || 0) > 0 || x.error);
+  if (!repos.length) {
+    table.append(el("div", { class: "empty" }, "휴면 자산이 없습니다 ✓"));
+    return;
+  }
+  const rows = repos.map((x) => {
+    if (x.error) {
+      return el("tr", {}, [
+        el("td", {}, x.repository),
+        el("td", { class: "site-error", colspan: "4" }, x.error),
+      ]);
+    }
+    const biggest = (x.largest || [])[0];
+    return el("tr", {}, [
+      el("td", {}, x.repository),
+      el("td", {}, x.type || "—"),
+      el("td", { class: "num" }, `${(x.dormant_assets || 0).toLocaleString()} / ${(x.total_assets || 0).toLocaleString()}`),
+      el("td", { class: "num" }, fmtBytes(x.dormant_size_bytes || 0) + (x.truncated ? " *" : "")),
+      el("td", { title: biggest ? biggest.path : "" }, biggest ? `${biggest.path.split("/").pop()} (${fmtBytes(biggest.size_bytes || 0)})` : "—"),
+    ]);
+  });
+  table.append(buildTable(["저장소", "타입", "휴면/전체 자산", "휴면 용량", "가장 큰 휴면 자산"], rows));
+  if (repos.some((x) => x.truncated)) {
+    table.append(el("p", { class: "hint" }, "* 일부 대형 저장소는 최대 50페이지까지만 스캔했습니다(하한값)."));
+  }
+}
+
 async function loadBlobstores() {
   loadDiskForecast();
   const container = document.getElementById("blobstore-table");
@@ -962,6 +1096,7 @@ function setupTopology() {
   document.getElementById("topo-refresh").addEventListener("click", loadTopology);
   document.getElementById("topo-probe").addEventListener("change", loadTopology);
   document.getElementById("pxs-refresh").addEventListener("click", loadProxyStatus);
+  document.getElementById("pxs-fix-all").addEventListener("click", fixAllBlockedProxies);
   document.getElementById("pxs-problem-only").addEventListener("change", renderProxyStatus);
   document.getElementById("topo-reset").addEventListener("click", () => {
     localStorage.removeItem("topoPos");
@@ -4394,6 +4529,8 @@ async function init() {
   setupInfra();
   setupSearch();
   document.getElementById("df-refresh").addEventListener("click", () => loadDiskForecast(true));
+  document.getElementById("dc-days").addEventListener("change", loadDiskCharts);
+  document.getElementById("cc-run").addEventListener("click", loadCleanupCandidates);
   setupReleaseNotes();
   loadOverviewTree();   // 개요 (계위 상황판)
   loadOverview();       // 인스턴스 상태 카드

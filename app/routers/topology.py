@@ -325,3 +325,53 @@ async def proxy_fix(
     except NexusError as exc:
         raise HTTPException(status_code=502, detail=f"설정 변경 실패: {exc.message}")
     return {"ok": True, "action": action, "detail": detail}
+
+
+@router.post("/proxy-status/fix-all")
+async def proxy_fix_all(
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Reset (clear auto-block) on EVERY currently-blocked proxy, fleet-wide.
+
+    Re-saves each blocked proxy's config unchanged so Nexus retries the remote
+    immediately. Use after the upstream/path is restored.
+    """
+    async def one(inst) -> dict:
+        client = NexusClient(inst, timeout=get_settings().request_timeout)
+        try:
+            repos = await client.list_repositories()
+        except NexusError as exc:
+            return {"instance_id": inst.id, "instance_name": inst.name,
+                    "error": exc.message, "reset": [], "failed": []}
+        try:
+            statuses = await client.repo_statuses()
+        except NexusError as exc:
+            return {"instance_id": inst.id, "instance_name": inst.name,
+                    "error": f"상태 조회 불가: {exc.message}", "reset": [], "failed": []}
+        smap = {s["name"]: (s.get("status") or {})
+                for s in (statuses or []) if isinstance(s, dict) and s.get("name")}
+        blocked = [
+            r for r in repos
+            if (r.type or "").lower() == "proxy"
+            and "blocked" in str(smap.get(r.name, {}).get("description", "")).lower()
+        ]
+        reset: List[str] = []
+        failed: List[dict] = []
+        for r in blocked:
+            try:
+                cfg = await client.get_repository_config(r.format, r.type, r.name)
+                payload = {k: v for k, v in cfg.items() if k not in ("format", "type", "url")}
+                payload["httpClient"] = dict(payload.get("httpClient") or {"blocked": False, "autoBlock": True})
+                await client.update_repository(r.format, r.type, r.name, payload)
+                reset.append(r.name)
+            except NexusError as exc:
+                failed.append({"repository": r.name, "error": exc.message})
+        return {"instance_id": inst.id, "instance_name": inst.name,
+                "reset": reset, "failed": failed}
+
+    results = list(await asyncio.gather(*(one(i) for i in registry.monitoring())))
+    return {
+        "reset": sum(len(r["reset"]) for r in results),
+        "failed": sum(len(r.get("failed", [])) for r in results),
+        "by_instance": results,
+    }

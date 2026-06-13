@@ -91,6 +91,7 @@ _PUBLIC_READ_RE = re.compile(
     r"|metrics"
     r"|blobstores"
     r"|disk-forecast"
+    r"|disk-history"
     r"|ping-history"
     r"|alerts"
     r"|release-notes"

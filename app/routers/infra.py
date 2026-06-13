@@ -26,6 +26,15 @@ async def disk_forecast(
     return {"counts": counts, "stores": rows}
 
 
+@router.get("/disk-history")
+async def disk_history(
+    days: int = Query(60, ge=1, le=200),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Blob-store usage% time series (for the trend chart)."""
+    return {"stores": diskmon.history(registry, get_settings(), days)}
+
+
 @router.get("/ping-history", response_model=PingHistory)
 async def ping_history(
     days: int = Query(1, ge=1, le=366),

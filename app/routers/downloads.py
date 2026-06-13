@@ -7,6 +7,7 @@ repository (detail) or for every repository on a server (overview).
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 from typing import List, Tuple
 
 from fastapi import APIRouter, HTTPException, Query
@@ -125,6 +126,74 @@ async def downloads_batch(
         )
 
     return list(await asyncio.gather(*(one(n) for n in repository)))
+
+
+@router.get("/cleanup-candidates")
+async def cleanup_candidates(
+    instance_id: str,
+    days: int = Query(90, ge=1, le=3650, description="Dormant threshold (days)."),
+    top: int = Query(8, ge=0, le=50, description="Largest dormant assets per repo."),
+) -> dict:
+    """Per repository: assets never downloaded or not downloaded in ``days`` —
+    cleanup candidates that consume disk without being used."""
+    client: NexusClient = get_client(instance_id)
+    try:
+        repos = await client.list_repositories()
+    except NexusError as exc:
+        raise HTTPException(status_code=exc.status_code or 502, detail=exc.message)
+    scannable = [r for r in repos if (r.type or "").lower() != "group"]
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    sem = asyncio.Semaphore(_SUMMARY_CONCURRENCY)
+
+    async def one(repo) -> dict:
+        async with sem:
+            total = dormant = dormant_size = 0
+            largest: List[dict] = []
+            token = None
+            pages = 0
+            truncated = False
+            try:
+                while True:
+                    page = await client.list_assets(repo.name, token)
+                    for a in page.items:
+                        total += 1
+                        ld = a.last_downloaded
+                        if (not ld) or (str(ld)[:10] < cutoff):
+                            size = a.file_size or 0
+                            dormant += 1
+                            dormant_size += size
+                            largest.append({
+                                "path": a.path or a.id,
+                                "size_bytes": a.file_size,
+                                "last_downloaded": ld,
+                            })
+                    token = page.continuation_token
+                    pages += 1
+                    if not token:
+                        break
+                    if pages >= _MAX_PAGES:
+                        truncated = True
+                        break
+            except NexusError as exc:
+                return {"repository": repo.name, "format": repo.format,
+                        "type": repo.type, "error": exc.message}
+        largest.sort(key=lambda x: x["size_bytes"] or 0, reverse=True)
+        return {
+            "repository": repo.name, "format": repo.format, "type": repo.type,
+            "total_assets": total, "dormant_assets": dormant,
+            "dormant_size_bytes": dormant_size, "truncated": truncated,
+            "largest": largest[:top],
+        }
+
+    items = list(await asyncio.gather(*(one(r) for r in scannable)))
+    items.sort(key=lambda x: x.get("dormant_size_bytes", 0), reverse=True)
+    return {
+        "instance_id": instance_id,
+        "days": days,
+        "dormant_assets": sum(x.get("dormant_assets", 0) for x in items),
+        "dormant_size_bytes": sum(x.get("dormant_size_bytes", 0) for x in items),
+        "repositories": items,
+    }
 
 
 @router.get("/downloads-summary", response_model=ServerDownloadSummary)

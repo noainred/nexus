@@ -44,6 +44,7 @@
       <button class="tab" data-tab="compare">저장소 1:1 비교</button>
       <button class="tab" data-tab="repositories">저장소 관리</button>
       <button class="tab" data-tab="downloads">다운로드 현황</button>
+      <button class="tab" data-tab="cleanup-candidates">정리 후보</button>
       <button class="tab" data-tab="tasks">작업</button>
       <button class="tab" data-tab="security">보안 점검</button>
       <button class="tab" data-tab="alerts">알림</button>
@@ -78,6 +79,7 @@
               <input type="checkbox" id="pxs-problem-only" checked />
               문제만 보기
             </label>
+            <button id="pxs-fix-all" class="pick-mini" title="차단된 모든 프록시를 한 번에 차단 초기화(원격/경로 복구 후 사용)">차단 전체 초기화</button>
             <button id="pxs-refresh">상태 조회</button>
           </div>
         </div>
@@ -135,6 +137,22 @@
             <span id="df-status" class="hint" style="margin:0"></span>
           </div>
           <div id="df-table"></div>
+        </div>
+
+        <div class="settings-card">
+          <h3>사용량 추세 차트</h3>
+          <p class="hint">자동 수집한 표본으로 blob store별 <b>사용률(%) 변화</b>를 그립니다. 90% 경고선(빨강)·80% 주의선(노랑) 기준으로 증가 추세를 한눈에 봅니다.</p>
+          <div class="form-actions" style="justify-content:flex-start;gap:8px">
+            <label class="pick-label" for="dc-days">기간</label>
+            <select id="dc-days">
+              <option value="14">14일</option>
+              <option value="30">30일</option>
+              <option value="60" selected>60일</option>
+              <option value="200">200일</option>
+            </select>
+            <span id="dc-status" class="hint" style="margin:0"></span>
+          </div>
+          <div id="disk-charts"></div>
         </div>
 
         <div id="blobstore-table"></div>
@@ -258,6 +276,25 @@
         <div id="dl-summary" class="cards"></div>
         <div id="dl-note" class="hint"></div>
         <div id="dl-table"></div>
+      </section>
+
+      <section id="cleanup-candidates" class="panel">
+        <h2>정리 후보 (휴면 아티팩트)</h2>
+        <p class="hint">서버를 선택하면 각 저장소에서 <b>한 번도 / 오랫동안 다운로드되지 않은 자산</b>을 찾아 용량 순으로 보여줍니다. 디스크를 차지하지만 안 쓰이는 콘텐츠 — Cleanup 정책 수립·증설 판단의 근거입니다.</p>
+        <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap;gap:8px">
+          <label class="ref-pick">서버 <select id="cc-inst"></select></label>
+          <label class="pick-label" for="cc-days">기준</label>
+          <select id="cc-days">
+            <option value="30">30일+ 미사용</option>
+            <option value="90" selected>90일+ 미사용</option>
+            <option value="180">180일+ 미사용</option>
+            <option value="365">365일+ 미사용</option>
+          </select>
+          <button type="button" id="cc-run">스캔</button>
+          <span id="cc-status" class="hint" style="margin:0"></span>
+        </div>
+        <div id="cc-summary" class="cards"></div>
+        <div id="cc-table"></div>
       </section>
 
       <section id="tasks" class="panel">

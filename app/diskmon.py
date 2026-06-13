@@ -124,6 +124,36 @@ def forecast(registry, settings: Settings) -> List[dict]:
     return rows
 
 
+def history(registry, settings: Settings, days: int = 60) -> List[dict]:
+    """Per blob store: usage% time series for the trend chart."""
+    names = {i.id: i.name for i in registry.all()}
+    data = _read(settings)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    out: List[dict] = []
+    for (iid, store), samples in data.items():
+        if iid not in names:
+            continue
+        pts = [
+            {
+                "t": int(dt.timestamp()),
+                "used": used,
+                "total": total,
+                "pct": round(used / total * 100, 1) if total > 0 else 0.0,
+            }
+            for (dt, used, total) in samples if dt >= cutoff
+        ]
+        if not pts:
+            continue
+        out.append({
+            "instance_id": iid,
+            "instance_name": names[iid],
+            "store": store,
+            "points": pts,
+        })
+    out.sort(key=lambda s: (s["instance_name"], s["store"]))
+    return out
+
+
 def _prune(settings: Settings) -> None:
     p = _path(settings)
     if not p.is_file():

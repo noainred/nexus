@@ -220,6 +220,50 @@ def test_proxy_fix_unknown_repo_returns_404(http_client):
     assert r.status_code == 404
 
 
+@respx.mock
+def test_proxy_fix_all_resets_blocked(http_client):
+    repos = [{"name": "fedora-epel", "format": "yum", "type": "proxy",
+              "attributes": {"proxy": {"remoteUrl": "https://mirror.example/epel/"}}}]
+    respx.get(f"{API}/repositories").mock(return_value=httpx.Response(200, json=repos))
+    respx.get(INTERNAL).mock(return_value=httpx.Response(200, json=[
+        {"name": "fedora-epel", "status": {"online": True,
+         "description": "Remote Auto Blocked and Unavailable"}},
+    ]))
+    respx.get(f"{API}/repositories/yum/proxy/fedora-epel").mock(
+        return_value=httpx.Response(200, json={"name": "fedora-epel", "format": "yum",
+                                               "type": "proxy", "httpClient": {"autoBlock": True}}))
+    saved = respx.put(f"{API}/repositories/yum/proxy/fedora-epel").mock(
+        return_value=httpx.Response(204))
+    r = http_client.post("/api/proxy-status/fix-all").json()
+    assert r["reset"] == 1 and r["failed"] == 0
+    assert saved.called
+
+
+# -- cleanup candidates (dormant assets) ------------------------------------------
+
+@respx.mock
+def test_cleanup_candidates_flags_dormant(http_client):
+    respx.get(f"{API}/repositories").mock(return_value=httpx.Response(200, json=[
+        {"name": "raw-hosted", "format": "raw", "type": "hosted"},
+    ]))
+    respx.get(f"{API}/assets").mock(return_value=httpx.Response(200, json={
+        "items": [
+            {"id": "a1", "path": "/old.bin", "fileSize": 1000, "lastDownloaded": None},
+            {"id": "a2", "path": "/fresh.bin", "fileSize": 50, "lastDownloaded": "2999-01-01T00:00:00.000+00:00"},
+        ],
+        "continuationToken": None,
+    }))
+    r = http_client.get("/api/instances/test/cleanup-candidates?days=90").json()
+    assert r["dormant_assets"] == 1
+    assert r["dormant_size_bytes"] == 1000
+    repo = r["repositories"][0]
+    assert repo["largest"][0]["path"] == "/old.bin"
+
+
+def test_disk_history_empty_ok(http_client):
+    assert http_client.get("/api/disk-history").json() == {"stores": []}
+
+
 # -- fleet search -----------------------------------------------------------------
 
 @respx.mock
