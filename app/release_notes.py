@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.0.5",
+        "date": "2026-06-13",
+        "changes": [
+            {"type": "changed", "text": "로그인 창이 계속 뜨는 진짜 원인 해결 — 자격증명이 틀린 관리 대상 Nexus(예: DMZ1/DMZ2)가 돌려준 401을 매니저 세션 만료로 오인하던 문제. 매니저 인증 게이트 401에만 auth_required 마커를 붙이고, 프런트는 그 마커가 있을 때만 로그인 창을 띄움. 업스트림 Nexus 401은 해당 인스턴스 오류로만 처리"},
+        ],
+    },
+    {
         "version": "1.0.4",
         "date": "2026-06-13",
         "changes": [

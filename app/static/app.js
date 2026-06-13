@@ -31,7 +31,10 @@ async function api(path, options = {}) {
   if (res.status === 204) return null;
   const body = await res.json().catch(() => ({}));
   if (res.status === 401) {
-    showLoginOverlay();
+    // Only the manager's own auth gate sets auth_required. A 401 WITHOUT it
+    // is an upstream Nexus error (a managed instance with bad credentials) and
+    // must NOT pop the login overlay.
+    if (body && body.auth_required) showLoginOverlay();
     throw new Error(formatApiError(body.detail, res.status));
   }
   if (!res.ok) {

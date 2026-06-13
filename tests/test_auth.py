@@ -29,6 +29,12 @@ def test_auth_required_blocks_and_login_unlocks(client, monkeypatch, tmp_path):
     st = client.get("/api/auth-status").json()
     assert st["required"] is True and st["authenticated"] is False
 
+    blocked = client.get("/api/instances")
+    assert blocked.status_code == 401
+    # The manager auth gate is flagged so the SPA can tell it apart from an
+    # upstream Nexus 401 (which must NOT re-open the login overlay).
+    assert blocked.json().get("auth_required") is True
+
     assert client.post("/api/login", json={"password": "wrong"}).status_code == 401
     ok = client.post("/api/login", json={"password": "pw123"})
     assert ok.status_code == 200 and "nm_session" in ok.cookies

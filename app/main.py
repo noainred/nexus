@@ -116,7 +116,13 @@ async def auth_and_audit(request: Request, call_next):
         and not _is_public_read(request.method, path)
         and not auth.is_authenticated(request, settings)
     ):
-        return JSONResponse({"detail": "로그인이 필요합니다."}, status_code=401)
+        # 'auth_required' marks this as the MANAGER login gate, so the SPA can
+        # tell it apart from an upstream Nexus 401 (a managed instance with bad
+        # credentials) and avoid wrongly popping the login overlay.
+        return JSONResponse(
+            {"detail": "로그인이 필요합니다.", "auth_required": True},
+            status_code=401,
+        )
     response = await call_next(request)
     if (
         request.method in ("POST", "PUT", "DELETE")
