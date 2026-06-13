@@ -62,17 +62,6 @@ function hideLoginOverlay() {
   if (ov) ov.classList.add("hidden");
 }
 
-// Reveal the full authenticated UI in place (reverse of enterPublicMode), so
-// a successful login doesn't depend on the page reload actually firing.
-function exitPublicMode() {
-  state.publicMode = false;
-  document.querySelectorAll(".tab").forEach((t) => t.classList.remove("hidden"));
-  const lb = document.getElementById("login-btn");
-  if (lb) lb.classList.add("hidden");
-  const out = document.getElementById("logout-btn");
-  if (out) out.classList.remove("hidden");
-}
-
 // Public (not-logged-in) mode: show only status tabs + a 로그인 button; the
 // protected tabs/loaders are hidden so no protected endpoint is hit.
 function enterPublicMode() {
@@ -98,11 +87,11 @@ function setupAuth() {
           method: "POST",
           body: JSON.stringify({ password: document.getElementById("login-pw").value }),
         });
-        // Close the overlay and reveal the full app immediately — don't rely
-        // solely on the reload (which can be delayed/blocked in some setups).
+        // Full page refresh so the whole UI re-initialises with authenticated
+        // data. (Revealing tabs in place left protected screens like 서버 설정
+        // showing stale public-mode state because /api/instances wasn't loaded.)
         hideLoginOverlay();
-        exitPublicMode();
-        location.reload();
+        window.location.reload();
       } catch (e) {
         status.textContent = e.message;
       }

@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.0.8",
+        "date": "2026-06-13",
+        "changes": [
+            {"type": "changed", "text": "로그인 성공 시 전체 화면을 새로고침하도록 변경 — 기존엔 화면을 제자리에서 펼치기만 해 서버 설정 등 보호 화면에 로그인 이전(공개 모드) 정보가 남던 문제 해결"},
+        ],
+    },
+    {
         "version": "1.0.7",
         "date": "2026-06-13",
         "changes": [
