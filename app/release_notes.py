@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.0.9",
+        "date": "2026-06-13",
+        "changes": [
+            {"type": "added", "text": "비교 매트릭스 인스턴스(열) 순서를 드래그로 지정 — '인스턴스' 칩을 끌어 순서 변경, 브라우저에 자동 저장되어 새로고침 후에도 유지(매트릭스 열도 그 순서로). '순서 초기화'로 기본값 복원"},
+        ],
+    },
+    {
         "version": "1.0.8",
         "date": "2026-06-13",
         "changes": [

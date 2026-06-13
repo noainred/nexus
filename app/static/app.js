@@ -1484,10 +1484,43 @@ function evaluateRow(row, columns, refId) {
   return { status, matches, refMissing: false };
 }
 
+// User-defined column (instance) order, persisted per-browser in localStorage.
+function loadMatrixColOrder() {
+  try { return JSON.parse(localStorage.getItem("matrixColOrder") || "[]"); }
+  catch (e) { return []; }
+}
+function saveMatrixColOrder(ids) {
+  localStorage.setItem("matrixColOrder", JSON.stringify(ids));
+}
+// Sort columns by the saved order; ids not in it keep their original order at
+// the end (so newly added servers still appear).
+function orderedMatrixColumns(cols) {
+  const order = loadMatrixColOrder();
+  if (!order.length) return cols.slice();
+  const rank = {};
+  order.forEach((id, i) => { rank[id] = i; });
+  return cols.slice().sort((a, b) =>
+    (rank[a.id] == null ? 1e9 : rank[a.id]) - (rank[b.id] == null ? 1e9 : rank[b.id]));
+}
+// Move srcId to sit just before beforeId in the full column order, then persist.
+function reorderMatrixCol(srcId, beforeId) {
+  if (!state.matrix) return;
+  const ids = orderedMatrixColumns(state.matrix.columns).map((c) => c.id);
+  const from = ids.indexOf(srcId);
+  if (from < 0) return;
+  ids.splice(from, 1);
+  const to = ids.indexOf(beforeId);
+  ids.splice(to < 0 ? ids.length : to, 0, srcId);
+  saveMatrixColOrder(ids);
+  renderMatrixPickers();
+  renderMatrix();
+}
+
 function visibleMatrixColumns() {
   const m = state.matrix;
   if (!m) return [];
-  return state.matrixCols ? m.columns.filter((c) => state.matrixCols.has(c.id)) : m.columns;
+  const ordered = orderedMatrixColumns(m.columns);
+  return state.matrixCols ? ordered.filter((c) => state.matrixCols.has(c.id)) : ordered;
 }
 
 function pruneMatrixSet(prev, all) {
@@ -1502,13 +1535,35 @@ function renderMatrixPickers() {
   const repoBox = document.getElementById("matrix-repo-pick");
   if (!m || !instBox || !repoBox) return;
   instBox.innerHTML = "";
-  m.columns.forEach((col) => {
+  orderedMatrixColumns(m.columns).forEach((col) => {
     const on = !state.matrixCols || state.matrixCols.has(col.id);
-    instBox.append(el("button", {
+    const chip = el("button", {
       type: "button",
       class: `pick-chip ${on ? "on" : ""}`,
-      onclick: () => toggleMatrixPick("matrixCols", col.id),
-    }, col.reachable ? col.name : `${col.name} ⚠`));
+      draggable: "true",
+      title: "클릭: 표시/숨김 · 드래그: 열 순서 변경",
+      onclick: () => {
+        if (chip._dragged) { chip._dragged = false; return; }
+        toggleMatrixPick("matrixCols", col.id);
+      },
+    }, col.reachable ? col.name : `${col.name} ⚠`);
+    chip.dataset.id = col.id;
+    chip.addEventListener("dragstart", (e) => {
+      chip._dragging = true; chip.classList.add("dragging");
+      e.dataTransfer.setData("text/plain", col.id);
+      e.dataTransfer.effectAllowed = "move";
+    });
+    chip.addEventListener("dragend", () => {
+      chip._dragged = chip._dragging; chip._dragging = false;
+      chip.classList.remove("dragging");
+    });
+    chip.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; });
+    chip.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const src = e.dataTransfer.getData("text/plain");
+      if (src && src !== col.id) reorderMatrixCol(src, col.id);
+    });
+    instBox.append(chip);
   });
   repoBox.innerHTML = "";
   const q = (state.matrixRepoSearch || "").trim().toLowerCase();
@@ -2087,6 +2142,12 @@ document.getElementById("matrix-ref").addEventListener("change", (e) => {
 });
 document.getElementById("matrix-repo-all").addEventListener("click", () => setAllMatrixRepos(true));
 document.getElementById("matrix-repo-none").addEventListener("click", () => setAllMatrixRepos(false));
+document.getElementById("matrix-col-reset").addEventListener("click", () => {
+  localStorage.removeItem("matrixColOrder");
+  toast("열 순서를 기본값으로 되돌렸습니다");
+  renderMatrixPickers();
+  renderMatrix();
+});
 document.getElementById("matrix-repo-search").addEventListener("input", (ev) => {
   state.matrixRepoSearch = ev.target.value;
   renderMatrixPickers();   // filter chips only; the matrix table is unaffected
