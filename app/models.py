@@ -15,6 +15,7 @@ class InstanceSummary(BaseModel):
     alt_url: str = ""
     username: Optional[str] = None
     group: str = ""
+    tier: int = 0
     timezone: str = ""
     verify_tls: Optional[bool] = None
     use_in_monitoring: bool = True
@@ -32,6 +33,7 @@ class InstanceCreate(BaseModel):
     username: str = ""
     password: str = ""
     group: str = ""
+    tier: int = 0
     timezone: str = ""
     verify_tls: Optional[bool] = None
     use_in_monitoring: bool = True
@@ -48,6 +50,7 @@ class InstanceUpdate(BaseModel):
     # Blank password means "keep the existing one".
     password: Optional[str] = None
     group: str = ""
+    tier: int = 0
     timezone: str = ""
     verify_tls: Optional[bool] = None
     use_in_monitoring: bool = True
@@ -444,6 +447,7 @@ class TopologyNode(BaseModel):
     id: str
     name: str
     base_url: str
+    tier: int = 0
     reachable: bool = True
     error: Optional[str] = None
     proxies: List[ProxyLink] = Field(default_factory=list)

@@ -30,13 +30,27 @@ def _remote_url(repo: Repository) -> Optional[str]:
 
 
 async def _fetch_node(instance) -> Tuple[TopologyNode, Optional[List[Repository]]]:
-    node = TopologyNode(id=instance.id, name=instance.name, base_url=instance.base_url)
+    node = TopologyNode(
+        id=instance.id, name=instance.name,
+        base_url=instance.base_url, tier=getattr(instance, "tier", 0) or 0,
+    )
     client = NexusClient(instance, timeout=get_settings().request_timeout)
     try:
         repos = await client.list_repositories()
     except NexusError as exc:
-        node.reachable = False
-        node.error = exc.message
+        # status_code None == connection-level failure (timeout/refused/DNS) ==
+        # genuinely down. A status code means the server ANSWERED (reachable)
+        # but we couldn't list its repos — e.g. 401/403 from a wrong or
+        # under-privileged account. Don't flag that node (or links into it) as
+        # down; surface it as a reachable-but-warning node instead.
+        if exc.status_code is None:
+            node.reachable = False
+            node.error = exc.message
+        else:
+            node.error = (
+                f"도달 가능하나 저장소 조회 실패(HTTP {exc.status_code}) — "
+                f"계정/권한 확인 필요"
+            )
         return node, None
     return node, repos
 

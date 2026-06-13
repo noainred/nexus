@@ -791,6 +791,36 @@ def test_topology_internal_link_and_broken(http_client):
 
 
 @respx.mock
+def test_topology_auth_error_node_stays_reachable(http_client):
+    # A 401 means the server ANSWERED (reachable) but our account can't list
+    # repos — the node must NOT be flagged down.
+    respx.get(f"{API}/repositories").mock(
+        return_value=httpx.Response(401, text="unauthorized")
+    )
+    body = http_client.get("/api/topology").json()
+    node = next(n for n in body["nodes"] if n["id"] == "test")
+    assert node["reachable"] is True
+    assert node["error"] and "권한" in node["error"]
+
+
+@respx.mock
+def test_topology_connection_error_node_down(http_client):
+    # A connection-level failure (no HTTP status) is genuinely down.
+    respx.get(f"{API}/repositories").mock(side_effect=httpx.ConnectError("refused"))
+    body = http_client.get("/api/topology").json()
+    node = next(n for n in body["nodes"] if n["id"] == "test")
+    assert node["reachable"] is False
+
+
+def test_instance_tier_round_trips(http_client):
+    http_client.post("/api/instances", json={
+        "id": "tier1", "name": "Tier One", "base_url": "http://t1:8081", "tier": 2,
+    })
+    got = next(i for i in http_client.get("/api/instances").json() if i["id"] == "tier1")
+    assert got["tier"] == 2
+
+
+@respx.mock
 def test_security_check(http_client):
     respx.get(f"{API}/security/anonymous").mock(
         return_value=httpx.Response(200, json={"enabled": True, "userId": "anonymous"})

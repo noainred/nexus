@@ -1014,8 +1014,11 @@ function renderTopoTree(data) {
     }));
     if (ids.length) parentOf[n.id] = ids.sort((a, b) => counts[b] - counts[a])[0];
   });
-  if (!edges.length) {
-    wrap.append(el("p", { class: "hint" }, "내부(서버 간) 프록시 링크가 없어 계위 트리를 그릴 수 없습니다."));
+  // Manual tiers (계위 set in 서버 설정) let the board be arranged even when
+  // there are no internal proxy links to derive a hierarchy from.
+  const useManualTier = nodes.some((n) => (n.tier || 0) > 0);
+  if (!edges.length && !useManualTier) {
+    wrap.append(el("p", { class: "hint" }, "내부(서버 간) 프록시 링크가 없어 계위 트리를 그릴 수 없습니다. (서버 설정에서 계위를 지정하면 수동 배치할 수 있습니다)"));
     return;
   }
 
@@ -1052,6 +1055,18 @@ function renderTopoTree(data) {
     (layers[d] = layers[d] || []).push(n);
   });
   layers = layers.filter((l) => l && l.length);  // compact (no sparse holes)
+
+  // Manual tier override: when any node has a 계위(tier) set, arrange the rows
+  // strictly by that number (1=top .. N). Nodes left at 0 drop to the bottom.
+  if (useManualTier) {
+    const maxT = Math.max(...nodes.map((n) => n.tier || 0));
+    const byTier = [];
+    nodes.forEach((n) => {
+      const t = (n.tier || 0) > 0 ? n.tier : maxT + 1;
+      (byTier[t] = byTier[t] || []).push(n);
+    });
+    layers = byTier.filter((l) => l && l.length);
+  }
 
   const NW = 150, NH = 48, HGAP = 22, VGAP = 100, PAD = 70;
   const maxCount = Math.max(...layers.map((l) => l.length));
@@ -1118,14 +1133,16 @@ function renderTopoTree(data) {
   nodes.forEach((n) => {
     const p = pos[n.id];
     if (!p) return;
-    const cls = n.reachable ? "tt-node up" : "tt-node down";
+    // down (truly unreachable) / warn (answered but auth/permission issue) / up.
+    const cls = !n.reachable ? "tt-node down" : (n.error ? "tt-node warn" : "tt-node up");
     const host = hostOf(n.base_url) || n.base_url;
+    const note = !n.reachable ? " · 연결 불가" : (n.error ? " · " + n.error : "");
     s += `<g class="${cls}" data-id="${escapeHtml(n.id)}" transform="translate(${p.x},${p.y})">` +
       `<rect width="${NW}" height="${NH}" rx="11"/>` +
       `<circle class="tt-dot" cx="${NW - 13}" cy="13" r="4"/>` +
       `<text x="${NW / 2}" y="20" class="tt-name">${escapeHtml(n.name)}</text>` +
       `<text x="${NW / 2}" y="37" class="tt-host">${escapeHtml(host)}</text>` +
-      `<title>${escapeHtml(n.name)} · ${escapeHtml(n.base_url)}${n.reachable ? "" : " · 연결 불가"}</title></g>`;
+      `<title>${escapeHtml(n.name)} · ${escapeHtml(n.base_url)}${escapeHtml(note)}</title></g>`;
   });
 
   wrap.innerHTML =
@@ -1134,6 +1151,19 @@ function renderTopoTree(data) {
   // Drag & drop arrangement: drag a node anywhere; edges follow live and the
   // position is remembered (localStorage). A plain click still opens Nexus.
   const svg = wrap.querySelector("svg");
+  // Grow the canvas so a node dragged toward an edge is never clipped (the
+  // wrap scrolls/expands to contain it). Width is a closure var read by the
+  // drag scale math, so updating it keeps dragging consistent.
+  const growCanvas = () => {
+    const w = Math.max(width, Math.max(...nodes.map((n) => pos[n.id].x)) + NW + 24);
+    const h = Math.max(height, Math.max(...nodes.map((n) => pos[n.id].y)) + NH + 24);
+    if (w !== width || h !== height) {
+      width = w; height = h;
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      svg.setAttribute("width", width);
+      svg.setAttribute("height", height);
+    }
+  };
   const refreshEdges = () => {
     edges.forEach((e, i) => {
       if (!pos[e.from] || !pos[e.to]) return;
@@ -1221,6 +1251,7 @@ function renderTopoTree(data) {
       pos[id].y = Math.max(0, oy + dy);
       g.setAttribute("transform", `translate(${pos[id].x},${pos[id].y})`);
       refreshEdges();
+      growCanvas();
     });
     g.addEventListener("pointerup", () => {
       if (!dragging) return;
@@ -1268,9 +1299,11 @@ async function loadTopology() {
   }
 
   data.nodes.forEach((node) => {
-    const statusBadge = node.reachable
-      ? el("span", { class: "badge up" }, "정상")
-      : el("span", { class: "badge down" }, "다운");
+    const statusBadge = !node.reachable
+      ? el("span", { class: "badge down" }, "다운")
+      : (node.error
+          ? el("span", { class: "badge warn", title: node.error }, "권한?")
+          : el("span", { class: "badge up" }, "정상"));
     const head = el("div", { class: "topo-node-head" }, [
       el("span", { class: "topo-node-name" }, node.name),
       statusBadge,
@@ -3167,6 +3200,7 @@ function settingsEdit(inst) {
   form.id.disabled = true;                 // id is the key; not editable
   form.name.value = inst.name;
   form.group.value = inst.group || "";
+  form.tier.value = inst.tier || 0;
   form.timezone.value = inst.timezone || "";
   form.base_url.value = inst.base_url;
   form.alt_url.value = inst.alt_url || "";
@@ -3193,6 +3227,7 @@ async function toggleFlag(inst, field) {
   const body = {
     name: inst.name,
     group: inst.group || "",
+    tier: inst.tier || 0,
     timezone: inst.timezone || "",
     base_url: inst.base_url,
     alt_url: inst.alt_url || "",
@@ -3234,7 +3269,7 @@ async function loadSettings() {
     el("tr", {}, [
       el("td", {}, i.name),
       el("td", {}, i.id),
-      el("td", {}, i.group || "—"),
+      el("td", {}, (i.group || "—") + (i.tier ? ` · 계위${i.tier}` : "")),
       el("td", {}, i.alt_url ? `${i.base_url} (별칭: ${i.alt_url})` : i.base_url),
       el("td", {}, i.username || "—"),
       el("td", {}, flagToggle(i, "use_in_monitoring")),
@@ -3706,6 +3741,7 @@ function setupSettings() {
     const body = {
       name: fd.get("name"),
       group: fd.get("group") || "",
+      tier: Number(fd.get("tier")) || 0,
       timezone: String(fd.get("timezone") || "").trim(),
       base_url: fd.get("base_url"),
       alt_url: String(fd.get("alt_url") || "").trim(),

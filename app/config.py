@@ -27,6 +27,11 @@ class InstanceConfig(BaseModel):
     username: str = Field(..., description="Account used for management calls.")
     password: str = Field(..., description="Password or token for the account.")
     group: str = Field(default="", description="Group label for the overview.")
+    tier: int = Field(
+        default=0,
+        description="Manual hierarchy tier for the topology board (1=top..N); "
+        "0 means auto-derive from proxy links.",
+    )
     timezone: str = Field(
         default="",
         description="IANA timezone of the server (e.g. Asia/Seoul); optional.",
@@ -186,6 +191,7 @@ def instances_to_dict(
                 "username": c.username,
                 "password": c.password,
                 "group": c.group,
+                "tier": c.tier,
                 "timezone": c.timezone,
                 "verify_tls": c.verify_tls,
                 "use_in_monitoring": c.use_in_monitoring,

@@ -239,6 +239,8 @@ h3 { font-size: 14px; color: var(--muted); }
 .topo-tree-wrap g.tt-node .tt-dot { fill: var(--green); }
 .topo-tree-wrap g.tt-node.down rect { stroke: rgba(248,81,73,.85); fill: rgba(248,81,73,.10); }
 .topo-tree-wrap g.tt-node.down .tt-dot { fill: var(--red); }
+.topo-tree-wrap g.tt-node.warn rect { stroke: rgba(210,153,34,.85); fill: rgba(210,153,34,.10); }
+.topo-tree-wrap g.tt-node.warn .tt-dot { fill: var(--amber); }
 .topo-tree-wrap g.tt-node:hover rect { stroke: var(--accent); stroke-width: 2; }
 .topo-tree-wrap .tt-name { fill: var(--text); font-size: 13px; font-weight: 700; text-anchor: middle; }
 .topo-tree-wrap .tt-host { fill: var(--muted); font-size: 10px; text-anchor: middle; }
