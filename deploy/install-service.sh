@@ -19,6 +19,8 @@
 #   PORT         (default 8000)
 #   PYTHON       (default python3)
 #   WITH_AUTOUPDATE (default 1 — install a folder-watch auto-update timer)
+#   UPDATE_URL   (optional — remote auto-update source, e.g.
+#                 github:owner/repo  or  https://host/path/ ; see deploy/auto-update.sh)
 #
 set -euo pipefail
 
@@ -131,6 +133,9 @@ Type=oneshot
 Environment=INSTALL_DIR=$INSTALL_DIR
 Environment=PYTHON=$PYTHON
 Environment=PORT=$PORT
+${UPDATE_URL:+Environment=UPDATE_URL=$UPDATE_URL}
+${UPDATE_TAG:+Environment=UPDATE_TAG=$UPDATE_TAG}
+${GITHUB_TOKEN:+Environment=GITHUB_TOKEN=$GITHUB_TOKEN}
 ExecStart=/usr/bin/env bash $INSTALL_DIR/deploy/auto-update.sh
 UPDEOF
   cat > /etc/systemd/system/nexus-manager-update.timer <<UPTEOF
@@ -160,6 +165,11 @@ echo ""
 echo "  ※ 자동 업데이트: 새 zip을  $INSTALL_DIR/updates/  에 넣으면 5분 내 자동 업그레이드"
 echo "      즉시 적용:  sudo systemctl start nexus-manager-update.service"
 echo "      로그:       tail -f $INSTALL_DIR/auto-update.log"
+if [ -n "${UPDATE_URL:-}" ]; then
+echo "      원격 소스:  $UPDATE_URL (인터넷에서 새 버전 자동 다운로드)"
+else
+echo "      원격(인터넷) 소스도 쓰려면 재설치 시  UPDATE_URL=github:owner/repo  지정"
+fi
 fi
 echo ""
 echo "  ※ 방화벽이 켜져 있으면 포트를 여세요:"

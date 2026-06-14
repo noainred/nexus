@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.2.1",
+        "date": "2026-06-14",
+        "changes": [
+            {"type": "changed", "text": "계위 상황판 간선 화살표가 일부 간선에서 안 보이던 문제 수정 — 곡선 끝 접선이 0에 가까우면 마커가 렌더되지 않던 케이스를, 부모로 접근하는 짧은 수직 구간을 둬 항상 방향이 정의되게 함"},
+            {"type": "added", "text": "원격(인터넷) 자동 업그레이드 — UPDATE_URL로 GitHub 릴리스(github:owner/repo) 또는 HTTP 디렉터리를 감시해 새 버전 번들을 자동 다운로드 후 업그레이드(폐쇄망은 기존 폴더 투입 방식 유지). install-service.sh가 UPDATE_URL/UPDATE_TAG/GITHUB_TOKEN을 타이머에 전달"},
+        ],
+    },
+    {
         "version": "1.2.0",
         "date": "2026-06-13",
         "changes": [

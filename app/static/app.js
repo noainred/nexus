@@ -1239,11 +1239,16 @@ function renderTopoTree(data) {
   // Edges, tagged so dragging can re-route them (visible line + a wide
   // invisible twin that makes hovering for the tooltip easy).
   const edgeD = (e) => {
-    const a = pos[e.from], b = pos[e.to];
-    const x1 = a.x + NW / 2, y1 = a.y + NH;
-    const x2 = b.x + NW / 2, y2 = b.y;
+    const a = pos[e.from], b = pos[e.to];       // a = parent(upstream), b = child
+    const x1 = a.x + NW / 2, y1 = a.y + NH;      // parent bottom = arrow target
+    const x2 = b.x + NW / 2, y2 = b.y;           // child top = start
     const my = (y1 + y2) / 2;
-    return { d: `M${x2},${y2} C${x2},${my} ${x1},${my} ${x1},${y1}`, lx: (x1 + x2) / 2, ly: my - 4 };
+    // Approach the parent with a short straight vertical run so the arrow's
+    // orientation is always well-defined — some renderers drop the marker when
+    // the curve's end tangent is ~zero-length (which made arrows disappear on
+    // edges whose endpoints were nearly aligned).
+    const ctrl2y = y1 + Math.max(16, Math.abs(y2 - y1) * 0.25);
+    return { d: `M${x2},${y2} C${x2},${my} ${x1},${ctrl2y} ${x1},${y1}`, lx: (x1 + x2) / 2, ly: my - 4 };
   };
   edges.forEach((e, i) => {
     if (!pos[e.from] || !pos[e.to]) return;

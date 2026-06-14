@@ -180,6 +180,17 @@ sudo systemctl start nexus-manager-update.service
 tail -f /opt/nexus-manager/auto-update.log     # 진행 로그
 ```
 
+**원격(인터넷) 소스**도 지원합니다 — 인터넷이 되는 서버라면 GitHub 릴리스나
+HTTP 디렉터리를 바라보다가 새 버전을 **자동으로 내려받아** 업그레이드합니다.
+설치 시 `UPDATE_URL`을 지정하세요(폐쇄망이면 생략 — 폴더 투입 방식만 사용).
+
+```bash
+# GitHub 릴리스(latest 태그)를 감시
+sudo UPDATE_URL=github:noainred/nexus bash deploy/install-service.sh
+# 또는 사내 HTTP 미러 디렉터리(…/nexus-manager-offline-vX.Y.Z.zip)
+sudo UPDATE_URL=https://mirror.example/nexus/ bash deploy/install-service.sh
+```
+
 > 끄려면 설치 시 `WITH_AUTOUPDATE=0`, 또는
 > `sudo systemctl disable --now nexus-manager-update.timer`.
 
