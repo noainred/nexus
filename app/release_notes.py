@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.3.1",
+        "date": "2026-06-16",
+        "changes": [
+            {"type": "changed", "text": "install-service.sh 안정화 — 설치 폴더 안에서 직접 실행해 소스=설치위치인 경우 'cp: are the same file' 오류 및 소스 삭제 위험 제거(제자리 업그레이드는 복사 건너뜀). 그 외 업그레이드는 app/deploy/wheelhouse를 깨끗이 덮어써 옛 파일이 남지 않게 함(instances.yaml/.env 보존)"},
+        ],
+    },
+    {
         "version": "1.3.0",
         "date": "2026-06-16",
         "changes": [

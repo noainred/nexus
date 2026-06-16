@@ -52,13 +52,21 @@ if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
   useradd --system --home "$INSTALL_DIR" --shell /sbin/nologin "$SERVICE_USER"
 fi
 
-# 2) Copy code (preserve existing instances.yaml / .env on upgrade).
-echo "==> 파일 복사 ..."
+# 2) Copy code (clean overwrite — remove the old dirs first so deleted/renamed
+#    files don't linger. instances.yaml / .env are preserved below).
 mkdir -p "$INSTALL_DIR"
-cp -r "$SRC/app" "$INSTALL_DIR/"
-cp "$SRC/requirements.txt" "$INSTALL_DIR/"
-[ -d "$SRC/deploy" ]     && cp -r "$SRC/deploy" "$INSTALL_DIR/"
-[ -d "$SRC/wheelhouse" ] && cp -r "$SRC/wheelhouse" "$INSTALL_DIR/"
+if [ "$(readlink -f "$SRC")" = "$(readlink -f "$INSTALL_DIR")" ]; then
+  # Running from inside the install dir (files already in place) — copying onto
+  # itself would error ("same file") and a pre-delete would wipe the source.
+  echo "==> 소스가 설치 위치와 동일 — 복사 건너뜀(제자리 업그레이드)"
+else
+  echo "==> 파일 복사 (덮어쓰기) ..."
+  rm -rf "$INSTALL_DIR/app"
+  cp -rf "$SRC/app" "$INSTALL_DIR/"
+  cp -f "$SRC/requirements.txt" "$INSTALL_DIR/"
+  if [ -d "$SRC/deploy" ];     then rm -rf "$INSTALL_DIR/deploy";     cp -rf "$SRC/deploy" "$INSTALL_DIR/"; fi
+  if [ -d "$SRC/wheelhouse" ]; then rm -rf "$INSTALL_DIR/wheelhouse"; cp -rf "$SRC/wheelhouse" "$INSTALL_DIR/"; fi
+fi
 
 if [ ! -f "$INSTALL_DIR/instances.yaml" ]; then
   if [ -f "$SRC/instances.yaml" ]; then cp "$SRC/instances.yaml" "$INSTALL_DIR/"
