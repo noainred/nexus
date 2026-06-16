@@ -48,38 +48,76 @@ ver_gt() {
   [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$1" ]
 }
 
+# Portal-saved config (update-config.json) overrides env, so the dashboard can
+# change the source/token/auto-install without touching systemd.
+load_portal_config() {
+  local f="$INSTALL_DIR/update-config.json"
+  [ -f "$f" ] || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+  local kv
+  kv=$(python3 - "$f" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(0)
+print("URL=%s" % (d.get("url") or ""))
+print("TOKEN=%s" % (d.get("token") or ""))
+print("AUTO=%s" % ("1" if d.get("auto_install", True) else "0"))
+print("INTERVAL=%s" % (d.get("interval") or ""))
+PY
+)
+  local u t a iv
+  u=$(printf '%s\n' "$kv" | sed -n 's/^URL=//p')
+  t=$(printf '%s\n' "$kv" | sed -n 's/^TOKEN=//p')
+  a=$(printf '%s\n' "$kv" | sed -n 's/^AUTO=//p')
+  iv=$(printf '%s\n' "$kv" | sed -n 's/^INTERVAL=//p')
+  [ -n "$u" ] && UPDATE_URL="$u"
+  [ -n "$t" ] && GITHUB_TOKEN="$t"
+  [ -n "$a" ] && AUTO_INSTALL="$a"
+  [ -n "$iv" ] && INTERVAL="${INTERVAL:-$iv}"
+}
+
 # Optional remote source: when UPDATE_URL is set, fetch a newer bundle into the
 # watch folder so the normal local-install flow can apply it. Supports:
-#   UPDATE_URL=github:owner/repo            (GitHub releases, tag=UPDATE_TAG|latest)
-#   UPDATE_URL=https://host/path/           (directory index of *-vX.Y.Z.zip files)
+#   github:owner/repo        (GitHub releases, tag=UPDATE_TAG|latest)
+#   https://host/path/       (internal mirror: versions.json, else dir listing)
 remote_fetch() {
   [ -z "${UPDATE_URL:-}" ] && return 0
   if ! command -v curl >/dev/null 2>&1; then log "curl 없음 — 원격 확인 건너뜀"; return 0; fi
-  local cur; cur=$(current_version)
+  local cur auth=(); cur=$(current_version)
+  [ -n "${GITHUB_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
   case "$UPDATE_URL" in
-    github:*)
-      local repo="${UPDATE_URL#github:}" tag="${UPDATE_TAG:-latest}"
-      local json rver durl
-      json=$(curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} \
-               "https://api.github.com/repos/$repo/releases/tags/$tag" 2>/dev/null) \
+    github:*|*github.com*)
+      local repo tag="${UPDATE_TAG:-latest}" json rver durl
+      repo=$(printf '%s' "$UPDATE_URL" | sed -E 's#^github:##; s#https?://github.com/##; s#\.git$##; s#/$##')
+      json=$(curl -fsSL "${auth[@]}" "https://api.github.com/repos/$repo/releases/tags/$tag" 2>/dev/null) \
         || { log "GitHub 릴리스 조회 실패: $repo@$tag"; return 0; }
       rver=$(printf '%s' "$json" | grep -oE 'ver_[0-9]+\.[0-9]+\.[0-9]+\.md' | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
       durl=$(printf '%s' "$json" | grep -oE 'https://[^"]*nexus-manager-offline\.zip' | head -1 || true)
       if [ -z "$rver" ] || [ -z "$durl" ]; then log "릴리스 자산 식별 실패"; return 0; fi
       if ! ver_gt "$rver" "$cur"; then log "원격 새 버전 없음 (현재 $cur · 원격 $rver)"; return 0; fi
       log "원격(GitHub) 새 버전 $rver 다운로드..."
-      curl -fsSL -o "$WATCH_DIR/nexus-manager-offline-v$rver.zip" "$durl" \
+      curl -fsSL "${auth[@]}" -o "$WATCH_DIR/nexus-manager-offline-v$rver.zip" "$durl" \
         && log "다운로드 완료 → 감시 폴더" || log "다운로드 실패"
       ;;
     http://*|https://*)
-      local idx rver base="${UPDATE_URL%/}/"
-      idx=$(curl -fsSL "$UPDATE_URL" 2>/dev/null) || { log "원격 디렉터리 조회 실패: $UPDATE_URL"; return 0; }
-      rver=$(printf '%s' "$idx" | grep -oE 'nexus-manager-offline-v[0-9]+\.[0-9]+\.[0-9]+\.zip' \
-               | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 || true)
-      if [ -z "$rver" ]; then log "원격에 버전 zip 없음"; return 0; fi
+      local base="${UPDATE_URL%/}/" rver vj file
+      # Prefer a versions.json manifest (internal mirror), else parse the index.
+      vj=$(curl -fsSL "${auth[@]}" "${base}versions.json" 2>/dev/null || true)
+      if [ -n "$vj" ]; then
+        rver=$(printf '%s' "$vj" | grep -oE '"(version|latest)"[[:space:]]*:[[:space:]]*"[0-9]+\.[0-9]+\.[0-9]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+        file=$(printf '%s' "$vj" | grep -oE '"file"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"file"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' | head -1 || true)
+      fi
+      if [ -z "${rver:-}" ]; then
+        local idx; idx=$(curl -fsSL "${auth[@]}" "$UPDATE_URL" 2>/dev/null) || { log "원격 조회 실패: $UPDATE_URL"; return 0; }
+        rver=$(printf '%s' "$idx" | grep -oE 'nexus-manager-offline-v[0-9]+\.[0-9]+\.[0-9]+\.zip' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 || true)
+      fi
+      if [ -z "${rver:-}" ]; then log "원격에 버전 정보 없음"; return 0; fi
       if ! ver_gt "$rver" "$cur"; then log "원격 새 버전 없음 (현재 $cur · 원격 $rver)"; return 0; fi
-      log "원격(디렉터리) 새 버전 $rver 다운로드..."
-      curl -fsSL -o "$WATCH_DIR/nexus-manager-offline-v$rver.zip" "${base}nexus-manager-offline-v$rver.zip" \
+      [ -z "${file:-}" ] && file="nexus-manager-offline-v$rver.zip"
+      log "원격 새 버전 $rver 다운로드... ($file)"
+      curl -fsSL "${auth[@]}" -o "$WATCH_DIR/$file" "${base}${file}" \
         && log "다운로드 완료 → 감시 폴더" || log "다운로드 실패"
       ;;
     *) log "알 수 없는 UPDATE_URL 형식: $UPDATE_URL" ;;
@@ -89,7 +127,13 @@ remote_fetch() {
 check_once() {
   mkdir -p "$WATCH_DIR" "$PROCESSED"
   if [ "$(id -u)" -ne 0 ]; then log "root 권한이 필요합니다."; return 1; fi
+  load_portal_config
   remote_fetch || true
+
+  if [ "${AUTO_INSTALL:-1}" = "0" ]; then
+    log "자동 설치 꺼짐 — 새 번들 다운로드만 수행(적용은 수동/포탈)."
+    return 0
+  fi
 
   local cur best="" bestver=""
   cur=$(current_version)

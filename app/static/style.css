@@ -151,6 +151,16 @@ h3 { font-size: 14px; color: var(--muted); }
   border: 1px solid var(--border); border-radius: 14px;
   padding: 2px 10px; font-size: 12px; cursor: pointer;
 }
+.backup-run { border: 1px solid var(--border); border-radius: 8px; margin: 6px 0; background: var(--panel); }
+.backup-run > summary {
+  cursor: pointer; padding: 8px 12px; font-weight: 600; list-style: none;
+  display: flex; align-items: center; gap: 8px;
+}
+.backup-run > summary::before { content: "▸"; color: var(--muted); }
+.backup-run[open] > summary::before { content: "▾"; }
+.backup-run > summary:hover { color: var(--accent); }
+.backup-run table { margin: 0 0 8px; }
+
 .update-log {
   margin: 10px 0 0; max-height: 160px; overflow: auto;
   background: rgba(0,0,0,.25); border: 1px solid var(--border); border-radius: 8px;

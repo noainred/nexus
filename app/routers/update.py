@@ -1,15 +1,16 @@
-"""Portal-facing auto-update: report current vs available version and trigger
-the (root) systemd update unit.
+"""Portal-facing auto-update: editable source config, version check, and
+trigger of the (root) systemd update unit.
 
-The actual upgrade is performed by ``deploy/auto-update.sh`` via the
-``nexus-manager-update.service`` systemd unit (it rebuilds the venv and
-restarts the service, which the non-root app process cannot do itself). This
-router only *reports* status and *triggers* that unit without blocking.
+The settings entered in the dashboard are persisted to ``update-config.json``
+so both this app and the ``deploy/auto-update.sh`` watcher use the same source.
+The actual upgrade is performed by the ``nexus-manager-update.service`` systemd
+unit (it rebuilds the venv and restarts the service).
 """
 from __future__ import annotations
 
 import asyncio
 import glob
+import json
 import os
 import re
 import zipfile
@@ -18,6 +19,7 @@ from typing import List, Optional
 
 import httpx
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from .. import __version__
 from ..config import get_settings
@@ -25,6 +27,7 @@ from ..config import get_settings
 router = APIRouter(prefix="/api/update", tags=["update"])
 
 _VER_RE = re.compile(r"(\d+)\.(\d+)\.(\d+)")
+_DEFAULTS = {"source": "server", "url": "", "token": "", "interval": 300, "auto_install": True}
 
 
 def _vkey(v: str):
@@ -37,15 +40,37 @@ def _abs(path: str) -> Path:
     return p if p.is_absolute() else Path(os.getcwd()) / p
 
 
+def _cfg_path() -> Path:
+    return _abs(get_settings().update_config_file)
+
+
+def _load_cfg() -> dict:
+    cfg = dict(_DEFAULTS)
+    p = _cfg_path()
+    if p.is_file():
+        try:
+            cfg.update({k: v for k, v in json.loads(p.read_text("utf-8")).items() if k in _DEFAULTS})
+        except Exception:  # noqa: BLE001
+            pass
+    if not cfg.get("url"):
+        cfg["url"] = get_settings().update_url or ""
+    return cfg
+
+
+def _masked(cfg: dict) -> dict:
+    out = dict(cfg)
+    out["token"] = bool(cfg.get("token"))   # never echo the token back
+    return out
+
+
 def _zip_version(path: str) -> Optional[str]:
-    """Version from the ver_X.Y.Z.md marker inside the bundle, else filename."""
     try:
         with zipfile.ZipFile(path) as z:
             for name in z.namelist():
                 m = re.search(r"ver_(\d+\.\d+\.\d+)\.md", name)
                 if m:
                     return m.group(1)
-    except Exception:  # noqa: BLE001 - a bad zip just isn't a candidate
+    except Exception:  # noqa: BLE001
         pass
     m = _VER_RE.search(os.path.basename(path))
     return ".".join(m.groups()) if m else None
@@ -53,31 +78,49 @@ def _zip_version(path: str) -> Optional[str]:
 
 def _folder_latest(dirpath: Path) -> Optional[str]:
     best: Optional[str] = None
-    for p in glob.glob(str(dirpath / "*.zip")):
-        v = _zip_version(p)
+    for p in glob.glob(str(dirpath / "*.zip")) + glob.glob(str(dirpath / "*.tar.gz")):
+        v = _zip_version(p) or (_VER_RE.search(os.path.basename(p)) and ".".join(_VER_RE.search(os.path.basename(p)).groups()))
         if v and (best is None or _vkey(v) > _vkey(best)):
             best = v
     return best
 
 
-async def _remote_latest(url: str) -> Optional[str]:
+async def _remote_latest(cfg: dict) -> Optional[str]:
     """Highest version advertised by the configured remote source."""
-    async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as c:
-        if url.startswith("github:"):
-            repo = url[len("github:"):]
-            r = await c.get(f"https://api.github.com/repos/{repo}/releases/tags/latest")
+    url = (cfg.get("url") or "").strip()
+    if not url:
+        return None
+    token = cfg.get("token") or ""
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    async with httpx.AsyncClient(timeout=8.0, follow_redirects=True, verify=False) as c:
+        if cfg.get("source") == "github" or url.startswith("github:"):
+            repo = url[len("github:"):] if url.startswith("github:") else url
+            m = re.search(r"github\.com[:/]+([^/]+/[^/]+?)(?:\.git|/|$)", repo)
+            if m:
+                repo = m.group(1)
+            r = await c.get(f"https://api.github.com/repos/{repo}/releases/tags/latest", headers=headers)
             r.raise_for_status()
             for asset in (r.json() or {}).get("assets", []):
-                m = re.fullmatch(r"ver_(\d+\.\d+\.\d+)\.md", asset.get("name", ""))
-                if m:
-                    return m.group(1)
-        elif url.startswith("http://") or url.startswith("https://"):
-            r = await c.get(url)
-            r.raise_for_status()
-            vers = re.findall(r"nexus-manager-offline-v(\d+\.\d+\.\d+)\.zip", r.text)
-            if vers:
-                return max(vers, key=_vkey)
-    return None
+                mm = re.fullmatch(r"ver_(\d+\.\d+\.\d+)\.md", asset.get("name", ""))
+                if mm:
+                    return mm.group(1)
+            return _VER_RE.search((r.json() or {}).get("name", "")) and ".".join(_VER_RE.search(r.json()["name"]).groups())
+        # "server" — an internal mirror directory: prefer versions.json, else
+        # parse the directory listing for the highest bundle filename.
+        base = url if url.endswith("/") else url + "/"
+        try:
+            vr = await c.get(base + "versions.json", headers=headers)
+            if vr.status_code == 200:
+                data = vr.json()
+                v = data.get("version") or data.get("latest")
+                if v:
+                    return ".".join(_VER_RE.search(v).groups())
+        except Exception:  # noqa: BLE001 - fall back to listing
+            pass
+        r = await c.get(url, headers=headers)
+        r.raise_for_status()
+        vers = re.findall(r"nexus-manager-offline-v(\d+\.\d+\.\d+)\.(?:zip|tar\.gz)", r.text)
+        return max(vers, key=_vkey) if vers else None
 
 
 def _tail(path: Path, lines: int) -> List[str]:
@@ -91,15 +134,15 @@ def _tail(path: Path, lines: int) -> List[str]:
 
 @router.get("/status")
 async def update_status() -> dict:
-    """Current version + best available (watch folder and/or remote) + log tail."""
     s = get_settings()
+    cfg = _load_cfg()
     current = __version__
     folder = _folder_latest(_abs(s.update_dir))
     remote = None
     remote_error = None
-    if s.update_url:
+    if cfg.get("url"):
         try:
-            remote = await _remote_latest(s.update_url)
+            remote = await _remote_latest(cfg)
         except Exception as exc:  # noqa: BLE001 - remote is best-effort
             remote_error = str(exc)[:200]
     cands = [v for v in (folder, remote) if v]
@@ -112,16 +155,54 @@ async def update_status() -> dict:
         "remote_error": remote_error,
         "available": available,
         "update_available": newer,
-        "source": s.update_url or "",
+        "config": _masked(cfg),
         "log": _tail(_abs(s.update_log), 25),
     }
+
+
+class UpdateConfig(BaseModel):
+    source: str = "server"
+    url: str = ""
+    token: Optional[str] = None       # None = keep existing; "" = clear
+    interval: int = 300
+    auto_install: bool = True
+    clear_token: bool = False
+
+
+@router.post("/config")
+async def update_config(body: UpdateConfig) -> dict:
+    src = body.source if body.source in ("server", "github") else "server"
+    url = (body.url or "").strip()
+    if url and src == "github":
+        if not (url.startswith("github:") or "github.com" in url):
+            raise HTTPException(status_code=400, detail="GitHub 소스는 'github:owner/repo' 또는 github.com 주소여야 합니다.")
+    if url and src == "server" and not (url.startswith("http://") or url.startswith("https://")):
+        raise HTTPException(status_code=400, detail="Update Server 소스는 http(s):// 주소여야 합니다.")
+    cur = _load_cfg()
+    token = cur.get("token", "")
+    if body.clear_token:
+        token = ""
+    elif body.token is not None and body.token != "":
+        token = body.token
+    cfg = {
+        "source": src, "url": url, "token": token,
+        "interval": max(30, int(body.interval or 300)),
+        "auto_install": bool(body.auto_install),
+    }
+    p = _cfg_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        os.chmod(p, 0o600)   # may hold a token
+    except OSError:
+        pass
+    return {"ok": True, "config": _masked(cfg)}
 
 
 @router.post("/run")
 async def update_run() -> dict:
     """Trigger the systemd update unit (non-blocking — it restarts the app)."""
-    cmd = ["sudo", "-n", "systemctl", "start", "--no-block",
-           "nexus-manager-update.service"]
+    cmd = ["sudo", "-n", "systemctl", "start", "--no-block", "nexus-manager-update.service"]
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
@@ -136,6 +217,6 @@ async def update_run() -> dict:
     raise HTTPException(
         status_code=503,
         detail=("업데이트 트리거 실패 — 권한(sudo) 또는 systemd 서비스가 없습니다. "
-                "감시 폴더에 zip을 넣으면 타이머가 5분 내 적용합니다. "
+                "감시 폴더에 zip을 넣으면 타이머가 적용합니다. "
                 f"{(err or b'').decode(errors='ignore')[:200]}"),
     )

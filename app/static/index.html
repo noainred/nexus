@@ -413,14 +413,35 @@
         <p class="hint">관리할 Nexus 서버를 추가·수정·삭제합니다. 각 서버를 모니터링/비교에 사용할지 선택할 수 있습니다.</p>
 
         <div class="settings-card">
-          <h3>자동 업데이트</h3>
-          <p class="hint">감시 폴더(updates/) 또는 원격 소스(UPDATE_URL)에 더 높은 버전이 있으면 표시합니다. '지금 업데이트 적용'을 누르면 설치된 systemd 업데이트 서비스가 즉시 실행되어 자동 업그레이드 후 서비스가 재시작됩니다.</p>
+          <h3>🌐 인터넷(URL) 자동 업그레이드</h3>
           <div id="update-status" class="cards"></div>
-          <div class="form-actions" style="justify-content:flex-start;gap:8px;margin-top:8px">
-            <button type="button" id="update-check">업데이트 확인</button>
-            <button type="button" id="update-run">지금 업데이트 적용</button>
-            <span id="update-msg" class="hint" style="margin:0"></span>
-          </div>
+          <p id="update-src" class="hint" style="margin:6px 0"></p>
+          <form id="update-form" class="form">
+            <label>소스
+              <select name="source">
+                <option value="server">Update Server (사내 미러/디렉터리)</option>
+                <option value="github">GitHub 릴리스</option>
+              </select>
+            </label>
+            <label>Site Info(URL)
+              <input name="url" placeholder="http://mirror/…/  또는  github:owner/repo" />
+            </label>
+            <label>인증 토큰
+              <input name="token" type="password" placeholder="GitHub PAT 등 — 공개 소스면 비움" autocomplete="off" />
+            </label>
+            <label>확인 주기(초)
+              <input name="interval" type="number" min="30" step="10" value="300" />
+            </label>
+            <label class="chk"><input type="checkbox" name="auto_install" checked /> 새 버전 자동 설치·재시작</label>
+            <label class="chk"><input type="checkbox" name="clear_token" /> 저장된 토큰 지우기</label>
+            <p class="hint" style="margin:2px 0">※ 사내 미러는 <code>versions.json</code>(+ 번들 zip)이 있는 <b>폴더 주소</b>를 넣으세요. GitHub는 <code>github:owner/repo</code> 또는 github.com 주소. 비공개면 토큰을 함께 저장하세요.</p>
+            <div class="form-actions" style="justify-content:flex-start;gap:8px">
+              <button type="submit">설정 저장</button>
+              <button type="button" id="update-check">지금 확인</button>
+              <button type="button" id="update-run">지금 적용</button>
+              <span id="update-msg" class="hint" style="margin:0"></span>
+            </div>
+          </form>
           <pre id="update-log" class="update-log"></pre>
         </div>
 

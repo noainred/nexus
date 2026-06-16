@@ -98,6 +98,7 @@ class Settings(BaseSettings):
     # Portal-driven auto-update view (mirrors the deploy/auto-update.sh watcher).
     update_dir: str = "updates"
     update_url: str = ""
+    update_config_file: str = "update-config.json"
     update_log: str = "auto-update.log"
 
     @field_validator("admin_password")

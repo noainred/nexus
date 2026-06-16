@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.4.0",
+        "date": "2026-06-16",
+        "changes": [
+            {"type": "added", "text": "인터넷(URL) 자동 업그레이드 설정 UI — 서버 설정 탭에서 소스(Update Server/GitHub)·Site Info(URL)·인증 토큰·확인 주기·자동 설치 여부를 입력·저장. 사내 미러는 versions.json(+번들) 폴더 주소, GitHub는 github:owner/repo(비공개는 토큰) 지원. 설정은 update-config.json에 저장되어 앱과 워처(auto-update.sh)가 공유, 토큰은 화면에 다시 노출하지 않음(마스킹)"},
+            {"type": "changed", "text": "구성 백업 목록을 시각별로 접어서 표시 — 시각 줄을 클릭하면 그 시점의 서버별 파일이 펼쳐짐(최신 1건만 기본 펼침)"},
+        ],
+    },
+    {
         "version": "1.3.1",
         "date": "2026-06-16",
         "changes": [

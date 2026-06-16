@@ -3629,21 +3629,23 @@ async function loadBackupList() {
     box.append(el("p", { class: "hint" }, "아직 백업이 없습니다. ‘지금 백업’으로 첫 백업을 만들 수 있습니다."));
     return;
   }
-  const rows = [];
-  runs.forEach((run) => {
-    run.files.forEach((f, idx) => {
-      rows.push(el("tr", {}, [
-        el("td", {}, idx === 0 ? run.timestamp : ""),
-        el("td", {}, [
-          el("a", {
-            href: `/api/backups/${encodeURIComponent(run.timestamp)}/${encodeURIComponent(f.name)}`,
-          }, f.name),
-        ]),
-        el("td", { class: "num" }, fmtBytes(f.size)),
-      ]));
-    });
+  // Each backup run is collapsed by default — click the 시각 줄을 클릭하면
+  // 그 시점의 서버별 파일 목록이 펼쳐집니다.
+  box.append(el("p", { class: "hint" }, `백업 ${runs.length}건 — 시각을 클릭하면 서버별 파일이 펼쳐집니다.`));
+  runs.forEach((run, i) => {
+    const total = run.files.reduce((a, f) => a + (f.size || 0), 0);
+    const det = el("details", { class: "backup-run" });
+    if (i === 0) det.open = true;   // 최신 1건만 펼쳐서 보여줌
+    det.append(el("summary", {}, `${run.timestamp}  ·  파일 ${run.files.length}개  ·  ${fmtBytes(total)}`));
+    const rows = run.files.map((f) => el("tr", {}, [
+      el("td", {}, el("a", {
+        href: `/api/backups/${encodeURIComponent(run.timestamp)}/${encodeURIComponent(f.name)}`,
+      }, f.name)),
+      el("td", { class: "num" }, fmtBytes(f.size)),
+    ]));
+    det.append(buildTable(["파일(서버)", "크기"], rows));
+    box.append(det);
   });
-  box.append(buildTable(["시각", "파일(서버)", "크기"], rows));
 }
 
 async function runBackupNow() {
@@ -3861,6 +3863,7 @@ async function loadUpdateStatus() {
   const box = document.getElementById("update-status");
   const logEl = document.getElementById("update-log");
   const msg = document.getElementById("update-msg");
+  const srcEl = document.getElementById("update-src");
   if (!box) return;
   box.innerHTML = ""; msg.textContent = "확인 중…";
   let r;
@@ -3871,19 +3874,52 @@ async function loadUpdateStatus() {
     return;
   }
   msg.textContent = "";
-  box.append(summaryCard("현재 버전", r.current || "—"));
-  box.append(summaryCard("사용 가능", r.available || "—"));
-  if (r.source) box.append(summaryCard("원격 소스", r.source));
+  box.append(summaryCard("현재 버전", "v" + (r.current || "—")));
+  box.append(summaryCard("최신", r.available ? "v" + r.available : "—"));
   const runBtn = document.getElementById("update-run");
   if (r.update_available) {
-    box.append(summaryCard("상태", `⬆ ${r.available} 업그레이드 가능`));
+    box.append(summaryCard("상태", `⬆ v${r.available} 업그레이드 가능`));
     if (runBtn) runBtn.disabled = false;
   } else {
     box.append(summaryCard("상태", "최신입니다 ✓"));
     if (runBtn) runBtn.disabled = true;
   }
+  const c = r.config || {};
+  if (srcEl) srcEl.textContent = c.url ? `소스: ${c.url}` : "소스 미설정 — 아래에서 URL을 입력하세요.";
+  // Fill the form from the saved config (token shown as placeholder if set).
+  const form = document.getElementById("update-form");
+  if (form) {
+    if (c.source) form.source.value = c.source;
+    form.url.value = c.url || "";
+    form.interval.value = c.interval || 300;
+    form.auto_install.checked = c.auto_install !== false;
+    form.token.value = "";
+    form.token.placeholder = c.token ? "(저장된 토큰 있음 — 바꿀 때만 입력)" : "GitHub PAT 등 — 공개 소스면 비움";
+  }
   if (r.remote_error) msg.textContent = `원격 확인 경고: ${r.remote_error}`;
   logEl.textContent = (r.log || []).join("\n") || "(업데이트 로그 없음)";
+}
+
+async function saveUpdateConfig(ev) {
+  ev.preventDefault();
+  const form = ev.target;
+  const fd = new FormData(form);
+  const body = {
+    source: fd.get("source"),
+    url: String(fd.get("url") || "").trim(),
+    interval: Number(fd.get("interval")) || 300,
+    auto_install: form.auto_install.checked,
+    clear_token: form.clear_token.checked,
+  };
+  const tok = String(fd.get("token") || "");
+  if (tok) body.token = tok;          // omit → keep existing
+  try {
+    await api("/api/update/config", { method: "POST", body: JSON.stringify(body) });
+    toast("업데이트 설정을 저장했습니다");
+    loadUpdateStatus();
+  } catch (e) {
+    toast(`저장 실패: ${e.message}`, "err");
+  }
 }
 
 async function runUpdate() {
@@ -3901,6 +3937,8 @@ async function runUpdate() {
 }
 
 function setupUpdate() {
+  const f = document.getElementById("update-form");
+  if (f) f.addEventListener("submit", saveUpdateConfig);
   const c = document.getElementById("update-check");
   if (c) c.addEventListener("click", loadUpdateStatus);
   const r = document.getElementById("update-run");
