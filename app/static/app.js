@@ -1214,11 +1214,21 @@ function renderTopoTree(data) {
   });
 
   // User-arranged positions (drag & drop) override the automatic layout.
+  // Only accept FINITE coordinates — typeof NaN === "number", so a corrupt
+  // saved value would otherwise poison width/height and collapse the board.
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem("topoPos") || "{}"); } catch (e) { saved = {}; }
   nodes.forEach((n) => {
     const sp = saved[n.id];
-    if (sp && typeof sp.x === "number" && typeof sp.y === "number") pos[n.id] = { x: sp.x, y: sp.y };
+    if (sp && Number.isFinite(sp.x) && Number.isFinite(sp.y)) pos[n.id] = { x: sp.x, y: sp.y };
+  });
+  // Final guard: every node must have a finite position (fallback to origin
+  // so one bad value can never blank the whole board).
+  nodes.forEach((n, i) => {
+    const p = pos[n.id];
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+      pos[n.id] = { x: 24 + (i % 6) * (NW + HGAP), y: 26 + Math.floor(i / 6) * VGAP };
+    }
   });
 
   // Fit the canvas to the actual content (no dead margins).
@@ -1376,8 +1386,9 @@ function renderTopoTree(data) {
       const scale = rect.width ? width / rect.width : 1;
       const dx = ev.clientX * scale - sx, dy = ev.clientY * scale - sy;
       if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
-      pos[id].x = Math.max(0, ox + dx);
-      pos[id].y = Math.max(0, oy + dy);
+      const nx = Math.max(0, ox + dx), ny = Math.max(0, oy + dy);
+      if (!Number.isFinite(nx) || !Number.isFinite(ny)) return;  // never go NaN
+      pos[id].x = nx; pos[id].y = ny;
       g.setAttribute("transform", `translate(${pos[id].x},${pos[id].y})`);
       refreshEdges();
       growCanvas();
@@ -1388,8 +1399,10 @@ function renderTopoTree(data) {
       if (moved) {
         let store = {};
         try { store = JSON.parse(localStorage.getItem("topoPos") || "{}"); } catch (e) { store = {}; }
-        store[id] = { x: Math.round(pos[id].x), y: Math.round(pos[id].y) };
-        localStorage.setItem("topoPos", JSON.stringify(store));
+        if (Number.isFinite(pos[id].x) && Number.isFinite(pos[id].y)) {
+          store[id] = { x: Math.round(pos[id].x), y: Math.round(pos[id].y) };
+          localStorage.setItem("topoPos", JSON.stringify(store));
+        }
       } else {
         const n = byId[id];
         if (n) window.open(n.base_url, "_blank", "noopener,noreferrer");

@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.4.1",
+        "date": "2026-06-16",
+        "changes": [
+            {"type": "changed", "text": "계위 상황판이 새 노드 추가/특정 상황에서 빈 화면(작은 점)만 나오던 문제 수정 — 저장된 드래그 좌표 검증이 NaN을 통과시켜(typeof NaN==='number') width/height가 깨지던 버그. 유한값만 허용하도록 강화하고, 좌표 누락 시 자동 배치로 폴백 + 드래그 저장 시에도 NaN 차단"},
+        ],
+    },
+    {
         "version": "1.4.0",
         "date": "2026-06-16",
         "changes": [
