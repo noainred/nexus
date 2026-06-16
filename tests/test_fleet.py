@@ -271,6 +271,30 @@ def test_disk_history_empty_ok(http_client):
     assert http_client.get("/api/disk-history").json() == {"stores": []}
 
 
+@respx.mock
+def test_create_admin_user(http_client):
+    route = respx.post(f"{API}/security/users").mock(return_value=httpx.Response(200, json={}))
+    r = http_client.post("/api/accounts/create-admin", json={
+        "instance_ids": ["test"], "user_id": "ops", "password": "pw",
+    }).json()
+    assert r["ok"] == 1 and r["roles"] == ["nx-admin"]
+    assert route.called
+
+
+@respx.mock
+def test_change_password_syncs_manager_credential(http_client):
+    # 'admin' is the manager's connect account for the test instance.
+    respx.put(f"{API}/security/users/admin/change-password").mock(
+        return_value=httpx.Response(204))
+    r = http_client.post("/api/accounts/change-password", json={
+        "instance_ids": ["test"], "user_id": "admin", "password": "newpw",
+    }).json()
+    assert r["ok"] == 1
+    assert r["items"][0]["credential_synced"] is True
+    # the stored credential was updated in lockstep
+    assert deps.registry.get("test").password == "newpw"
+
+
 def test_portal_title_default_and_save(http_client, tmp_path, monkeypatch):
     from app.config import Settings
     s = Settings(portal_config_file=str(tmp_path / "portal.json"))

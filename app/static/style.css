@@ -161,6 +161,11 @@ h3 { font-size: 14px; color: var(--muted); }
 .backup-run > summary:hover { color: var(--accent); }
 .backup-run table { margin: 0 0 8px; }
 
+.acct-forms { display: flex; gap: 18px; flex-wrap: wrap; }
+.acct-forms .form { flex: 1; min-width: 280px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+.acct-forms h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+#acct-insts .pick-chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
 .update-log {
   margin: 10px 0 0; max-height: 160px; overflow: auto;
   background: rgba(0,0,0,.25); border: 1px solid var(--border); border-radius: 8px;

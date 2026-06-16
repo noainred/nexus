@@ -21,6 +21,7 @@ from .diskmon import run_loop as disk_run_loop
 from .routers.sync import run_loop as sync_run_loop
 from .routers import (
     alerts,
+    accounts,
     auth,
     backup,
     bulk,
@@ -166,6 +167,7 @@ app.include_router(bulk.router)
 app.include_router(cleanup.fleet_router)
 app.include_router(meta.router)
 app.include_router(update.router)
+app.include_router(accounts.router)
 
 
 @app.middleware("http")

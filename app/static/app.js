@@ -214,7 +214,7 @@ function selectTab(name) {
   if (name === "security" && !state.securityLoaded) { state.securityLoaded = true; loadSecurity(); }
   if (name === "alerts") loadAlerts();
   if (name === "content" && !state.contentSetup) { state.contentSetup = true; setupContent(); }
-  if (name === "settings") { loadSettings(); loadUpdateStatus(); }
+  if (name === "settings") { loadSettings(); loadUpdateStatus(); fillAcctInstances(); }
   if (name === "topology" && !state.topologyLoaded) { state.topologyLoaded = true; loadTopology(); }
   if (name === "blobstore") { loadBlobstores(); loadDiskCharts(); }
   if (name === "cleanup-candidates") fillCleanupInstances();
@@ -3988,6 +3988,84 @@ function setupPortalTitle() {
   });
 }
 
+// ---- 노드 계정 관리 (관리자 유저 생성 / 비번 변경) -----------------------
+
+function fillAcctInstances() {
+  const box = document.getElementById("acct-insts");
+  if (!box) return;
+  state.acctSel = state.acctSel || new Set();
+  box.innerHTML = "";
+  (state.instances || []).forEach((i) => {
+    const on = state.acctSel.has(i.id);
+    box.append(el("button", {
+      type: "button",
+      class: `pick-chip ${on ? "on" : ""}`,
+      onclick: () => {
+        if (state.acctSel.has(i.id)) state.acctSel.delete(i.id);
+        else state.acctSel.add(i.id);
+        fillAcctInstances();
+      },
+    }, i.name));
+  });
+}
+
+function renderAcctResult(r, label) {
+  const box = document.getElementById("acct-result");
+  box.innerHTML = "";
+  if (r.error) { box.append(el("p", { class: "site-error" }, r.error)); return; }
+  box.append(el("p", { class: "hint" }, `${label} — 성공 ${r.ok}/${r.total}`));
+  const rows = (r.items || []).map((it) => el("tr", {}, [
+    el("td", {}, it.instance_name),
+    el("td", {}, it.ok
+      ? el("span", { class: "badge up" }, it.credential_synced ? "성공(자격증명 동기화)" : "성공")
+      : el("span", { class: "badge down", title: it.error }, "실패")),
+    el("td", { class: "site-error" }, it.ok ? "" : (it.error || "")),
+  ]));
+  box.append(buildTable(["서버", "결과", "오류"], rows));
+}
+
+function setupAccounts() {
+  const all = document.getElementById("acct-all");
+  if (all) all.addEventListener("click", () => {
+    state.acctSel = new Set((state.instances || []).map((i) => i.id)); fillAcctInstances();
+  });
+  const none = document.getElementById("acct-none");
+  if (none) none.addEventListener("click", () => { state.acctSel = new Set(); fillAcctInstances(); });
+
+  const create = document.getElementById("acct-create");
+  if (create) create.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const ids = [...(state.acctSel || [])];
+    if (!ids.length) { toast("대상 서버를 선택하세요.", "err"); return; }
+    const fd = new FormData(create);
+    if (!confirm(`선택한 ${ids.length}개 서버에 관리자(nx-admin) 유저 '${fd.get("user_id")}'를 생성합니다.\n진행할까요?`)) return;
+    try {
+      const r = await api("/api/accounts/create-admin", { method: "POST", body: JSON.stringify({
+        instance_ids: ids, user_id: fd.get("user_id"), password: fd.get("password"),
+        first_name: fd.get("first_name") || "", email: fd.get("email") || "",
+      }) });
+      renderAcctResult(r, "관리자 유저 생성");
+      toast(r.error ? r.error : `유저 생성 — 성공 ${r.ok}/${r.total}`, r.error || r.ok < r.total ? "err" : "ok");
+    } catch (e) { toast(`실패: ${e.message}`, "err"); }
+  });
+
+  const pw = document.getElementById("acct-pw");
+  if (pw) pw.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const ids = [...(state.acctSel || [])];
+    if (!ids.length) { toast("대상 서버를 선택하세요.", "err"); return; }
+    const fd = new FormData(pw);
+    if (!confirm(`선택한 ${ids.length}개 서버에서 '${fd.get("user_id")}' 비밀번호를 변경합니다.\n(매니저 접속 계정이면 저장된 자격증명도 함께 갱신)\n진행할까요?`)) return;
+    try {
+      const r = await api("/api/accounts/change-password", { method: "POST", body: JSON.stringify({
+        instance_ids: ids, user_id: fd.get("user_id"), password: fd.get("password"),
+      }) });
+      renderAcctResult(r, "비밀번호 변경");
+      toast(r.error ? r.error : `비번 변경 — 성공 ${r.ok}/${r.total}`, r.error || r.ok < r.total ? "err" : "ok");
+    } catch (e) { toast(`실패: ${e.message}`, "err"); }
+  });
+}
+
 function setupUpdate() {
   const f = document.getElementById("update-form");
   if (f) f.addEventListener("submit", saveUpdateConfig);
@@ -4672,6 +4750,7 @@ async function init() {
   setupSecurity();
   setupSettings();
   setupPortalTitle();
+  setupAccounts();
   setupUpdate();
   setupBulk();
   setupTopology();

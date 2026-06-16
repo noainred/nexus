@@ -425,6 +425,34 @@
         </div>
 
         <div class="settings-card">
+          <h3>노드 계정 관리 (관리자 유저 생성 / 비밀번호 변경)</h3>
+          <p class="hint">선택한 서버에 관리자(nx-admin) 유저를 만들거나 기존 사용자의 비밀번호를 변경합니다. 매니저가 접속에 쓰는 계정의 비번을 바꾸면 저장된 자격증명도 자동 갱신되어 잠기지 않습니다.</p>
+          <div class="pick-group" style="margin-bottom:10px">
+            <span class="pick-label">대상 서버</span>
+            <button type="button" id="acct-all" class="pick-mini">전체</button>
+            <button type="button" id="acct-none" class="pick-mini">해제</button>
+            <div id="acct-insts" class="pick-chips"></div>
+          </div>
+          <div class="acct-forms">
+            <form id="acct-create" class="form">
+              <h4>① 새 관리자 유저 생성</h4>
+              <label>userId <input name="user_id" placeholder="예: ops-admin" required /></label>
+              <label>비밀번호 <input name="password" type="password" autocomplete="new-password" required /></label>
+              <label>이름(선택) <input name="first_name" /></label>
+              <label>이메일(선택) <input name="email" type="email" /></label>
+              <div class="form-actions"><button type="submit">관리자 유저 생성</button></div>
+            </form>
+            <form id="acct-pw" class="form">
+              <h4>② 비밀번호 변경</h4>
+              <label>userId <input name="user_id" value="admin" required /></label>
+              <label>새 비밀번호 <input name="password" type="password" autocomplete="new-password" required /></label>
+              <div class="form-actions"><button type="submit">비밀번호 변경</button></div>
+            </form>
+          </div>
+          <div id="acct-result"></div>
+        </div>
+
+        <div class="settings-card">
           <h3>🌐 인터넷(URL) 자동 업그레이드</h3>
           <div id="update-status" class="cards"></div>
           <p id="update-src" class="hint" style="margin:6px 0"></p>

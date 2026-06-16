@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.5.0",
+        "date": "2026-06-16",
+        "changes": [
+            {"type": "added", "text": "노드 계정 관리 — 서버 설정에서 선택한 서버(들)에 관리자(nx-admin) 유저 생성 및 기존 사용자 비밀번호 변경(여러 노드 일괄). 매니저 접속 계정의 비번을 바꾸면 저장된 자격증명도 자동 동기화해 잠김 방지. GET /api/accounts/instances/{id}/users · POST /api/accounts/create-admin · /change-password, nexus_client.change_password 추가"},
+        ],
+    },
+    {
         "version": "1.4.4",
         "date": "2026-06-16",
         "changes": [

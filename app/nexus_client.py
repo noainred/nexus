@@ -378,6 +378,16 @@ class NexusClient:
     async def create_user(self, payload: dict[str, Any]) -> None:
         await self._request("POST", "/security/users", json=payload)
 
+    async def change_password(self, user_id: str, new_password: str) -> None:
+        """Change a user's password (Nexus expects the new password as a
+        text/plain request body)."""
+        await self._request(
+            "PUT",
+            f"/security/users/{user_id}/change-password",
+            content=new_password.encode("utf-8"),
+            headers={"Content-Type": "text/plain"},
+        )
+
     async def create_routing_rule(self, payload: dict[str, Any]) -> None:
         await self._request("POST", "/routing-rules", json=payload)
 
