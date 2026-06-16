@@ -199,6 +199,18 @@ sudo UPDATE_URL=https://mirror.example/nexus/ bash deploy/install-service.sh
 > 끄려면 설치 시 `WITH_AUTOUPDATE=0`, 또는
 > `sudo systemctl disable --now nexus-manager-update.timer`.
 
+**GitHub → 사내 Nexus raw 미러** — 폐쇄망 매니저가 사내에서만 업그레이드받게
+하려면 `deploy/mirror-to-nexus.sh`로 GitHub 최신 릴리스를 사내 raw 저장소에
+올리세요(`versions.json` + 번들 자동 생성·업로드). 이후 포탈/`UPDATE_URL`을 그
+raw 폴더 주소로 두면 됩니다.
+
+```bash
+NEXUS_RAW_URL=http://repository.dvc.lgensol.com:8081/repository/manager-upgrade/nexus-manager \
+NEXUS_USER=admin NEXUS_PASS=*** \
+  bash deploy/mirror-to-nexus.sh
+# → 포탈 자동 업그레이드 Site Info(URL) 에  …/manager-upgrade/nexus-manager/  입력
+```
+
 ## 설정
 
 ### `instances.yaml`

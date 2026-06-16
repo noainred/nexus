@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.4.2",
+        "date": "2026-06-16",
+        "changes": [
+            {"type": "added", "text": "deploy/mirror-to-nexus.sh 추가 — GitHub 최신 릴리스를 사내 Nexus raw 저장소로 미러(versions.json + 번들 zip 자동 생성·업로드). 폐쇄망 매니저가 사내 주소(UPDATE_URL)만으로 자동 업그레이드되도록 GitHub 소스와 사내 배포 경로를 조합"},
+        ],
+    },
+    {
         "version": "1.4.1",
         "date": "2026-06-16",
         "changes": [
