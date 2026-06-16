@@ -167,6 +167,8 @@ class InstanceSecurity(BaseModel):
     admin_active: Optional[bool] = None
     admin_users: List[str] = Field(default_factory=list)
     user_count: Optional[int] = None
+    issues: List[str] = Field(default_factory=list)
+    risk: str = "ok"   # ok | warn | unknown
 
 
 class Repository(BaseModel):

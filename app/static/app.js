@@ -3248,18 +3248,37 @@ async function loadSecurity() {
     container.append(el("div", { class: "empty" }, "구성된 인스턴스가 없습니다."));
     return;
   }
+  // Fleet summary for at-a-glance scanning.
+  const summary = document.getElementById("security-summary");
+  if (summary) {
+    const warn = list.filter((s) => s.risk === "warn").length;
+    const anon = list.filter((s) => s.anonymous_enabled).length;
+    const unk = list.filter((s) => !s.reachable || s.risk === "unknown").length;
+    summary.innerHTML = "";
+    summary.append(
+      summaryCard("서버", String(list.length)),
+      summaryCard("점검 필요", String(warn)),
+      summaryCard("익명 접근 허용", String(anon)),
+      summaryCard("조회 불가", String(unk)),
+    );
+  }
   const rows = list.map((s) => {
     if (!s.reachable) {
       return el("tr", {}, [
         el("td", {}, s.name),
-        el("td", { colspan: "4", class: "site-error" }, `조회 불가: ${s.error || ""}`),
+        el("td", {}, el("span", { class: "badge warn" }, "조회 불가")),
+        el("td", { colspan: "4", class: "site-error" }, s.error || ""),
       ]);
     }
-    const adminList = s.admin_users && s.admin_users.length
-      ? s.admin_users.join(", ")
-      : "—";
+    const adminList = s.admin_users && s.admin_users.length ? s.admin_users.join(", ") : "—";
+    const riskBadge = s.risk === "warn"
+      ? el("span", { class: "badge down", title: (s.issues || []).join(", ") }, "⚠ 점검")
+      : (s.risk === "unknown"
+          ? el("span", { class: "badge warn", title: s.error || "" }, "확인불가")
+          : el("span", { class: "badge up" }, "양호"));
     return el("tr", {}, [
       el("td", {}, s.name),
+      el("td", {}, riskBadge),
       el("td", {}, yesNoBadge(s.anonymous_enabled, true, ["허용", "차단"])),
       el("td", {}, yesNoBadge(s.admin_active, true, ["활성", "비활성"])),
       el("td", { title: adminList }, `${s.admin_users ? s.admin_users.length : "—"}${adminList !== "—" ? " (" + adminList + ")" : ""}`),
@@ -3267,7 +3286,7 @@ async function loadSecurity() {
     ]);
   });
   container.append(buildTable(
-    ["서버", "익명 접근", "기본 admin 계정", "관리자 권한 계정", "사용자 수"], rows
+    ["서버", "상태", "익명 접근", "기본 admin 계정", "관리자 권한 계정", "사용자 수"], rows
   ));
 }
 

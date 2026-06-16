@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.5.1",
+        "date": "2026-06-16",
+        "changes": [
+            {"type": "changed", "text": "보안 점검 최적화 — 인스턴스당 익명/사용자 조회를 병렬화(느린 링크에서 약 2배 빠름)하고, 서버별 위험도(양호/점검 필요/확인 불가)·위험 항목 목록·플릿 요약을 추가. 화면 범례·설명과 README 문서화 보강"},
+        ],
+    },
+    {
         "version": "1.5.0",
         "date": "2026-06-16",
         "changes": [

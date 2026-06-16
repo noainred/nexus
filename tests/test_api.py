@@ -841,6 +841,9 @@ def test_security_check(http_client):
     assert s["admin_active"] is True
     assert s["admin_users"] == ["admin"]
     assert s["user_count"] == 2
+    # anonymous access + default admin active -> flagged for review
+    assert s["risk"] == "warn"
+    assert "익명 접근 허용" in s["issues"]
 
 
 def test_compare_unknown_instance_404(http_client):
