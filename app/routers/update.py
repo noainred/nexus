@@ -14,6 +14,7 @@ import json
 import os
 import re
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -27,7 +28,8 @@ from ..config import get_settings
 router = APIRouter(prefix="/api/update", tags=["update"])
 
 _VER_RE = re.compile(r"(\d+)\.(\d+)\.(\d+)")
-_DEFAULTS = {"source": "server", "url": "", "token": "", "interval": 300, "auto_install": True}
+_DEFAULTS = {"source": "server", "url": "", "token": "", "interval": 300,
+             "auto_install": True, "edges": []}
 
 
 def _vkey(v: str):
@@ -132,6 +134,28 @@ def _tail(path: Path, lines: int) -> List[str]:
         return []
 
 
+async def _edge_version(client: httpx.AsyncClient, url: str) -> dict:
+    """Read one edge manager's running version from its /healthz (public)."""
+    base = url.rstrip("/")
+    try:
+        r = await client.get(base + "/healthz")
+        r.raise_for_status()
+        return {"url": url, "version": (r.json() or {}).get("version"), "error": None}
+    except Exception as exc:  # noqa: BLE001
+        return {"url": url, "version": None, "error": str(exc)[:120]}
+
+
+async def _check_edges(urls: List[str], deploy_code: str) -> List[dict]:
+    urls = [u.strip() for u in (urls or []) if u and u.strip()]
+    if not urls:
+        return []
+    async with httpx.AsyncClient(timeout=5.0, follow_redirects=True, verify=False) as c:
+        edges = list(await asyncio.gather(*(_edge_version(c, u) for u in urls)))
+    for e in edges:
+        e["outdated"] = bool(e["version"] and _vkey(e["version"]) < _vkey(deploy_code))
+    return edges
+
+
 @router.get("/status")
 async def update_status() -> dict:
     s = get_settings()
@@ -148,6 +172,7 @@ async def update_status() -> dict:
     cands = [v for v in (folder, remote) if v]
     available = max(cands, key=_vkey) if cands else None
     newer = bool(available and _vkey(available) > _vkey(current))
+    edges = await _check_edges(cfg.get("edges") or [], current)
     return {
         "current": current,
         "folder": folder,
@@ -155,6 +180,12 @@ async def update_status() -> dict:
         "remote_error": remote_error,
         "available": available,
         "update_available": newer,
+        "deploy_code": current,
+        "checked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "edges": edges,
+        "edges_total": len(edges),
+        "edges_outdated": sum(1 for e in edges if e.get("outdated")),
+        "edges_unreachable": sum(1 for e in edges if e.get("error")),
         "config": _masked(cfg),
         "log": _tail(_abs(s.update_log), 25),
     }
@@ -167,6 +198,7 @@ class UpdateConfig(BaseModel):
     interval: int = 300
     auto_install: bool = True
     clear_token: bool = False
+    edges: Optional[List[str]] = None  # None = keep existing
 
 
 @router.post("/config")
@@ -184,10 +216,14 @@ async def update_config(body: UpdateConfig) -> dict:
         token = ""
     elif body.token is not None and body.token != "":
         token = body.token
+    edges = cur.get("edges") or []
+    if body.edges is not None:
+        edges = [u.strip() for u in body.edges if u and u.strip()]
     cfg = {
         "source": src, "url": url, "token": token,
         "interval": max(30, int(body.interval or 300)),
         "auto_install": bool(body.auto_install),
+        "edges": edges,
     }
     p = _cfg_path()
     p.parent.mkdir(parents=True, exist_ok=True)

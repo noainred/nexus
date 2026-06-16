@@ -317,6 +317,8 @@ def test_update_status_reports_current(http_client, tmp_path, monkeypatch):
     assert body["current"] == __version__
     assert body["update_available"] is False
     assert body["available"] is None
+    assert body["deploy_code"] == __version__
+    assert body["edges_total"] == 0 and body["edges"] == []
 
 
 def test_update_config_save_and_mask_token(http_client, tmp_path, monkeypatch):
@@ -326,12 +328,13 @@ def test_update_config_save_and_mask_token(http_client, tmp_path, monkeypatch):
     monkeypatch.setattr("app.routers.update.get_settings", lambda: s)
     r = http_client.post("/api/update/config", json={
         "source": "github", "url": "github:noainred/nexus", "token": "secrettok",
-        "interval": 120, "auto_install": True,
+        "interval": 120, "auto_install": True, "edges": ["http://edge1:8000", " "],
     })
     assert r.status_code == 200
     cfg = r.json()["config"]
     assert cfg["url"] == "github:noainred/nexus" and cfg["interval"] == 120
     assert cfg["token"] is True            # masked, never echoed
+    assert cfg["edges"] == ["http://edge1:8000"]   # blanks trimmed
     # server source rejects a non-http url
     bad = http_client.post("/api/update/config", json={"source": "server", "url": "github:x/y"})
     assert bad.status_code == 400

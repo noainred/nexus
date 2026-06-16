@@ -3472,22 +3472,45 @@ async function toggleFlag(inst, field) {
   }
 }
 
-async function loadSettings() {
+// Server-list columns; those with `sk` are sortable by clicking the header.
+const SETTINGS_COLS = [
+  { label: "이름", sk: (i) => i.name },
+  { label: "식별자", sk: (i) => i.id },
+  { label: "그룹", sk: (i) => i.group || "" },
+  { label: "주소", sk: (i) => i.base_url || "" },
+  { label: "계정", sk: (i) => i.username || "" },
+  { label: "모니터링" }, { label: "비교" }, { label: "기준" }, { label: "" },
+];
+
+function renderSettingsTable(list) {
   const container = document.getElementById("settings-table");
   container.innerHTML = "";
-  let list = state.instances;
-  try {
-    list = await api("/api/instances");
-    state.instances = list;
-  } catch (e) {
-    container.append(el("div", { class: "empty" }, `목록 조회 실패: ${e.message}`));
-    return;
+  const sort = state.settingsSort;
+  let data = list.slice();
+  if (sort && sort.col) {
+    const col = SETTINGS_COLS.find((c) => c.label === sort.col);
+    if (col && col.sk) {
+      data.sort((a, b) => {
+        const va = String(col.sk(a) ?? "").toLowerCase();
+        const vb = String(col.sk(b) ?? "").toLowerCase();
+        return (va < vb ? -1 : va > vb ? 1 : 0) * (sort.dir === "desc" ? -1 : 1);
+      });
+    }
   }
-  if (!list.length) {
-    container.append(el("div", { class: "empty" }, "등록된 서버가 없습니다. 아래에서 추가하세요."));
-    return;
-  }
-  const rows = list.map((i) =>
+  const ths = SETTINGS_COLS.map((c) => {
+    if (!c.sk) return el("th", {}, c.label);
+    const active = sort && sort.col === c.label;
+    return el("th", {
+      class: `sortable${active ? " sorted" : ""}`,
+      title: "클릭하여 정렬",
+      onclick: () => {
+        if (sort && sort.col === c.label) sort.dir = sort.dir === "asc" ? "desc" : "asc";
+        else state.settingsSort = { col: c.label, dir: "asc" };
+        renderSettingsTable(state.instances || []);
+      },
+    }, c.label + (active ? (sort.dir === "desc" ? " ▼" : " ▲") : " ⇅"));
+  });
+  const rows = data.map((i) =>
     el("tr", {}, [
       el("td", {}, i.name),
       el("td", {}, i.id),
@@ -3518,9 +3541,28 @@ async function loadSettings() {
       ]),
     ])
   );
-  container.append(buildTable(
-    ["이름", "식별자", "그룹", "주소", "계정", "모니터링", "비교", "기준", ""], rows
-  ));
+  container.append(el("table", {}, [
+    el("thead", {}, el("tr", {}, ths)),
+    el("tbody", {}, rows),
+  ]));
+}
+
+async function loadSettings() {
+  const container = document.getElementById("settings-table");
+  container.innerHTML = "";
+  let list = state.instances;
+  try {
+    list = await api("/api/instances");
+    state.instances = list;
+  } catch (e) {
+    container.append(el("div", { class: "empty" }, `목록 조회 실패: ${e.message}`));
+    return;
+  }
+  if (!list.length) {
+    container.append(el("div", { class: "empty" }, "등록된 서버가 없습니다. 아래에서 추가하세요."));
+    return;
+  }
+  renderSettingsTable(list);
   loadGroupOrder();
   loadCompareFields();
   loadPingConfig();
@@ -3893,12 +3935,14 @@ async function importSettings(file) {
 // ---- 자동 업데이트 (포탈) -------------------------------------------------
 
 async function loadUpdateStatus() {
-  const box = document.getElementById("update-status");
+  const line = document.getElementById("update-statusline");
   const logEl = document.getElementById("update-log");
   const msg = document.getElementById("update-msg");
   const srcEl = document.getElementById("update-src");
-  if (!box) return;
-  box.innerHTML = ""; msg.textContent = "확인 중…";
+  const deployEl = document.getElementById("update-deploy");
+  const edgeBox = document.getElementById("update-edge-list");
+  if (!line) return;
+  msg.textContent = "확인 중…";
   let r;
   try {
     r = await api("/api/update/status");
@@ -3907,25 +3951,46 @@ async function loadUpdateStatus() {
     return;
   }
   msg.textContent = "";
-  box.append(summaryCard("현재 버전", "v" + (r.current || "—")));
-  box.append(summaryCard("최신", r.available ? "v" + r.available : "—"));
   const runBtn = document.getElementById("update-run");
-  if (r.update_available) {
-    box.append(summaryCard("상태", `⬆ v${r.available} 업그레이드 가능`));
-    if (runBtn) runBtn.disabled = false;
-  } else {
-    box.append(summaryCard("상태", "최신입니다 ✓"));
-    if (runBtn) runBtn.disabled = true;
+  if (runBtn) runBtn.disabled = !r.update_available;
+  // Compact status line: 현재 · 최신 · 확인시각 · 엣지 N대 · 엣지 상태
+  const latest = r.available || r.current;
+  const state = r.update_available
+    ? `<b style="color:var(--amber)">⬆ v${r.available} 업그레이드 가능</b>`
+    : `<b style="color:var(--green)">✓ 최신</b>`;
+  let edgeTxt = "";
+  if (r.edges_total) {
+    edgeTxt = ` · 엣지 ${r.edges_total}대 · ` + (
+      r.edges_outdated || r.edges_unreachable
+        ? `<b style="color:var(--amber)">구버전 ${r.edges_outdated} · 미응답 ${r.edges_unreachable}</b>`
+        : `<b style="color:var(--green)">엣지 모두 최신</b>`);
   }
+  line.innerHTML = `현재 <b>v${r.current}</b> · 최신 <b>v${latest}</b> ${state} · 확인 ${escapeHtml(r.checked_at || "")}${edgeTxt}`;
+  if (deployEl) deployEl.innerHTML = `엣지에 보낼 배포 코드 <b>v${r.deploy_code || r.current}</b> (실행 버전과 일치)`;
   const c = r.config || {};
   if (srcEl) srcEl.textContent = c.url ? `소스: ${c.url}` : "소스 미설정 — 아래에서 URL을 입력하세요.";
-  // Fill the form from the saved config (token shown as placeholder if set).
+
+  // Per-edge list (only when configured).
+  if (edgeBox) {
+    edgeBox.innerHTML = "";
+    if ((r.edges || []).length) {
+      const rows = r.edges.map((e) => el("tr", {}, [
+        el("td", {}, e.url),
+        el("td", {}, e.version
+          ? el("span", { class: `badge ${e.outdated ? "warn" : "up"}` }, "v" + e.version + (e.outdated ? " (구버전)" : ""))
+          : el("span", { class: "badge down", title: e.error || "" }, "미응답")),
+      ]));
+      edgeBox.append(buildTable(["엣지", "버전"], rows));
+    }
+  }
+
   const form = document.getElementById("update-form");
   if (form) {
     if (c.source) form.source.value = c.source;
     form.url.value = c.url || "";
-    form.interval.value = c.interval || 300;
+    form.interval.value = c.interval || 60;
     form.auto_install.checked = c.auto_install !== false;
+    form.edges.value = (c.edges || []).join("\n");
     form.token.value = "";
     form.token.placeholder = c.token ? "(저장된 토큰 있음 — 바꿀 때만 입력)" : "GitHub PAT 등 — 공개 소스면 비움";
   }
@@ -3940,9 +4005,10 @@ async function saveUpdateConfig(ev) {
   const body = {
     source: fd.get("source"),
     url: String(fd.get("url") || "").trim(),
-    interval: Number(fd.get("interval")) || 300,
+    interval: Number(fd.get("interval")) || 60,
     auto_install: form.auto_install.checked,
     clear_token: form.clear_token.checked,
+    edges: String(fd.get("edges") || "").split(/[\n,]+/).map((x) => x.trim()).filter(Boolean),
   };
   const tok = String(fd.get("token") || "");
   if (tok) body.token = tok;          // omit → keep existing

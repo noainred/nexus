@@ -166,6 +166,19 @@ h3 { font-size: 14px; color: var(--muted); }
 .acct-forms h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
 #acct-insts .pick-chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover { color: var(--accent); }
+th.sortable.sorted { color: var(--accent); }
+
+.update-statusline { font-size: 14px; margin: 4px 0; }
+.update-grid { display: grid; grid-template-columns: 200px 1fr 1fr 140px; gap: 10px 14px; align-items: end; }
+.update-grid .update-auto { grid-column: 1 / -1; }
+.update-grid .update-edges { grid-column: 1 / -1; }
+.update-grid .update-edges textarea { width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; }
+.update-grid .form-actions { grid-column: 1 / -1; }
+@media (max-width: 900px) { .update-grid { grid-template-columns: 1fr 1fr; } }
+#update-edge-list table { margin: 8px 0; }
+
 .update-log {
   margin: 10px 0 0; max-height: 160px; overflow: auto;
   background: rgba(0,0,0,.25); border: 1px solid var(--border); border-radius: 8px;
