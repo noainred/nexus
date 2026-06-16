@@ -271,6 +271,18 @@ def test_disk_history_empty_ok(http_client):
     assert http_client.get("/api/disk-history").json() == {"stores": []}
 
 
+def test_portal_title_default_and_save(http_client, tmp_path, monkeypatch):
+    from app.config import Settings
+    s = Settings(portal_config_file=str(tmp_path / "portal.json"))
+    monkeypatch.setattr("app.routers.meta.get_settings", lambda: s)
+    assert http_client.get("/api/portal").json()["title"] == "Nexus Repository 통합 관리"
+    http_client.put("/api/portal", json={"title": "OurCo Nexus"})
+    assert http_client.get("/api/portal").json()["title"] == "OurCo Nexus"
+    # blank resets to default
+    http_client.put("/api/portal", json={"title": "  "})
+    assert http_client.get("/api/portal").json()["title"] == "Nexus Repository 통합 관리"
+
+
 def test_update_status_reports_current(http_client, tmp_path, monkeypatch):
     from app import __version__
     from app.config import Settings

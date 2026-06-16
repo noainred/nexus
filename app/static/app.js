@@ -3950,6 +3950,44 @@ async function runUpdate() {
   }
 }
 
+// ---- 대시보드 제목(브랜딩) -----------------------------------------------
+
+async function loadPortalTitle() {
+  try {
+    const r = await api("/api/portal");
+    const t = (r && r.title) || "Nexus Repository 통합 관리";
+    const h = document.getElementById("app-title");
+    if (h) h.textContent = t;
+    document.title = t;
+    const inp = document.getElementById("title-input");
+    if (inp && !inp.value) inp.value = t;
+  } catch (e) { /* keep the default title */ }
+}
+
+function setupPortalTitle() {
+  const form = document.getElementById("title-form");
+  if (!form) return;
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const msg = document.getElementById("title-msg");
+    try {
+      const r = await api("/api/portal", {
+        method: "PUT",
+        body: JSON.stringify({ title: document.getElementById("title-input").value }),
+      });
+      const h = document.getElementById("app-title");
+      if (h) h.textContent = r.title;
+      document.title = r.title;
+      document.getElementById("title-input").value = r.title;
+      toast("제목을 저장했습니다");
+      if (msg) msg.textContent = "";
+    } catch (e) {
+      if (msg) msg.textContent = e.message;
+      toast(`저장 실패: ${e.message}`, "err");
+    }
+  });
+}
+
 function setupUpdate() {
   const f = document.getElementById("update-form");
   if (f) f.addEventListener("submit", saveUpdateConfig);
@@ -4608,6 +4646,7 @@ function setupBulk() {
 
 async function init() {
   setupAuth();
+  loadPortalTitle();          // public — show the custom title even before login
   let publicMode = false;
   try {
     const st = await api("/api/auth-status");
@@ -4632,6 +4671,7 @@ async function init() {
   setupTasks();
   setupSecurity();
   setupSettings();
+  setupPortalTitle();
   setupUpdate();
   setupBulk();
   setupTopology();

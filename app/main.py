@@ -96,6 +96,7 @@ _PUBLIC_READ_RE = re.compile(
     r"|ping-history"
     r"|alerts"
     r"|release-notes"
+    r"|portal"
     r"|instances/group-order"
     r"|instances/[^/]+/(?:status|blobstores)"
     r")$"

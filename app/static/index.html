@@ -9,7 +9,7 @@
   <body>
     <header class="topbar">
       <div class="title-wrap">
-        <h1>Nexus Repository 통합 관리</h1>
+        <h1 id="app-title">Nexus Repository 통합 관리</h1>
         <button id="app-version" class="version-badge" title="릴리스 노트 보기">v…</button>
         <button id="login-btn" class="version-badge hidden" title="관리 기능 로그인">🔒 로그인</button>
         <button id="logout-btn" class="version-badge hidden" title="로그아웃">로그아웃</button>
@@ -411,6 +411,18 @@
       <section id="settings" class="panel">
         <h2>Nexus 서버 설정</h2>
         <p class="hint">관리할 Nexus 서버를 추가·수정·삭제합니다. 각 서버를 모니터링/비교에 사용할지 선택할 수 있습니다.</p>
+
+        <div class="settings-card">
+          <h3>대시보드 제목</h3>
+          <p class="hint">상단에 표시되는 제목입니다. 비우고 저장하면 기본값으로 돌아갑니다. (모든 사용자에게 적용)</p>
+          <form id="title-form" class="form" style="max-width:560px">
+            <label>제목 <input name="title" id="title-input" placeholder="Nexus Repository 통합 관리" /></label>
+            <div class="form-actions" style="justify-content:flex-start;gap:8px">
+              <button type="submit">제목 저장</button>
+              <span id="title-msg" class="hint" style="margin:0"></span>
+            </div>
+          </form>
+        </div>
 
         <div class="settings-card">
           <h3>🌐 인터넷(URL) 자동 업그레이드</h3>

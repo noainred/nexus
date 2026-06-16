@@ -101,6 +101,9 @@ class Settings(BaseSettings):
     update_config_file: str = "update-config.json"
     update_log: str = "auto-update.log"
 
+    # Portal branding (dashboard title), editable from 서버 설정.
+    portal_config_file: str = "portal-config.json"
+
     @field_validator("admin_password")
     @classmethod
     def _clean_admin_password(cls, v: str) -> str:

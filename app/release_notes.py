@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.4.4",
+        "date": "2026-06-16",
+        "changes": [
+            {"type": "added", "text": "대시보드 제목을 서버 설정에서 변경 가능 — 상단 제목/브라우저 탭 제목을 원하는 문구로 저장(모든 사용자 공유, 비우면 기본값). GET /api/portal(공개)·PUT /api/portal"},
+        ],
+    },
+    {
         "version": "1.4.3",
         "date": "2026-06-16",
         "changes": [
