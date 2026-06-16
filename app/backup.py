@@ -33,6 +33,39 @@ def _safe(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("_") or "server"
 
 
+def _write_portal_backup(out: Path, settings: Settings) -> dict:
+    """Snapshot the portal's OWN configuration (server list + all dashboard
+    settings + auto-update source) so the manager itself can be restored, not
+    just the managed Nexus servers."""
+    from . import __version__
+    from .config import _instance_path
+
+    entry = {"id": "_portal", "name": "포탈 설정", "portal": True}
+    payload: dict = {
+        "portal": True,
+        "manager_version": __version__,
+        "exported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    try:
+        ip = _instance_path(settings)
+        if ip.is_file():
+            payload["instances_yaml"] = ip.read_text(encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        payload["instances_yaml_error"] = str(exc)
+    try:
+        uc = Path(settings.update_config_file)
+        if not uc.is_absolute():
+            uc = Path.cwd() / uc
+        if uc.is_file():
+            payload["update_config"] = json.loads(uc.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        payload["update_config_error"] = str(exc)
+    fname = "_portal.json"
+    (out / fname).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    entry.update(ok=True, file=fname)
+    return entry
+
+
 async def run_backup(registry, settings: Settings) -> dict:
     """Back up every managed server's configuration once. Returns a summary."""
     root = resolve_root(registry.backup_config().get("path", ""), settings)
@@ -40,6 +73,11 @@ async def run_backup(registry, settings: Settings) -> dict:
     out = root / ts
     out.mkdir(parents=True, exist_ok=True)
     items: List[dict] = []
+    # Portal's own config first, so a full setup is always recoverable.
+    try:
+        items.append(_write_portal_backup(out, settings))
+    except Exception as exc:  # noqa: BLE001
+        items.append({"id": "_portal", "name": "포탈 설정", "ok": False, "error": str(exc)})
     for inst in registry.all():
         entry = {"id": inst.id, "name": inst.name}
         client = NexusClient(inst, timeout=settings.request_timeout)

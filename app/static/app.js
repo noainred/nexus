@@ -3653,7 +3653,8 @@ async function loadBackupList() {
     const rows = run.files.map((f) => el("tr", {}, [
       el("td", {}, el("a", {
         href: `/api/backups/${encodeURIComponent(run.timestamp)}/${encodeURIComponent(f.name)}`,
-      }, f.name)),
+        title: f.name === "_portal.json" ? "포탈 자체 설정(instances.yaml + 자동 업데이트 설정)" : f.name,
+      }, f.name === "_portal.json" ? "📋 포탈 설정 (instances.yaml 등)" : f.name)),
       el("td", { class: "num" }, fmtBytes(f.size)),
     ]));
     det.append(buildTable(["파일(서버)", "크기"], rows));

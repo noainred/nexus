@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.4.3",
+        "date": "2026-06-16",
+        "changes": [
+            {"type": "added", "text": "구성 백업에 '포탈 설정' 백업 추가 — 매 백업 시 매니저 자체 설정(instances.yaml = 서버 목록·그룹·계위·비교기준·ping/백업/동기화 설정 + 자동 업데이트 설정)을 _portal.json으로 함께 저장. 매니저가 소실돼도 전체 설정 복구 가능. (각 Nexus 서버의 저장소 설정은 기존대로 포함됨)"},
+        ],
+    },
+    {
         "version": "1.4.2",
         "date": "2026-06-16",
         "changes": [

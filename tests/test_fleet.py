@@ -75,14 +75,21 @@ def test_backup_run_and_download(http_client, tmp_path):
         assert r.status_code == 200 and r.json()["path"] == str(tmp_path)
 
         run = http_client.post("/api/backup-run").json()
-        assert run["ok"] == 1 and run["total"] == 1
+        # 1 managed server + the portal's own config snapshot.
+        assert run["ok"] == 2 and run["total"] == 2
         assert run["directory"].startswith(str(tmp_path))
+        assert any(i.get("id") == "_portal" and i.get("ok") for i in run["items"])
 
         runs = http_client.get("/api/backups").json()
-        assert len(runs) == 1 and runs[0]["files"]
-        ts, name = runs[0]["timestamp"], runs[0]["files"][0]["name"]
-        dl = http_client.get(f"/api/backups/{ts}/{name}")
-        assert dl.status_code == 200 and "instance" in dl.json()
+        names = [f["name"] for f in runs[0]["files"]]
+        assert "_portal.json" in names
+        ts = runs[0]["timestamp"]
+        # server config file still has an instance block
+        srv = next(n for n in names if n != "_portal.json")
+        assert "instance" in http_client.get(f"/api/backups/{ts}/{srv}").json()
+        # portal file carries the manager's own config
+        portal = http_client.get(f"/api/backups/{ts}/_portal.json").json()
+        assert portal.get("portal") is True and "manager_version" in portal
     finally:
         http_client.put("/api/backup-config", json={
             "enabled": False, "time": "02:00", "keep": 14, "path": "",
