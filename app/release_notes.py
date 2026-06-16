@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.3.0",
+        "date": "2026-06-16",
+        "changes": [
+            {"type": "added", "text": "포탈 자동 업데이트 — 서버 설정 탭의 '자동 업데이트' 카드에서 현재/사용 가능 버전(감시 폴더+원격 소스)과 처리 로그를 확인하고 '지금 업데이트 적용' 버튼으로 즉시 업그레이드. GET /api/update/status · POST /api/update/run. install-service.sh가 앱 계정에 update 유닛 트리거용 sudoers(단일 명령)만 부여"},
+        ],
+    },
+    {
         "version": "1.2.1",
         "date": "2026-06-14",
         "changes": [

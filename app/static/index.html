@@ -413,6 +413,18 @@
         <p class="hint">관리할 Nexus 서버를 추가·수정·삭제합니다. 각 서버를 모니터링/비교에 사용할지 선택할 수 있습니다.</p>
 
         <div class="settings-card">
+          <h3>자동 업데이트</h3>
+          <p class="hint">감시 폴더(updates/) 또는 원격 소스(UPDATE_URL)에 더 높은 버전이 있으면 표시합니다. '지금 업데이트 적용'을 누르면 설치된 systemd 업데이트 서비스가 즉시 실행되어 자동 업그레이드 후 서비스가 재시작됩니다.</p>
+          <div id="update-status" class="cards"></div>
+          <div class="form-actions" style="justify-content:flex-start;gap:8px;margin-top:8px">
+            <button type="button" id="update-check">업데이트 확인</button>
+            <button type="button" id="update-run">지금 업데이트 적용</button>
+            <span id="update-msg" class="hint" style="margin:0"></span>
+          </div>
+          <pre id="update-log" class="update-log"></pre>
+        </div>
+
+        <div class="settings-card">
           <h3>서버 목록</h3>
           <div class="settings-io">
             <button id="export-btn">현재 목록 내보내기</button>

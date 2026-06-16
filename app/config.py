@@ -95,6 +95,11 @@ class Settings(BaseSettings):
     admin_password: str = ""
     audit_file: str = "audit.log"
 
+    # Portal-driven auto-update view (mirrors the deploy/auto-update.sh watcher).
+    update_dir: str = "updates"
+    update_url: str = ""
+    update_log: str = "auto-update.log"
+
     @field_validator("admin_password")
     @classmethod
     def _clean_admin_password(cls, v: str) -> str:

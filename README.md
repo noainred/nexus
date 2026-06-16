@@ -191,6 +191,11 @@ sudo UPDATE_URL=github:noainred/nexus bash deploy/install-service.sh
 sudo UPDATE_URL=https://mirror.example/nexus/ bash deploy/install-service.sh
 ```
 
+**포탈에서 업데이트** — `서버 설정` 탭의 **자동 업데이트** 카드에서 현재/사용
+가능 버전과 처리 로그를 확인하고 **'지금 업데이트 적용'** 버튼으로 즉시
+업그레이드할 수 있습니다(설치 시 등록되는 sudoers 규칙으로 앱이 systemd
+업데이트 유닛만 트리거 — 다른 권한은 없음).
+
 > 끄려면 설치 시 `WITH_AUTOUPDATE=0`, 또는
 > `sudo systemctl disable --now nexus-manager-update.timer`.
 

@@ -38,6 +38,7 @@ from .routers import (
     sync,
     tasks,
     topology,
+    update,
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -163,6 +164,7 @@ app.include_router(backup.router)
 app.include_router(bulk.router)
 app.include_router(cleanup.fleet_router)
 app.include_router(meta.router)
+app.include_router(update.router)
 
 
 @app.middleware("http")

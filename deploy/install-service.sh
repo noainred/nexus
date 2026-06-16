@@ -152,6 +152,25 @@ WantedBy=timers.target
 UPTEOF
   systemctl daemon-reload
   systemctl enable --now nexus-manager-update.timer
+
+  # Let the app process (SERVICE_USER) trigger the update unit from the portal
+  # button — exactly one command, NOPASSWD.
+  SUDOERS=/etc/sudoers.d/nexus-manager-update
+  cat > "$SUDOERS" <<SUDOEOF
+Cmnd_Alias NEXUSMGRUPD = /usr/bin/systemctl start --no-block nexus-manager-update.service, /bin/systemctl start --no-block nexus-manager-update.service
+$SERVICE_USER ALL=(root) NOPASSWD: NEXUSMGRUPD
+SUDOEOF
+  chmod 440 "$SUDOERS"
+  if command -v visudo >/dev/null 2>&1 && ! visudo -cf "$SUDOERS" >/dev/null 2>&1; then
+    echo "  ⚠ sudoers 검증 실패 — 포탈 버튼 비활성. 파일 제거: $SUDOERS"
+    rm -f "$SUDOERS"
+  fi
+
+  # Tell the app where to look so the portal can show remote availability.
+  if [ -n "${UPDATE_URL:-}" ] && ! grep -q '^NEXUS_MANAGER_UPDATE_URL=' "$INSTALL_DIR/.env" 2>/dev/null; then
+    echo "NEXUS_MANAGER_UPDATE_URL=$UPDATE_URL" >> "$INSTALL_DIR/.env"
+    chown "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR/.env" 2>/dev/null || true
+  fi
 fi
 
 echo ""

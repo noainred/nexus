@@ -264,6 +264,17 @@ def test_disk_history_empty_ok(http_client):
     assert http_client.get("/api/disk-history").json() == {"stores": []}
 
 
+def test_update_status_reports_current(http_client, tmp_path, monkeypatch):
+    from app import __version__
+    from app.config import Settings
+    s = Settings(update_dir=str(tmp_path / "updates"), update_log=str(tmp_path / "u.log"))
+    monkeypatch.setattr("app.routers.update.get_settings", lambda: s)
+    body = http_client.get("/api/update/status").json()
+    assert body["current"] == __version__
+    assert body["update_available"] is False
+    assert body["available"] is None
+
+
 # -- fleet search -----------------------------------------------------------------
 
 @respx.mock

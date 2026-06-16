@@ -214,7 +214,7 @@ function selectTab(name) {
   if (name === "security" && !state.securityLoaded) { state.securityLoaded = true; loadSecurity(); }
   if (name === "alerts") loadAlerts();
   if (name === "content" && !state.contentSetup) { state.contentSetup = true; setupContent(); }
-  if (name === "settings") loadSettings();
+  if (name === "settings") { loadSettings(); loadUpdateStatus(); }
   if (name === "topology" && !state.topologyLoaded) { state.topologyLoaded = true; loadTopology(); }
   if (name === "blobstore") { loadBlobstores(); loadDiskCharts(); }
   if (name === "cleanup-candidates") fillCleanupInstances();
@@ -3855,6 +3855,58 @@ async function importSettings(file) {
   }
 }
 
+// ---- 자동 업데이트 (포탈) -------------------------------------------------
+
+async function loadUpdateStatus() {
+  const box = document.getElementById("update-status");
+  const logEl = document.getElementById("update-log");
+  const msg = document.getElementById("update-msg");
+  if (!box) return;
+  box.innerHTML = ""; msg.textContent = "확인 중…";
+  let r;
+  try {
+    r = await api("/api/update/status");
+  } catch (e) {
+    msg.textContent = `조회 실패: ${e.message}`;
+    return;
+  }
+  msg.textContent = "";
+  box.append(summaryCard("현재 버전", r.current || "—"));
+  box.append(summaryCard("사용 가능", r.available || "—"));
+  if (r.source) box.append(summaryCard("원격 소스", r.source));
+  const runBtn = document.getElementById("update-run");
+  if (r.update_available) {
+    box.append(summaryCard("상태", `⬆ ${r.available} 업그레이드 가능`));
+    if (runBtn) runBtn.disabled = false;
+  } else {
+    box.append(summaryCard("상태", "최신입니다 ✓"));
+    if (runBtn) runBtn.disabled = true;
+  }
+  if (r.remote_error) msg.textContent = `원격 확인 경고: ${r.remote_error}`;
+  logEl.textContent = (r.log || []).join("\n") || "(업데이트 로그 없음)";
+}
+
+async function runUpdate() {
+  const msg = document.getElementById("update-msg");
+  if (!confirm("지금 업데이트를 적용합니다. 새 버전이 있으면 설치 후 서비스가 재시작됩니다.\n진행할까요?")) return;
+  msg.textContent = "업데이트 시작 중…";
+  try {
+    const r = await api("/api/update/run", { method: "POST" });
+    toast(r.detail || "업데이트를 시작했습니다", "ok");
+    msg.textContent = "업데이트 진행 중 — 잠시 후 새로고침하세요. (서비스 재시작 시 일시적으로 끊길 수 있습니다)";
+  } catch (e) {
+    toast(`업데이트 실패: ${e.message}`, "err");
+    msg.textContent = e.message;
+  }
+}
+
+function setupUpdate() {
+  const c = document.getElementById("update-check");
+  if (c) c.addEventListener("click", loadUpdateStatus);
+  const r = document.getElementById("update-run");
+  if (r) r.addEventListener("click", runUpdate);
+}
+
 function setupSettings() {
   const form = document.getElementById("settings-form");
   document.getElementById("ping-form").addEventListener("submit", async (ev) => {
@@ -4528,6 +4580,7 @@ async function init() {
   setupTasks();
   setupSecurity();
   setupSettings();
+  setupUpdate();
   setupBulk();
   setupTopology();
   setupAlerts();
