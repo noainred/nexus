@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.9",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "테스트용 버전 올림 — 1.7.8의 '업그레이드 후 자동 재시작' 수정이 1.7.8→1.7.9 자동 업데이트에서 수동 restart 없이 동작하는지 검증용"},
+        ],
+    },
+    {
         "version": "1.7.8",
         "date": "2026-06-17",
         "changes": [
