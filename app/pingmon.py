@@ -82,6 +82,21 @@ def _prune(settings: Settings) -> None:
         path.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
 
 
+def purge(instance_id: str, settings: Optional[Settings] = None) -> int:
+    """Drop all CSV rows for one instance (call when it's deleted). Returns the
+    number of removed samples."""
+    settings = settings or get_settings()
+    path = _ping_path(settings)
+    if not path.exists():
+        return 0
+    lines = path.read_text(encoding="utf-8").splitlines()
+    kept = [ln for ln in lines if ln.split(",", 2)[1:2] != [instance_id]]
+    removed = len(lines) - len(kept)
+    if removed:
+        path.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
+    return removed
+
+
 def _color(value: float, baseline: Optional[float], warn_ratio: float, crit_ratio: float) -> str:
     if not baseline or baseline <= 0:
         return "ok"
@@ -99,8 +114,14 @@ def query(
     warn_pct: float = 20.0,
     crit_pct: float = 50.0,
     settings: Optional[Settings] = None,
+    known_ids: Optional[set] = None,
 ) -> dict:
-    """Return down-sampled, colour-coded ping series for the last ``days``."""
+    """Return down-sampled, colour-coded ping series for the last ``days``.
+
+    When ``known_ids`` is given, series for instance ids *not* in it (e.g. nodes
+    that were deleted but still have rows in the CSV) are dropped, so stale
+    "garbage" nodes don't keep showing up on the chart.
+    """
     settings = settings or get_settings()
     warn_ratio = 1.0 + max(0.0, warn_pct) / 100.0
     crit_ratio = 1.0 + max(0.0, crit_pct) / 100.0
@@ -130,6 +151,8 @@ def query(
     span = max(t1 - t0, 1.0)
     series = []
     for iid in sorted(by_inst, key=lambda k: names.get(k, k).lower()):
+        if known_ids is not None and iid not in known_ids:
+            continue  # deleted/unknown node still lingering in the CSV — skip
         pts = by_inst[iid]
         values = [v for _, v in pts if v is not None]
         baseline = round(statistics.median(values), 1) if values else None

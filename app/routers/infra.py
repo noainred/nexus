@@ -43,7 +43,7 @@ async def ping_history(
     names = {i.id: i.name for i in registry.all()}
     groups = {i.id: i.group for i in registry.all()}
     cfg = registry.ping_config()
-    res = pingmon.query(days, names, cfg["warn_pct"], cfg["crit_pct"])
+    res = pingmon.query(days, names, cfg["warn_pct"], cfg["crit_pct"], known_ids=set(names))
     for s in res["series"]:
         s["group"] = groups.get(s["id"], "")
     return PingHistory(**res)

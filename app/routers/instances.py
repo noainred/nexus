@@ -310,4 +310,11 @@ async def delete_instance(
     instance_id: str, registry: InstanceRegistry = Depends(get_registry)
 ) -> Response:
     registry.remove(instance_id)  # 404 if unknown
+    # Clean up trailing data so a deleted node never reappears on charts/cards.
+    from .. import pingmon, statusmon
+    try:
+        pingmon.purge(instance_id)
+    except Exception:  # noqa: BLE001 - best-effort cleanup
+        pass
+    statusmon.drop(instance_id)
     return Response(status_code=204)
