@@ -490,7 +490,13 @@
             <label class="update-edges">엣지 목록 (한 줄에 하나 — 엣지 매니저 주소)
               <textarea name="edges" rows="2" placeholder="http://edge1:8000&#10;http://edge2:8000"></textarea>
             </label>
-            <label class="chk"><input type="checkbox" name="clear_token" /> 저장된 토큰 지우기 · 사설(비공개) 레포는 토큰을 함께 저장하세요. 비공개 GitHub는 raw 주소를 그대로 넣으면 자동으로 contents API로 인증 조회합니다(브랜치에 / 가 있어도 OK). 사내 미러는 <code>versions.json</code> + 번들이 있는 폴더 주소를 넣으세요. 사내 Nexus가 GitHub를 proxy하면 <code>…/repository/&lt;proxy&gt;/nexus/releases/download/latest/</code> 처럼 릴리스 폴더를 가리키면 자동으로 읽어옵니다(versions.json은 릴리스에 자동 게시됨).</label>
+            <label class="chk update-help-chk"><input type="checkbox" name="clear_token" /> 저장된 토큰 지우기</label>
+            <p class="hint update-help">
+              <b>소스별 입력 안내</b><br>
+              • <b>GitHub</b>: <code>github:owner/repo</code> (릴리스). 비공개 레포는 토큰을 함께 저장하세요.<br>
+              • <b>비공개 GitHub(브랜치 폴더)</b>: <code>raw.githubusercontent.com/owner/repo/&lt;브랜치&gt;/download</code> 주소를 그대로 넣으면 자동으로 contents API로 인증 조회합니다(브랜치에 <code>/</code> 있어도 OK).<br>
+              • <b>사내 미러</b>: <code>versions.json</code> + 번들이 있는 폴더 주소. 사내 Nexus가 GitHub를 proxy하면 <code>…/&lt;proxy&gt;/nexus/releases/download/latest/</code> 같은 릴리스 폴더를 가리키세요(versions.json은 릴리스에 자동 게시됩니다).
+            </p>
             <div class="form-actions" style="justify-content:flex-start;gap:8px">
               <button type="submit">설정 저장</button>
               <button type="button" id="update-check">🔄 지금 확인</button>

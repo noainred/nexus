@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.7",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "자동 업그레이드 설정의 안내문 가독성 개선 — 좁은 그리드 칸에 갇혀 긴 URL/코드가 한 글자씩 세로로 흐르던 문제를 해결. 체크박스(저장된 토큰 지우기)와 안내문을 분리하고, 안내문을 전체폭으로 펴 소스별(GitHub/비공개 브랜치 폴더/사내 미러) 입력 예시를 줄바꿈되게 정리(긴 code는 자동 줄바꿈)"},
+        ],
+    },
+    {
         "version": "1.7.6",
         "date": "2026-06-17",
         "changes": [

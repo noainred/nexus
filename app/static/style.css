@@ -181,6 +181,9 @@ th.sortable.sorted { color: var(--accent); }
 .update-grid .update-edges { grid-column: 1 / -1; }
 .update-grid .update-edges textarea { width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; }
 .update-grid .form-actions { grid-column: 1 / -1; }
+.update-grid .update-help-chk { grid-column: 1 / -1; }
+.update-grid .update-help { grid-column: 1 / -1; margin: 2px 0 0; line-height: 1.6; }
+.update-grid .update-help code { background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: 12px; overflow-wrap: anywhere; word-break: break-word; }
 @media (max-width: 900px) { .update-grid { grid-template-columns: 1fr 1fr; } }
 #update-edge-list table { margin: 8px 0; }
 
