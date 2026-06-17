@@ -2464,6 +2464,14 @@ async function loadMatrix() {
 }
 
 document.getElementById("drift-only").addEventListener("change", renderMatrix);
+// Scrolling the table hides the legend/description (more room); back to top shows it.
+(() => {
+  const wrap = document.getElementById("matrix-table");
+  const sec = document.getElementById("matrix");
+  if (wrap && sec) wrap.addEventListener("scroll", () => {
+    sec.classList.toggle("matrix-scrolled", wrap.scrollTop > 4);
+  });
+})();
 document.getElementById("matrix-ref").addEventListener("change", (e) => {
   state.matrixReference = e.target.value;
   renderMatrix();

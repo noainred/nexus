@@ -593,6 +593,11 @@ table.matrix td.ref-col { box-shadow: inset 2px 0 0 var(--accent), inset -2px 0 
 .sw.unknown { background: repeating-linear-gradient(45deg, #2a3640, #2a3640 4px, #222e3a 4px, #222e3a 8px); border: 1px solid var(--border); }
 
 .matrix-wrap { overflow: auto; max-height: calc(100vh - 210px); }
+/* When the table is scrolled, hide the legend + description to give the table
+   more room (toggled by a scroll listener on #matrix-table). */
+#matrix.matrix-scrolled .legend,
+#matrix.matrix-scrolled > .hint { display: none; }
+#matrix.matrix-scrolled .matrix-wrap { max-height: calc(100vh - 120px); }
 table.matrix { border-collapse: separate; border-spacing: 0; min-width: 100%; }
 table.matrix th, table.matrix td {
   border-bottom: 1px solid var(--border);

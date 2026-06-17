@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.24",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "비교 매트릭스에서 표를 아래로 스크롤하면 상단의 범례·설명문이 자동으로 숨겨져 표 영역이 넓어지고, 다시 맨 위로 스크롤하면 나타난다"},
+        ],
+    },
+    {
         "version": "1.7.23",
         "date": "2026-06-17",
         "changes": [
