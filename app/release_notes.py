@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.4",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "자동 업그레이드 안내에 '사내 Nexus가 GitHub를 proxy하는 경우 …/repository/<proxy>/nexus/releases/download/latest/ 릴리스 폴더를 가리키면 자동으로 읽어온다'는 예시 추가(versions.json은 릴리스에 자동 게시되므로 별도 미러/수동 업로드 불필요). 테스트용 버전 올림"},
+        ],
+    },
+    {
         "version": "1.7.3",
         "date": "2026-06-17",
         "changes": [
