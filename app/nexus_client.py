@@ -26,6 +26,12 @@ from .models import (
 
 def _describe(exc: Exception) -> str:
     """Readable detail for an httpx error (timeouts often have empty str())."""
+    if isinstance(exc, httpx.TimeoutException):
+        return ("연결 시간 초과 — 매니저 호스트에서 서버에 닿지 못했습니다"
+                " (주소·포트·방화벽/라우팅 확인)")
+    if isinstance(exc, httpx.ConnectError):
+        return ("연결 실패 — 주소·포트가 맞는지, 매니저 호스트에서 접근 가능한지"
+                " 확인하세요 (포트 미개방/거부)")
     text = str(exc).strip()
     return text or type(exc).__name__
 
@@ -62,10 +68,15 @@ class NexusClient:
 
     def _client(self) -> httpx.AsyncClient:
         verify = True if self.instance.verify_tls is None else self.instance.verify_tls
+        # Cap the *connect* phase well below the overall timeout so an
+        # unreachable host (wrong port / firewall DROP / different subnet)
+        # fails in a few seconds instead of hanging the whole request_timeout.
+        # The read timeout stays at self._timeout for legitimately slow Nexus.
+        connect = min(self._timeout, 6.0)
         return httpx.AsyncClient(
             base_url=self.instance.api_root,
             auth=(self.instance.username, self.instance.password),
-            timeout=self._timeout,
+            timeout=httpx.Timeout(self._timeout, connect=connect),
             verify=verify,
             headers={"Accept": "application/json"},
         )
