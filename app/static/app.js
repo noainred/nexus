@@ -520,9 +520,10 @@ async function loadOverviewTree() {
   if (!wrap) return;
   const insts = state.instances || [];
   const token = (state.treeToken = (state.treeToken || 0) + 1);
-  // 1) Render every node immediately, then color each as its probe answers —
-  //    a slow node only delays its own chip, not the whole board.
-  if (insts.length >= 2) {
+  // 1) On the *first* load (no tree yet) render every node immediately, then
+  //    color each as its probe answers — a slow node only delays its own chip.
+  //    If a tier tree is already drawn, keep it (no skeleton flicker on refresh).
+  if (insts.length >= 2 && !wrap.querySelector("svg")) {
     renderTopoSkeleton(insts);
     insts.forEach(async (i) => {
       let s = null;

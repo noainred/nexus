@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.15",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "계위 상황판 로딩 스켈레톤은 최초 로드(트리가 아직 없을 때)에만 표시하도록 변경 — 이미 계위 트리가 그려져 있으면(새로고침·탭 복귀) 기존 배치를 유지하고 스켈레톤으로 깜빡이지 않는다. 스켈레톤은 로딩 중 임시 화면이며 /api/topology 완료 시 저장된 드래그 배치의 계위 트리로 교체됨"},
+        ],
+    },
+    {
         "version": "1.7.14",
         "date": "2026-06-17",
         "changes": [
