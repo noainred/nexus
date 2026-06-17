@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.27",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "메뉴 표시 설정이 저장해도 반영되지 않던 문제 보완 — 저장 즉시 화면에 적용하고 localStorage에도 저장한다. 백엔드가 아직 옛 버전(hidden_tabs 미지원)이어도 브라우저에서 메뉴 숨김이 동작하며, 백엔드가 새 버전이면 서버 저장값을 우선 적용"},
+        ],
+    },
+    {
         "version": "1.7.26",
         "date": "2026-06-17",
         "changes": [
