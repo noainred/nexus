@@ -1312,6 +1312,16 @@ function renderTopoTree(data) {
   width = Math.max(...nodes.map((n) => pos[n.id].x)) + NW + 20;
   height = Math.max(...nodes.map((n) => pos[n.id].y)) + NH + 20;
 
+  // Sticky layout: once the user has arranged the board (≥1 saved position),
+  // freeze EVERY node's coordinates so a later change in proxy structure (or a
+  // node briefly going unreachable) can't re-flow the un-dragged nodes — which
+  // looked like the board "resetting". "배치 초기화" clears this and re-derives.
+  if (Object.keys(saved).length) {
+    const store = {};
+    nodes.forEach((n) => { store[n.id] = { x: Math.round(pos[n.id].x), y: Math.round(pos[n.id].y) }; });
+    try { localStorage.setItem("topoPos", JSON.stringify(store)); } catch (e) { /* quota */ }
+  }
+
   let s = "";
   // Arrowheads: the proxy direction is child → upstream(parent), so paths are
   // drawn child-top → parent-bottom with a marker-end pointing at the parent.
