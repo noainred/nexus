@@ -35,19 +35,26 @@ ver=$(printf '%s' "$json" | grep -oE 'ver_[0-9]+\.[0-9]+\.[0-9]+\.md' | head -1 
 durl=$(printf '%s' "$json" | grep -oE 'https://[^"]*nexus-manager-offline\.zip' | head -1 || true)
 [ -n "$ver" ] && [ -n "$durl" ] || { echo "ERROR: 릴리스 자산(버전/zip) 식별 실패" >&2; exit 1; }
 
-file="nexus-manager-offline-v$ver.zip"
+# Stable file name — matches the versions.json that the release workflow ships.
+file="nexus-manager-offline.zip"
+vjurl=$(printf '%s' "$json" | grep -oE 'https://[^"]*/versions\.json' | head -1 || true)
 echo "==> 최신 버전 v$ver  ($file)"
 
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 echo "==> 다운로드(GitHub) ..."
 curl -fsSL "${gh_auth[@]}" -o "$tmp/$file" "$durl"
-printf '{"version":"%s","file":"%s"}\n' "$ver" "$file" > "$tmp/versions.json"
+# versions.json 은 릴리스 워크플로가 자동 생성한다 — 있으면 그대로 복사, 없으면(구버전 릴리스) 생성.
+if [ -n "$vjurl" ]; then
+  curl -fsSL "${gh_auth[@]}" -o "$tmp/versions.json" "$vjurl"
+else
+  printf '{"version":"%s","file":"%s"}\n' "$ver" "$file" > "$tmp/versions.json"
+fi
 
 echo "==> 사내 Nexus raw 업로드 → $base"
 curl -fsS -u "$NEXUS_USER:$NEXUS_PASS" --upload-file "$tmp/$file"          "${base}${file}"
 curl -fsS -u "$NEXUS_USER:$NEXUS_PASS" --upload-file "$tmp/versions.json"  "${base}versions.json"
 
 echo ""
-echo "==> 완료. 매니저 포탈 '자동 업그레이드 > Site Info(URL)' 에 아래를 넣으세요:"
+echo "==> 완료. 매니저 포탈 '자동 업그레이드 > 소스=Update Server, Site Info(URL)' 에 아래를 넣으세요:"
 echo "      ${base}"
 echo "    (versions.json + $file 이 업로드되었습니다)"

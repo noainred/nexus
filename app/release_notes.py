@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.3",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "added", "text": "릴리스 워크플로(release.yml)가 versions.json을 자동 생성해 GitHub 릴리스에 포함 — 더 이상 손으로 만들 필요 없음. latest 릴리스엔 {\"version\":\"X.Y.Z\",\"file\":\"nexus-manager-offline.zip\"}(고정 파일명), 버전별 릴리스엔 versioned 파일명으로 게시"},
+            {"type": "changed", "text": "사내 Nexus 미러 스크립트(mirror-to-nexus.sh)가 CI가 만든 versions.json을 그대로 복사하고 안정 파일명(nexus-manager-offline.zip)으로 업로드하도록 통일 — GitHub latest 릴리스 폴더와 1:1로 미러되어 경로/파일명이 항상 일치"},
+        ],
+    },
+    {
         "version": "1.7.2",
         "date": "2026-06-17",
         "changes": [

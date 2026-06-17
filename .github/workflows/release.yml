@@ -60,22 +60,27 @@ jobs:
           cp "$VER_SRC_ZIP" nexus-manager-src.zip
 
           # Per-version release: version-stamped filenames, kept forever.
+          # versions.json (auto-generated) lets the manager / intranet mirror
+          # auto-update without anyone hand-writing it.
+          printf '{"version":"%s","file":"%s"}\n' "$VERSION" "$VER_OFFLINE_ZIP" > versions.json
           if gh release view "v${VERSION}" >/dev/null 2>&1; then
-            gh release upload "v${VERSION}" "$VER_OFFLINE" "$VER_OFFLINE_ZIP" "$VER_SRC" "$VER_SRC_ZIP" "$VER_MD" --clobber
+            gh release upload "v${VERSION}" "$VER_OFFLINE" "$VER_OFFLINE_ZIP" "$VER_SRC" "$VER_SRC_ZIP" "$VER_MD" versions.json --clobber
             gh release edit "v${VERSION}" --title "v${VERSION}" --notes "$NOTES"
           else
-            gh release create "v${VERSION}" "$VER_OFFLINE" "$VER_OFFLINE_ZIP" "$VER_SRC" "$VER_SRC_ZIP" "$VER_MD" \
+            gh release create "v${VERSION}" "$VER_OFFLINE" "$VER_OFFLINE_ZIP" "$VER_SRC" "$VER_SRC_ZIP" "$VER_MD" versions.json \
               --target "$GITHUB_SHA" --title "v${VERSION}" --notes "$NOTES"
           fi
 
-          # Rolling latest: stable filenames + version marker.
+          # Rolling latest: stable filenames + version marker + versions.json
+          # (points at the stable zip name, so the latest URLs never change).
+          printf '{"version":"%s","file":"%s"}\n' "$VERSION" "nexus-manager-offline.zip" > versions.json
           if gh release view latest >/dev/null 2>&1; then
             for OLD in $(gh release view latest --json assets -q '.assets[].name' | grep '^ver_' || true); do
               [ "$OLD" = "$VER_MD" ] || gh release delete-asset latest "$OLD" -y || true
             done
-            gh release upload latest nexus-manager-offline.tar.gz nexus-manager-offline.zip nexus-manager-src.tar.gz nexus-manager-src.zip "$VER_MD" --clobber
+            gh release upload latest nexus-manager-offline.tar.gz nexus-manager-offline.zip nexus-manager-src.tar.gz nexus-manager-src.zip "$VER_MD" versions.json --clobber
             gh release edit latest --title "latest (v${VERSION})" --notes "$NOTES"
           else
-            gh release create latest nexus-manager-offline.tar.gz nexus-manager-offline.zip nexus-manager-src.tar.gz nexus-manager-src.zip "$VER_MD" \
+            gh release create latest nexus-manager-offline.tar.gz nexus-manager-offline.zip nexus-manager-src.tar.gz nexus-manager-src.zip "$VER_MD" versions.json \
               --target "$GITHUB_SHA" --title "latest (v${VERSION})" --notes "$NOTES" --prerelease
           fi
