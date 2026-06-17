@@ -417,8 +417,15 @@
       <section id="settings" class="panel">
         <h2>Nexus 서버 설정</h2>
         <p class="hint">관리할 Nexus 서버를 추가·수정·삭제합니다. 각 서버를 모니터링/비교에 사용할지 선택할 수 있습니다.</p>
+        <nav class="subtabs" id="settings-subtabs">
+          <button type="button" class="subtab active" data-sub="nodes">🗄️ 노드 관리</button>
+          <button type="button" class="subtab" data-sub="account">🔑 계정·보안</button>
+          <button type="button" class="subtab" data-sub="upgrade">⬆ 자동 업그레이드</button>
+          <button type="button" class="subtab" data-sub="monitor">📈 모니터링·백업</button>
+          <button type="button" class="subtab" data-sub="general">⚙ 일반</button>
+        </nav>
 
-        <div class="settings-card">
+        <div class="settings-card" data-sub="general">
           <h3>대시보드 제목</h3>
           <p class="hint">상단에 표시되는 제목입니다. 비우고 저장하면 기본값으로 돌아갑니다. (모든 사용자에게 적용)</p>
           <form id="title-form" class="form" style="max-width:560px">
@@ -430,7 +437,7 @@
           </form>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card" data-sub="account">
           <h3>노드 계정 관리 (관리자 유저 생성 / 비밀번호 변경)</h3>
           <p class="hint">선택한 서버에 관리자(nx-admin) 유저를 만들거나 기존 사용자의 비밀번호를 변경합니다. 매니저가 접속에 쓰는 계정의 비번을 바꾸면 저장된 자격증명도 자동 갱신되어 잠기지 않습니다.</p>
           <div class="pick-group" style="margin-bottom:10px">
@@ -458,7 +465,7 @@
           <div id="acct-result"></div>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card" data-sub="upgrade">
           <h3>🌐 인터넷(URL) 자동 업그레이드 — 포탈 + 전 엣지</h3>
           <p id="update-statusline" class="update-statusline"></p>
           <p id="update-deploy" class="hint" style="margin:2px 0"></p>
@@ -495,7 +502,7 @@
           <pre id="update-log" class="update-log"></pre>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card" data-sub="nodes">
           <h3>서버 목록</h3>
           <div class="settings-io">
             <button id="export-btn">현재 목록 내보내기</button>
@@ -522,7 +529,7 @@
           <div id="settings-table"></div>
         </div>
 
-        <div id="settings-form-box" class="settings-card hidden">
+        <div id="settings-form-box" class="settings-card hidden" data-sub="nodes">
           <h3 id="settings-form-title">새 서버 추가</h3>
           <form id="settings-form" class="form">
             <input type="hidden" name="editing_id" value="" />
@@ -558,19 +565,19 @@
           <p class="hint">※ 수정 시 비밀번호를 비워두면 기존 비밀번호가 유지됩니다.</p>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card" data-sub="nodes">
           <h3>그룹 표시 순서</h3>
           <p class="hint">개요(인스턴스 상태)에서 그룹이 표시되는 순서입니다. ▲▼로 조정하면 바로 저장됩니다.</p>
           <div id="group-order"></div>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card" data-sub="nodes">
           <h3>비교 기준 항목</h3>
           <p class="hint">비교 매트릭스에서 '설정 상이(drift)'를 판단할 때 사용할 항목을 선택합니다. 체크한 항목만 비교합니다.</p>
           <div id="compare-fields" class="compare-fields-box"></div>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card" data-sub="monitor">
           <h3>Ping 모니터링 설정</h3>
           <p class="hint">인프라 체크 탭의 측정 주기와 색상 임계치(평소 중앙값 대비 %)입니다.</p>
           <form id="ping-form" class="form">
@@ -581,7 +588,7 @@
           </form>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card" data-sub="monitor">
           <h3>서버 설정 백업</h3>
           <p class="hint">관리 중인 모든 Nexus 서버의 구성(저장소·blob·정책·보안·작업 등)을 지정한 시각에 매일 자동 백업합니다. 서버가 소실되거나 데이터가 지워져도, 백업 JSON을 서버 행의 <b>복구 ↑</b>로 가져와 신속히 복구할 수 있습니다. (설정 구성만 백업 — 아티팩트/blob 실데이터는 제외)</p>
           <form id="backup-form" class="form">
@@ -598,7 +605,7 @@
           <div id="backup-list"></div>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card" data-sub="monitor">
           <h3>DR 준비도 점검 (DB 백업)</h3>
           <p class="hint">구성은 위의 '서버 설정 백업'이 책임지지만, <b>실데이터 복구</b>에는 각 Nexus 서버 자체의 <b>'Admin - Export databases for backup'</b> 작업이 필요합니다. 모든 서버에 그 작업이 있고 최근 성공했는지 점검합니다. (작업 생성은 REST 미지원 — 없는 서버는 Nexus UI에서 만들어야 합니다)</p>
           <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap;gap:8px">
@@ -609,7 +616,7 @@
           <div id="dr-table"></div>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card" data-sub="monitor">
           <h3>예약 콘텐츠 동기화 (프록시 캐시)</h3>
           <p class="hint">원본 서버의 저장소 캐시를 대상(프록시) 서버에 매일 지정 시각에 자동으로 채웁니다. Pro의 콘텐츠 복제를 대신해, 마스터→사이트로 아티팩트를 미리 내려두어 원격 사이트의 첫 다운로드 지연을 없앱니다.</p>
           <div class="form-actions" style="justify-content:flex-start;flex-wrap:wrap;gap:8px;align-items:flex-end">

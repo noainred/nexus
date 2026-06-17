@@ -170,6 +170,11 @@ th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
 th.sortable:hover { color: var(--accent); }
 th.sortable.sorted { color: var(--accent); }
 
+.subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 16px; border-bottom: 1px solid var(--border); }
+.subtab { background: transparent; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0; padding: 8px 16px; color: var(--muted); cursor: pointer; font-size: 14px; }
+.subtab:hover { color: var(--text); }
+.subtab.active { color: var(--text); background: var(--panel); border-color: var(--border); margin-bottom: -1px; }
+
 .update-statusline { font-size: 14px; margin: 4px 0; }
 .update-grid { display: grid; grid-template-columns: 200px 1fr 1fr 140px; gap: 10px 14px; align-items: end; }
 .update-grid .update-auto { grid-column: 1 / -1; }

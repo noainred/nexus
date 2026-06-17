@@ -4167,6 +4167,21 @@ function setupUpdate() {
   if (r) r.addEventListener("click", runUpdate);
 }
 
+// 서버 설정 탭을 기능별 서브 탭으로 분할(노드 관리/계정/업그레이드/모니터링/일반).
+function setupSettingsSubtabs() {
+  const nav = document.getElementById("settings-subtabs");
+  if (!nav) return;
+  const show = (sub) => {
+    nav.querySelectorAll(".subtab").forEach((b) => b.classList.toggle("active", b.dataset.sub === sub));
+    document.querySelectorAll("#settings .settings-card[data-sub]").forEach((c) => {
+      c.style.display = c.dataset.sub === sub ? "" : "none";
+    });
+    state.settingsSub = sub;
+  };
+  nav.querySelectorAll(".subtab").forEach((b) => b.addEventListener("click", () => show(b.dataset.sub)));
+  show(state.settingsSub || "nodes");
+}
+
 function setupSettings() {
   const form = document.getElementById("settings-form");
   document.getElementById("ping-form").addEventListener("submit", async (ev) => {
@@ -4841,6 +4856,7 @@ async function init() {
   setupTasks();
   setupSecurity();
   setupSettings();
+  setupSettingsSubtabs();
   setupPortalTitle();
   setupAccounts();
   setupUpdate();
