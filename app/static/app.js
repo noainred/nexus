@@ -195,6 +195,31 @@ function el(tag, props = {}, children = []) {
   return node;
 }
 
+// Make a modal movable: drag its header (handle) to reposition the box. Clicks
+// on header controls (✕, checkbox, links) still work — they don't start a drag.
+function makeModalDraggable(box, handle) {
+  if (!box || !handle || handle._draggable) return;
+  handle._draggable = true;
+  handle.style.cursor = "move";
+  handle.style.touchAction = "none";
+  let active = false, sx = 0, sy = 0;
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("button, a, input, select, label")) return;
+    active = true; sx = e.clientX; sy = e.clientY;
+    try { handle.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    e.preventDefault();
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (!active) return;
+    box._dx = (box._dx0 || 0) + (e.clientX - sx);
+    box._dy = (box._dy0 || 0) + (e.clientY - sy);
+    box.style.transform = `translate(${box._dx}px, ${box._dy}px)`;
+  });
+  const end = () => { if (active) { active = false; box._dx0 = box._dx || 0; box._dy0 = box._dy || 0; } };
+  handle.addEventListener("pointerup", end);
+  handle.addEventListener("pointercancel", end);
+}
+
 // ---- tabs ----------------------------------------------------------------
 
 // Activate a tab by name + run its lazy loader. Shared by clicks, the URL
@@ -2192,6 +2217,7 @@ function openStepModal(title, steps, sub) {
   okBtn.addEventListener("click", close);
   overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
   document.body.append(overlay);
+  makeModalDraggable(overlay.querySelector(".modal-box"), overlay.querySelector(".modal-head"));
   return {
     setStep(idx) {
       stepEls.forEach((s, i) => {
@@ -2612,6 +2638,7 @@ function openBulkModal(sName, repo, targetCols) {
   closeBtn.addEventListener("click", () => overlay.remove());
   overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.append(overlay);
+  makeModalDraggable(overlay.querySelector(".modal-box"), overlay.querySelector(".modal-head"));
   return { overlay, big, fill, rowEls, note: overlay.querySelector(".bulk-bg-note") };
 }
 
@@ -2839,6 +2866,9 @@ document.getElementById("repo-diff-only").addEventListener("change", renderRepoD
 document.getElementById("repo-modal").addEventListener("click", (ev) => {
   if (ev.target.id === "repo-modal") closeRepoDiff();
 });
+makeModalDraggable(
+  document.querySelector("#repo-modal .modal-box"),
+  document.querySelector("#repo-modal .modal-head"));
 
 // ---- repository 1:1 compare ----------------------------------------------
 

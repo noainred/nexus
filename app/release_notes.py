@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.25",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "팝업(모달)을 헤더를 잡고 드래그해 이동할 수 있게 함 — 저장소 설정 비교 팝업과 일괄 적용·드래그 복사 진행 팝업 모두 적용. 헤더의 닫기(✕)·체크박스 등 컨트롤 클릭은 그대로 동작"},
+        ],
+    },
+    {
         "version": "1.7.24",
         "date": "2026-06-17",
         "changes": [
