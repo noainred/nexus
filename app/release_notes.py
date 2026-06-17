@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.29",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "added", "text": "집계 정보 제공 API 추가 — GET /api/summary (공개, 인증 불필요)가 전체 서버 수·정상/주의/다운 집계·그룹별 현황·저장소 합계·평균 응답시간·서버별 상태를 JSON으로 반환한다. 백그라운드 상태 캐시 기반이라 즉시 응답하며, 다른 서버/시스템이 폴링해 이 대시보드 현황을 가져갈 수 있다"},
+            {"type": "changed", "text": "업데이트 안내 팝업을 첫 방문 시에도 무조건 표시하도록 변경(이전엔 재방문·버전 변경 시에만)"},
+        ],
+    },
+    {
         "version": "1.7.28",
         "date": "2026-06-17",
         "changes": [

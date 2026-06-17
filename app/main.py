@@ -90,6 +90,7 @@ _AUTH_EXEMPT = {"/api/login", "/api/auth-status"}
 _PUBLIC_READ_RE = re.compile(
     r"^/api/(?:"
     r"status"
+    r"|summary"
     r"|topology"
     r"|proxy-status"
     r"|metrics"

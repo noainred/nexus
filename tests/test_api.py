@@ -861,3 +861,13 @@ def test_status_endpoint_handles_unreachable(http_client):
     body = resp.json()
     assert body[0]["reachable"] is False
     assert body[0]["error"]
+
+
+def test_summary_aggregate_public(http_client):
+    r = http_client.get("/api/summary")
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert "manager_version" in d
+    assert d["servers"]["total"] >= 1
+    assert isinstance(d["instances"], list) and isinstance(d["groups"], list)
+    assert "repository_total" in d and "generated_at" in d

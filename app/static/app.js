@@ -4895,7 +4895,8 @@ function maybeShowUpdatePopup() {
   const cur = data.version;
   let seen = null;
   try { seen = localStorage.getItem("seenVersion"); } catch (e) { /* ignore */ }
-  if (seen && seen !== cur) showUpdatePopup(data.notes[0]);
+  // Show on every version change AND on the first-ever visit (seen == null).
+  if (seen !== cur) showUpdatePopup(data.notes[0]);
   try { localStorage.setItem("seenVersion", cur); } catch (e) { /* ignore */ }
 }
 

@@ -12,6 +12,7 @@ from ..deps import InstanceRegistry, get_client, get_registry
 from ..models import BlobStore, InstanceBlobStores, InstanceStatus, NodeMetrics
 from ..nexus_client import NexusClient, NexusError
 from .. import statusmon
+from .. import __version__
 
 router = APIRouter(prefix="/api", tags=["monitoring"])
 
@@ -53,6 +54,54 @@ async def status_all(
     order = {inst.id: n for n, inst in enumerate(insts)}
     out.sort(key=lambda s: order.get(s.id, 1 << 30))
     return out
+
+
+@router.get("/summary")
+async def summary(registry: InstanceRegistry = Depends(get_registry)) -> dict:
+    """Aggregated fleet snapshot for *other servers/systems* to consume (public,
+    read-only). Built from the background status cache, so it's instant and adds
+    no load. Poll this to mirror the dashboard's health elsewhere."""
+    insts = list(registry.monitoring())
+    up = warn = down = unknown = 0
+    repo_total = 0
+    resp: List[float] = []
+    groups: dict = {}
+    items = []
+    for inst in insts:
+        s = statusmon.get_status(inst.id)
+        g = (inst.group or "").strip() or "(미지정)"
+        gd = groups.setdefault(g, {"name": g, "total": 0, "up": 0, "warn": 0, "down": 0, "unknown": 0})
+        gd["total"] += 1
+        if s is None:
+            st = "unknown"; unknown += 1
+            items.append({"id": inst.id, "name": inst.name, "group": inst.group,
+                          "state": st, "reachable": None, "healthy": None,
+                          "response_ms": None, "repository_count": None, "checked_at": None})
+        else:
+            if not s.reachable:
+                st = "down"; down += 1
+            elif not s.healthy:
+                st = "warn"; warn += 1
+            else:
+                st = "up"; up += 1
+            if s.repository_count:
+                repo_total += s.repository_count
+            if s.response_ms is not None:
+                resp.append(s.response_ms)
+            items.append({"id": inst.id, "name": inst.name, "group": inst.group,
+                          "state": st, "reachable": s.reachable, "healthy": s.healthy,
+                          "response_ms": s.response_ms, "repository_count": s.repository_count,
+                          "checked_at": _fmt_ts(statusmon.checked_at(inst.id))})
+        gd[st] += 1
+    return {
+        "manager_version": __version__,
+        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+        "servers": {"total": len(insts), "up": up, "warn": warn, "down": down, "unknown": unknown},
+        "repository_total": repo_total,
+        "avg_response_ms": round(sum(resp) / len(resp), 1) if resp else None,
+        "groups": list(groups.values()),
+        "instances": items,
+    }
 
 
 @router.get("/instances/{instance_id}/status", response_model=InstanceStatus)
