@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.6.2",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "자동 업그레이드 versions.json의 file 값이 하위 폴더 경로(예: v1.6.0/nexus-manager-offline-v1.6.0.zip)여도 동작하도록 워처 보완 — URL은 상대경로로 받고 감시 폴더에는 파일명만 저장. 버전별 폴더로 mirror하는 사내 raw 구조 지원"},
+        ],
+    },
+    {
         "version": "1.6.1",
         "date": "2026-06-17",
         "changes": [

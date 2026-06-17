@@ -116,8 +116,11 @@ remote_fetch() {
       if [ -z "${rver:-}" ]; then log "원격에 버전 정보 없음"; return 0; fi
       if ! ver_gt "$rver" "$cur"; then log "원격 새 버전 없음 (현재 $cur · 원격 $rver)"; return 0; fi
       [ -z "${file:-}" ] && file="nexus-manager-offline-v$rver.zip"
+      # `file` may be a path with sub-folders (e.g. v1.6.0/nexus-...zip): keep
+      # the relative path for the URL but save under the watch folder by name.
+      local fname; fname=$(basename "$file")
       log "원격 새 버전 $rver 다운로드... ($file)"
-      curl -fsSL "${auth[@]}" -o "$WATCH_DIR/$file" "${base}${file}" \
+      curl -fsSL "${auth[@]}" -o "$WATCH_DIR/$fname" "${base}${file}" \
         && log "다운로드 완료 → 감시 폴더" || log "다운로드 실패"
       ;;
     *) log "알 수 없는 UPDATE_URL 형식: $UPDATE_URL" ;;
