@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.6.1",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "계위 상황판 간선이 상대 노드 위치에 맞춰 붙는 변을 선택 — 연결된 노드가 위에 있으면 위쪽 변에서, 아래 있으면 아래쪽 변에서 선이 시작/도착하도록 적응형으로 변경(드래그 배치 시 선이 자연스럽게 연결)"},
+        ],
+    },
+    {
         "version": "1.6.0",
         "date": "2026-06-16",
         "changes": [
