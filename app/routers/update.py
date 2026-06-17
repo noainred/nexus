@@ -107,8 +107,9 @@ async def _remote_latest(cfg: dict) -> Optional[str]:
                 if mm:
                     return mm.group(1)
             return _VER_RE.search((r.json() or {}).get("name", "")) and ".".join(_VER_RE.search(r.json()["name"]).groups())
-        # "server" — an internal mirror directory: prefer versions.json, else
-        # parse the directory listing for the highest bundle filename.
+        # "server" — an internal mirror directory: prefer versions.json. A plain
+        # HTTP index is also supported, but Nexus *raw* repos reject browsing
+        # ("404 You can't browse this way"), so versions.json is required there.
         base = url if url.endswith("/") else url + "/"
         try:
             vr = await c.get(base + "versions.json", headers=headers)
@@ -119,10 +120,19 @@ async def _remote_latest(cfg: dict) -> Optional[str]:
                     return ".".join(_VER_RE.search(v).groups())
         except Exception:  # noqa: BLE001 - fall back to listing
             pass
-        r = await c.get(url, headers=headers)
-        r.raise_for_status()
-        vers = re.findall(r"nexus-manager-offline-v(\d+\.\d+\.\d+)\.(?:zip|tar\.gz)", r.text)
-        return max(vers, key=_vkey) if vers else None
+        try:
+            r = await c.get(url, headers=headers)
+            r.raise_for_status()
+            vers = re.findall(r"nexus-manager-offline-v(\d+\.\d+\.\d+)\.(?:zip|tar\.gz)", r.text)
+            if vers:
+                return max(vers, key=_vkey)
+        except Exception:  # noqa: BLE001
+            pass
+        raise RuntimeError(
+            f"versions.json을 찾을 수 없습니다 — {base}versions.json 에 "
+            '{"version":"x.y.z","file":"…zip"} 를 올리세요. '
+            "(Nexus raw 저장소는 폴더 목록 조회를 막으므로 versions.json이 필수입니다)"
+        )
 
 
 def _tail(path: Path, lines: int) -> List[str]:

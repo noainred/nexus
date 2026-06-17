@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.1",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "자동 업그레이드 원격 확인 시, Nexus raw 저장소의 폴더 브라우징 404('You can't browse this way') 대신 'versions.json을 찾을 수 없습니다 — …/versions.json 을 올리세요'라는 명확한 안내를 표시"},
+        ],
+    },
+    {
         "version": "1.7.0",
         "date": "2026-06-17",
         "changes": [
