@@ -44,7 +44,9 @@ async def status_all(
         else:
             missing.append(inst)
     if missing:
-        live = await asyncio.gather(*(statusmon.probe_status(i) for i in missing))
+        # Cold cache: ping-only (fast) so each card shows the moment its ping
+        # answers; the background poller backfills repository_count shortly.
+        live = await asyncio.gather(*(statusmon.probe_status(i, with_repos=False) for i in missing))
         for s in live:
             s.checked_at = _fmt_ts(time.time())
         out.extend(live)
@@ -66,7 +68,8 @@ async def status_one(
             cached.checked_at = _fmt_ts(statusmon.checked_at(instance_id))
             cached.cached = True
             return cached
-    st = await statusmon.probe_status(instance)
+    # Not cached yet → ping-only (fast); poller backfills repository_count.
+    st = await statusmon.probe_status(instance, with_repos=(False if not fresh else True))
     st.checked_at = _fmt_ts(time.time())
     return st
 

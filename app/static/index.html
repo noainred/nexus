@@ -35,15 +35,15 @@
     <nav class="tabs">
       <button class="tab active" data-tab="overview">개요</button>
       <button class="tab" data-tab="instances-status">인스턴스 상태</button>
+      <button class="tab" data-tab="infra">네트워크 체크</button>
+      <button class="tab" data-tab="topology">토폴로지</button>
+      <button class="tab" data-tab="matrix">비교 매트릭스</button>
+      <button class="tab" data-tab="repositories">저장소 관리</button>
+      <button class="tab" data-tab="downloads">다운로드 현황</button>
       <button class="tab" data-tab="search">통합 검색</button>
       <button class="tab" data-tab="blobstore">Blob Store</button>
       <button class="tab" data-tab="metrics">JVM / 리소스</button>
-      <button class="tab" data-tab="infra">인프라 체크</button>
-      <button class="tab" data-tab="topology">토폴로지</button>
-      <button class="tab" data-tab="matrix">비교 매트릭스</button>
       <button class="tab" data-tab="compare">저장소 1:1 비교</button>
-      <button class="tab" data-tab="repositories">저장소 관리</button>
-      <button class="tab" data-tab="downloads">다운로드 현황</button>
       <button class="tab" data-tab="cleanup-candidates">정리 후보</button>
       <button class="tab" data-tab="tasks">작업</button>
       <button class="tab" data-tab="security">보안 점검</button>
@@ -165,7 +165,7 @@
 
       <section id="infra" class="panel">
         <div class="matrix-header">
-          <h2>인프라 체크 (서버 Ping)</h2>
+          <h2>네트워크 체크 (서버 Ping)</h2>
           <div class="matrix-controls">
             <div id="infra-range" class="infra-range">
               <button data-days="1">1일</button>
@@ -585,7 +585,7 @@
 
         <div class="settings-card" data-sub="monitor">
           <h3>Ping 모니터링 설정</h3>
-          <p class="hint">인프라 체크 탭의 측정 주기와 색상 임계치(평소 중앙값 대비 %)입니다.</p>
+          <p class="hint">네트워크 체크 탭의 측정 주기와 색상 임계치(평소 중앙값 대비 %)입니다.</p>
           <form id="ping-form" class="form">
             <label>측정 주기 (초) <input name="interval" type="number" min="10" step="1" /></label>
             <label>노랑 임계치 (평소 대비 +%) <input name="warn_pct" type="number" min="0" step="1" /></label>

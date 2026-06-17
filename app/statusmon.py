@@ -19,8 +19,13 @@ _cache: Dict[str, InstanceStatus] = {}
 _checked_at: Dict[str, float] = {}
 
 
-async def probe_status(instance) -> InstanceStatus:
-    """Probe a single instance, never raising — failures become status fields."""
+async def probe_status(instance, with_repos: bool = True) -> InstanceStatus:
+    """Probe a single instance, never raising — failures become status fields.
+
+    ``with_repos=False`` returns as soon as the ping completes (skips the
+    heavier repository listing) so an on-demand card can show up the moment its
+    ping answers; the background poller fills repository_count with the default.
+    """
     client = NexusClient(instance, timeout=get_settings().request_timeout)
     base = InstanceStatus(
         id=instance.id,
@@ -39,27 +44,32 @@ async def probe_status(instance) -> InstanceStatus:
     base.response_ms = ping["response_ms"]
     base.checks = ping["checks"]
     base.healthy = all(base.checks.values()) if base.checks else True
-    try:
-        repos = await client.list_repositories()
-        base.repository_count = len(repos)
-    except NexusError:
-        base.repository_count = None
+    if with_repos:
+        try:
+            repos = await client.list_repositories()
+            base.repository_count = len(repos)
+        except NexusError:
+            base.repository_count = None
     return base
 
 
 async def refresh_once(registry) -> None:
-    """Probe every monitoring instance concurrently and update the cache."""
+    """Probe every monitoring instance and update the cache *per node* as each
+    finishes — so fast nodes are cached within their own response time and a
+    single slow node can't hold the whole cache cold."""
     insts = list(registry.monitoring())
     if not insts:
         return
-    results = await asyncio.gather(
-        *(probe_status(i) for i in insts), return_exceptions=True
-    )
-    now = time.time()
-    for inst, res in zip(insts, results):
-        if isinstance(res, InstanceStatus):
-            _cache[inst.id] = res
-            _checked_at[inst.id] = now
+
+    async def _one(inst) -> None:
+        try:
+            res = await probe_status(inst)
+        except Exception:  # pragma: no cover - defensive, probe_status rarely raises
+            return
+        _cache[inst.id] = res
+        _checked_at[inst.id] = time.time()
+
+    await asyncio.gather(*(_one(i) for i in insts), return_exceptions=True)
 
 
 def get_status(instance_id: str) -> Optional[InstanceStatus]:
