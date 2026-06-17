@@ -39,3 +39,4 @@ audit.log
 # runtime UI/config state
 column-order.json
 update-config.json
+portal-config.json

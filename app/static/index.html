@@ -437,6 +437,17 @@
           </form>
         </div>
 
+        <div class="settings-card" data-sub="general">
+          <h3>메뉴(탭) 표시 설정</h3>
+          <p class="hint">상단 메뉴에 표시할 탭을 선택합니다. 체크 해제한 탭은 메뉴에서 숨겨집니다(모든 사용자에게 적용). '개요'와 '서버 설정'은 항상 표시됩니다.</p>
+          <div id="tab-visibility" class="bulk-tgt-grid" style="margin:8px 0"></div>
+          <div class="form-actions" style="justify-content:flex-start;gap:8px">
+            <button type="button" id="tab-visibility-save">메뉴 저장</button>
+            <button type="button" id="tab-visibility-all" class="pick-mini">전체 표시</button>
+            <span id="tab-visibility-msg" class="hint" style="margin:0"></span>
+          </div>
+        </div>
+
         <div class="settings-card" data-sub="account">
           <h3>노드 계정 관리 (관리자 유저 생성 / 비밀번호 변경)</h3>
           <p class="hint">선택한 서버에 관리자(nx-admin) 유저를 만들거나 기존 사용자의 비밀번호를 변경합니다. 매니저가 접속에 쓰는 계정의 비번을 바꾸면 저장된 자격증명도 자동 갱신되어 잠기지 않습니다.</p>

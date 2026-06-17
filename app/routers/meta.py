@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import List, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -28,32 +29,47 @@ def _portal_path() -> Path:
     return p if p.is_absolute() else Path(os.getcwd()) / p
 
 
-def _read_title() -> str:
+def _read_config() -> dict:
     p = _portal_path()
     if p.is_file():
         try:
-            t = (json.loads(p.read_text(encoding="utf-8")).get("title") or "").strip()
-            if t:
-                return t
+            d = json.loads(p.read_text(encoding="utf-8"))
+            if isinstance(d, dict):
+                return d
         except Exception:  # noqa: BLE001
             pass
-    return DEFAULT_TITLE
+    return {}
+
+
+def _read_title() -> str:
+    t = (_read_config().get("title") or "").strip()
+    return t or DEFAULT_TITLE
 
 
 class PortalConfig(BaseModel):
     title: str = ""
+    hidden_tabs: Optional[List[str]] = None   # None = keep existing
 
 
 @router.get("/portal")
 async def get_portal() -> dict:
-    """Dashboard branding (title) — public so it shows before login too."""
-    return {"title": _read_title(), "default_title": DEFAULT_TITLE}
+    """Dashboard branding (title) + hidden tabs — public so it applies before
+    login too."""
+    cfg = _read_config()
+    return {
+        "title": _read_title(),
+        "default_title": DEFAULT_TITLE,
+        "hidden_tabs": [str(x) for x in (cfg.get("hidden_tabs") or [])],
+    }
 
 
 @router.put("/portal")
 async def set_portal(body: PortalConfig) -> dict:
-    title = (body.title or "").strip() or DEFAULT_TITLE
+    cfg = _read_config()
+    cfg["title"] = (body.title or "").strip() or DEFAULT_TITLE
+    if body.hidden_tabs is not None:
+        cfg["hidden_tabs"] = [str(x) for x in body.hidden_tabs if x]
     p = _portal_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({"title": title}, ensure_ascii=False), encoding="utf-8")
-    return {"title": title}
+    p.write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+    return {"title": cfg["title"], "hidden_tabs": cfg.get("hidden_tabs") or []}

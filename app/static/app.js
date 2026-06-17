@@ -4309,6 +4309,39 @@ async function runUpdate() {
 
 // ---- 대시보드 제목(브랜딩) -----------------------------------------------
 
+// Tabs that must never be hidden (otherwise you can't get back to settings).
+const ALWAYS_TABS = new Set(["overview", "settings"]);
+
+function applyTabVisibility(hidden) {
+  const set = new Set((hidden || []).filter((x) => !ALWAYS_TABS.has(x)));
+  state.hiddenTabs = [...set];
+  document.querySelectorAll(".tab").forEach((t) => {
+    t.classList.toggle("tab-off", set.has(t.dataset.tab));
+  });
+  const active = document.querySelector(".tab.active");
+  if (active && active.classList.contains("tab-off")) selectTab("overview");
+  renderTabVisibility();
+}
+
+// (Re)build the menu-visibility checkboxes from the current state.
+function renderTabVisibility() {
+  const box = document.getElementById("tab-visibility");
+  if (!box) return;
+  const hidden = new Set(state.hiddenTabs || []);
+  box.innerHTML = "";
+  document.querySelectorAll(".tab").forEach((t) => {
+    const id = t.dataset.tab;
+    const always = ALWAYS_TABS.has(id);
+    const cb = el("input", { type: "checkbox", "data-tab": id });
+    cb.checked = always || !hidden.has(id);
+    if (always) cb.disabled = true;
+    box.append(el("label", { class: "bulk-tgt-cell", title: always ? "항상 표시" : "" }, [
+      el("span", { class: "bulk-tgt-name" }, t.textContent),
+      cb,
+    ]));
+  });
+}
+
 async function loadPortalTitle() {
   try {
     const r = await api("/api/portal");
@@ -4318,7 +4351,38 @@ async function loadPortalTitle() {
     document.title = t;
     const inp = document.getElementById("title-input");
     if (inp && !inp.value) inp.value = t;
+    applyTabVisibility((r && r.hidden_tabs) || []);
   } catch (e) { /* keep the default title */ }
+}
+
+// Settings → 일반: choose which tabs appear in the top menu (server-saved).
+function setupTabVisibility() {
+  const box = document.getElementById("tab-visibility");
+  const saveBtn = document.getElementById("tab-visibility-save");
+  if (!box || !saveBtn) return;
+  renderTabVisibility();
+  saveBtn.addEventListener("click", async () => {
+    const hidden = [...box.querySelectorAll("input[type=checkbox]")]
+      .filter((c) => !c.checked && !ALWAYS_TABS.has(c.dataset.tab))
+      .map((c) => c.dataset.tab);
+    const msg = document.getElementById("tab-visibility-msg");
+    try {
+      const r = await api("/api/portal", {
+        method: "PUT",
+        body: JSON.stringify({ title: document.getElementById("title-input").value, hidden_tabs: hidden }),
+      });
+      applyTabVisibility(r.hidden_tabs || []);
+      toast("메뉴 표시 설정을 저장했습니다");
+      if (msg) msg.textContent = "";
+    } catch (e) {
+      if (msg) msg.textContent = e.message;
+      toast(`저장 실패: ${e.message}`, "err");
+    }
+  });
+  const allBtn = document.getElementById("tab-visibility-all");
+  if (allBtn) allBtn.addEventListener("click", () => {
+    box.querySelectorAll("input[type=checkbox]").forEach((c) => { c.checked = true; });
+  });
 }
 
 function setupPortalTitle() {
@@ -5123,6 +5187,7 @@ async function init() {
   setupSettings();
   setupSettingsSubtabs();
   setupPortalTitle();
+  setupTabVisibility();
   setupAccounts();
   setupUpdate();
   setupBulk();

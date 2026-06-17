@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.26",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "added", "text": "상단 메뉴(탭)를 사용자가 선택해 보이게 — 서버 설정 → 일반 → '메뉴(탭) 표시 설정'에서 탭별 체크로 표시/숨김을 지정한다. 설정은 서버에 저장(portal-config.json)되어 모든 사용자/브라우저에 동일 적용. '개요'와 '서버 설정'은 항상 표시"},
+        ],
+    },
+    {
         "version": "1.7.25",
         "date": "2026-06-17",
         "changes": [

@@ -76,3 +76,22 @@ def test_column_order_roundtrip(tmp_path, monkeypatch):
     assert r.status_code == 200 and r.json() == {"order": ["b", "a", "c"]}
     # Persisted: a fresh GET returns the saved order.
     assert client.get("/api/instances/column-order").json() == {"order": ["b", "a", "c"]}
+
+
+def test_portal_hidden_tabs_roundtrip(tmp_path, monkeypatch):
+    from pathlib import Path
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.routers import meta
+
+    monkeypatch.setattr(meta, "_portal_path", lambda: Path(tmp_path) / "portal-config.json")
+    client = TestClient(app)
+    # default: no hidden tabs
+    assert client.get("/api/portal").json()["hidden_tabs"] == []
+    r = client.put("/api/portal", json={"title": "T", "hidden_tabs": ["search", "alerts"]})
+    assert r.status_code == 200 and r.json()["hidden_tabs"] == ["search", "alerts"]
+    got = client.get("/api/portal").json()
+    assert got["title"] == "T" and got["hidden_tabs"] == ["search", "alerts"]
+    # title-only PUT keeps hidden_tabs
+    client.put("/api/portal", json={"title": "T2"})
+    assert client.get("/api/portal").json()["hidden_tabs"] == ["search", "alerts"]
