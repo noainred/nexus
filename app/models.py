@@ -154,6 +154,8 @@ class InstanceStatus(BaseModel):
     error: Optional[str] = None
     checks: dict[str, bool] = Field(default_factory=dict)
     repository_count: Optional[int] = None
+    checked_at: Optional[str] = None   # when this status was last measured
+    cached: bool = False               # True when served from the poller cache
 
 
 class InstanceSecurity(BaseModel):

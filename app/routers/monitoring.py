@@ -2,71 +2,73 @@
 from __future__ import annotations
 
 import asyncio
-from typing import List
+import time
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..config import get_settings
 from ..deps import InstanceRegistry, get_client, get_registry
 from ..models import BlobStore, InstanceBlobStores, InstanceStatus, NodeMetrics
 from ..nexus_client import NexusClient, NexusError
+from .. import statusmon
 
 router = APIRouter(prefix="/api", tags=["monitoring"])
 
 
-async def _status_for(instance) -> InstanceStatus:
-    """Probe a single instance, never raising — failures become status fields."""
-    # Wait out a *slow but alive* node (high latency is still 정상): the read
-    # timeout stays at request_timeout. Truly unreachable nodes still fail fast
-    # because _client caps the *connect* phase (~6s), and the overview loads
-    # each card independently so one slow node never freezes the board.
-    client = NexusClient(instance, timeout=get_settings().request_timeout)
-    base = InstanceStatus(
-        id=instance.id,
-        name=instance.name,
-        base_url=instance.base_url,
-        group=instance.group,
-        reachable=False,
-        healthy=False,
-    )
-    try:
-        ping = await client.ping()
-    except NexusError as exc:
-        base.error = exc.message
-        return base
+def _fmt_ts(ts: Optional[float]) -> Optional[str]:
+    return time.strftime("%H:%M:%S", time.localtime(ts)) if ts else None
 
-    base.reachable = True
-    base.response_ms = ping["response_ms"]
-    base.checks = ping["checks"]
-    # Healthy when reachable and no subsystem reports unhealthy.
-    base.healthy = all(base.checks.values()) if base.checks else True
 
-    try:
-        repos = await client.list_repositories()
-        base.repository_count = len(repos)
-    except NexusError:
-        base.repository_count = None
-
-    return base
+# Backwards-compatible alias — the live probe now lives in statusmon so the
+# background poller and on-demand endpoints share one implementation.
+_status_for = statusmon.probe_status
 
 
 @router.get("/status", response_model=List[InstanceStatus])
 async def status_all(
+    fresh: bool = Query(False, description="Probe live instead of using the cache."),
     registry: InstanceRegistry = Depends(get_registry),
 ) -> List[InstanceStatus]:
-    """Probe every monitoring-enabled instance concurrently for the overview."""
-    results = await asyncio.gather(
-        *(_status_for(instance) for instance in registry.monitoring())
-    )
-    return list(results)
+    """Overview status. Served from the background poller cache (instant); only
+    not-yet-cached nodes are probed live (or all of them when ``fresh=true``)."""
+    insts = list(registry.monitoring())
+    out: List[InstanceStatus] = []
+    missing = []
+    for inst in insts:
+        cached = None if fresh else statusmon.get_status(inst.id)
+        if cached is not None:
+            cached.checked_at = _fmt_ts(statusmon.checked_at(inst.id))
+            cached.cached = True
+            out.append(cached)
+        else:
+            missing.append(inst)
+    if missing:
+        live = await asyncio.gather(*(statusmon.probe_status(i) for i in missing))
+        for s in live:
+            s.checked_at = _fmt_ts(time.time())
+        out.extend(live)
+    order = {inst.id: n for n, inst in enumerate(insts)}
+    out.sort(key=lambda s: order.get(s.id, 1 << 30))
+    return out
 
 
 @router.get("/instances/{instance_id}/status", response_model=InstanceStatus)
 async def status_one(
-    instance_id: str, registry: InstanceRegistry = Depends(get_registry)
+    instance_id: str,
+    fresh: bool = Query(False, description="Probe live instead of using the cache."),
+    registry: InstanceRegistry = Depends(get_registry),
 ) -> InstanceStatus:
     instance = registry.get(instance_id)
-    return await _status_for(instance)
+    if not fresh:
+        cached = statusmon.get_status(instance_id)
+        if cached is not None:
+            cached.checked_at = _fmt_ts(statusmon.checked_at(instance_id))
+            cached.cached = True
+            return cached
+    st = await statusmon.probe_status(instance)
+    st.checked_at = _fmt_ts(time.time())
+    return st
 
 
 def _gauge(gauges: dict, *names: str):

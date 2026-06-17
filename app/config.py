@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     instances_file: str = "instances.yaml"
     request_timeout: float = 15.0
     verify_tls: bool = True
+    # Background status poller: how often (seconds) to refresh the cached
+    # node status the dashboard reads instantly.
+    status_poll_interval: float = 20.0
 
     # Alerting (Slack-compatible incoming webhook; empty disables sending).
     alert_webhook: str = ""

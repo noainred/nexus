@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.16",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "added", "text": "백그라운드 상태 폴러 추가 — 메뉴에 들어갈 때 ping하지 않고, 서버가 20초 주기로 모든 노드를 계속 점검해 캐시에 저장한다. /api/status·/api/instances/{id}/status는 캐시값을 즉시 반환(로딩 즉시 표시)하고, 아직 캐시에 없는 노드만 즉석 점검한다. 최신값이 필요하면 ?fresh=true 로 강제 점검. 응답에 checked_at(측정 시각)·cached 표시"},
+        ],
+    },
+    {
         "version": "1.7.15",
         "date": "2026-06-17",
         "changes": [
