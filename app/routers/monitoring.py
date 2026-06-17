@@ -16,9 +16,11 @@ router = APIRouter(prefix="/api", tags=["monitoring"])
 
 async def _status_for(instance) -> InstanceStatus:
     """Probe a single instance, never raising — failures become status fields."""
-    # Dashboard status should stay snappy: cap the per-node probe so one
-    # unreachable/slow node can't drag the overview out to request_timeout.
-    client = NexusClient(instance, timeout=min(get_settings().request_timeout, 8.0))
+    # Wait out a *slow but alive* node (high latency is still 정상): the read
+    # timeout stays at request_timeout. Truly unreachable nodes still fail fast
+    # because _client caps the *connect* phase (~6s), and the overview loads
+    # each card independently so one slow node never freezes the board.
+    client = NexusClient(instance, timeout=get_settings().request_timeout)
     base = InstanceStatus(
         id=instance.id,
         name=instance.name,

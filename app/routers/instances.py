@@ -162,10 +162,10 @@ async def test_instance(body: InstanceTestRequest) -> InstanceTestResult:
         password=body.password,
         verify_tls=body.verify_tls,
     )
-    # Interactive probe — keep it snappy so the "서버 추가" button doesn't hang
-    # the full request_timeout when the host is unreachable.
-    probe_timeout = min(get_settings().request_timeout, 8.0)
-    client = NexusClient(cfg, timeout=probe_timeout)
+    # Wait out a slow-but-alive server (high latency is still OK). A truly
+    # unreachable host still fails fast because _client caps the connect
+    # phase (~6s); only the response read waits the full request_timeout.
+    client = NexusClient(cfg, timeout=get_settings().request_timeout)
     result = InstanceTestResult()
     try:
         ping = await client.ping()

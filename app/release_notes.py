@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.13",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "느린(고지연) 노드를 기다렸다가 응답오면 '정상'으로 표시 — 상태/연결 점검의 읽기(read) 타임아웃을 request_timeout(기본 15초)로 되돌림(800ms~수초 지연도 응답만 오면 정상). 연결(connect)만 ~6초로 짧게 유지해 진짜 안 닿는 노드는 빠르게 실패. 지연(ms)으로 상태를 깎지 않음(이미 응답하면 reachable·healthy). 카드별 개별 로딩과 함께라 느린 노드 하나가 전체를 묶지 않음"},
+        ],
+    },
+    {
         "version": "1.7.12",
         "date": "2026-06-17",
         "changes": [
