@@ -2165,6 +2165,49 @@ function onMatrixDragStart(e, repo, inst, present) {
   }
 }
 
+// Stepped progress popup (also used as the completion popup). Closing it does
+// not cancel the in-flight request — the copy keeps going and a toast still
+// fires on completion.
+function openStepModal(title, steps, sub) {
+  const stepEls = steps.map((s) => {
+    const icon = el("span", { class: "step-ic" }, "○");
+    return { icon, row: el("div", { class: "step-row" }, [icon, el("span", {}, s)]) };
+  });
+  const note = el("p", { class: "hint bulk-bg-note" },
+    "ℹ 이 팝업을 닫아도 작업은 계속 진행되며, 완료되면 알림으로 알려드립니다. (브라우저 탭을 닫으면 화면 표시만 사라집니다)");
+  const closeBtn = el("button", { type: "button", class: "modal-x", title: "닫기(백그라운드 계속)" }, "✕");
+  const okBtn = el("button", { type: "button", class: "hidden", style: "margin-top:8px" }, "확인");
+  const overlay = el("div", { class: "modal" }, [
+    el("div", { class: "modal-box", style: "max-width:460px" }, [
+      el("div", { class: "modal-head" }, [el("h3", {}, title), closeBtn]),
+      el("div", { class: "modal-body" }, [
+        sub ? el("p", { class: "hint", style: "margin:8px 0 4px" }, sub) : null,
+        el("div", { class: "step-list" }, stepEls.map((s) => s.row)),
+        note, okBtn,
+      ]),
+    ]),
+  ]);
+  const close = () => overlay.remove();
+  closeBtn.addEventListener("click", close);
+  okBtn.addEventListener("click", close);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  document.body.append(overlay);
+  return {
+    setStep(idx) {
+      stepEls.forEach((s, i) => {
+        s.icon.textContent = i < idx ? "✓" : (i === idx ? "⏳" : "○");
+        s.icon.className = "step-ic" + (i < idx ? " done" : i === idx ? " active" : "");
+      });
+    },
+    finish(ok, message) {
+      stepEls.forEach((s) => { if (ok) { s.icon.textContent = "✓"; s.icon.className = "step-ic done"; } });
+      note.textContent = (ok ? "✅ " : "❌ ") + message;
+      note.className = "hint bulk-bg-note " + (ok ? "bulk-bg-done" : "bulk-bg-fail");
+      okBtn.classList.remove("hidden");
+    },
+  };
+}
+
 async function onMatrixDrop(e, repo, inst) {
   e.preventDefault();
   e.currentTarget.classList.remove("drop-hover");
@@ -2183,21 +2226,41 @@ async function onMatrixDrop(e, repo, inst) {
     `원본: ${sName}\n대상: ${tName}\n(대상에 '${repo}'가 없으면 새로 생성됩니다.\n` +
     `그룹 저장소이면 대상에 없는 멤버 저장소도 함께 생성됩니다.)`
   )) return;
-  toast(`'${repo}' 설정 복사 중… (${sName} → ${tName})`);
+
+  const steps = [
+    `원본 서버(${sName})에 접속합니다`,
+    `원본의 '${repo}' 설정을 읽습니다`,
+    `대상 서버(${tName})에 연결합니다`,
+    `설정을 복사(적용)합니다`,
+    `완료합니다`,
+  ];
+  const M = openStepModal(`설정 복사 — ${sName} → ${tName}`, steps, `저장소: ${repo}`);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   try {
-    const r = await api(
+    M.setStep(0);
+    const apiP = api(
       `/api/matrix/copy-repo?repository=${encodeURIComponent(repo)}` +
         `&source_id=${encodeURIComponent(src.inst)}&target_id=${encodeURIComponent(inst)}`,
       { method: "POST" }
     );
+    // Walk the user through what the server is doing while the request flies.
+    await sleep(250); M.setStep(1);
+    await sleep(250); M.setStep(2);
+    await sleep(250); M.setStep(3);
+    const r = await apiP;
     const it = (r.items && r.items[0]) || {};
     if (it.status === "fail") {
+      M.finish(false, `복사 실패: ${it.detail || "원인 불명"}`);
       toast(`복사 실패: ${it.detail || "원인 불명"}`, "err");
     } else {
-      toast(`'${repo}' 복사 완료 — ${it.status === "update" ? "갱신" : "생성"} (${tName})`);
+      M.setStep(5);
+      const msg = `'${repo}' 복사 완료 — ${it.status === "update" ? "갱신" : "생성"} (${tName})`;
+      M.finish(true, msg);
+      toast(msg);
     }
     await loadMatrix();
   } catch (err) {
+    M.finish(false, `복사 실패: ${err.message}`);
     toast(`복사 실패: ${err.message}`, "err");
   }
 }
@@ -2512,17 +2575,62 @@ function repoBulkPanel() {
   ]);
 }
 
+// Big progress popup for bulk apply. Closing it does NOT stop the job — the
+// loop keeps running in this browser tab (updating detached nodes is harmless).
+function openBulkModal(sName, repo, targetCols) {
+  const big = el("div", { class: "bulk-big" }, `0 / ${targetCols.length}`);
+  const fill = el("div", { class: "bulk-bar-fill" });
+  const rowEls = {};
+  const rowsBox = el("div", { class: "bulk-rows" });
+  targetCols.forEach((t) => {
+    const badge = el("span", { class: "badge", style: "background:var(--panel-2)" }, "대기");
+    rowEls[t.id] = badge;
+    rowsBox.append(el("div", { class: "bulk-row" }, [el("span", {}, t.name), badge]));
+  });
+  const closeBtn = el("button", { type: "button", class: "modal-x", title: "닫기(백그라운드 계속)" }, "✕");
+  const overlay = el("div", { class: "modal" }, [
+    el("div", { class: "modal-box", style: "max-width:520px" }, [
+      el("div", { class: "modal-head" }, [el("h3", {}, "일괄 적용 진행"), closeBtn]),
+      el("div", { class: "modal-body" }, [
+        big,
+        el("div", { class: "bulk-bar" }, fill),
+        el("p", { class: "hint bulk-bg-note" },
+          "ℹ 이 팝업을 닫아도 현재 브라우저 탭에서 백그라운드로 계속 진행됩니다. 단, 브라우저 탭/창을 닫으면 중단됩니다."),
+        el("p", { class: "hint", style: "margin:4px 0 8px" }, `원본 ${sName} · 저장소 ${repo}`),
+        rowsBox,
+      ]),
+    ]),
+  ]);
+  closeBtn.addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.append(overlay);
+  return { overlay, big, fill, rowEls, note: overlay.querySelector(".bulk-bg-note") };
+}
+
 async function runBulkPush(repo, srcSel, status) {
   const sourceId = srcSel.value;
   const sName = srcSel.options[srcSel.selectedIndex].text;
-  const targets = [...document.querySelectorAll(".bulk-tgt:checked")].map((c) => c.getAttribute("data-id"));
+  const checked = [...document.querySelectorAll(".bulk-tgt:checked")];
+  const targets = checked.map((c) => c.getAttribute("data-id"));
   if (!targets.length) { toast("적용할 대상 서버를 선택하세요.", "err"); return; }
+  const nameOf = (cb) => {
+    const cell = cb.closest(".bulk-tgt-cell");
+    const n = cell && cell.querySelector(".bulk-tgt-name");
+    return n ? n.textContent : cb.getAttribute("data-id");
+  };
+  const targetCols = checked.map((c) => ({ id: c.getAttribute("data-id"), name: nameOf(c) }));
   if (!confirm(
     `'${sName}'의 '${repo}' 설정을 ${targets.length}개 서버에 적용(덮어쓰기·없으면 생성)합니다.\n진행할까요?`
   )) return;
+
+  const M = openBulkModal(sName, repo, targetCols);
   let ok = 0, fail = 0;
   for (let i = 0; i < targets.length; i++) {
+    const badge = M.rowEls[targets[i]];
+    if (badge) { badge.textContent = "진행 중…"; badge.className = "badge warn"; }
     status.textContent = `적용 중… ${i + 1}/${targets.length}`;
+    M.big.textContent = `${i} / ${targets.length}`;
+    M.fill.style.width = `${Math.round((i / targets.length) * 100)}%`;
     try {
       const r = await api(
         `/api/matrix/copy-repo?repository=${encodeURIComponent(repo)}` +
@@ -2530,8 +2638,15 @@ async function runBulkPush(repo, srcSel, status) {
         { method: "POST" }
       );
       const it = (r.items && r.items[0]) || {};
-      if (it.status === "fail") fail++; else ok++;
-    } catch (e) { fail++; }
+      if (it.status === "fail") { fail++; if (badge) { badge.textContent = "실패"; badge.className = "badge down"; badge.title = it.detail || ""; } }
+      else { ok++; if (badge) { badge.textContent = "성공"; badge.className = "badge up"; } }
+    } catch (e) { fail++; if (badge) { badge.textContent = "실패"; badge.className = "badge down"; badge.title = e.message || ""; } }
+  }
+  M.big.textContent = `${targets.length} / ${targets.length}`;
+  M.fill.style.width = "100%";
+  if (M.note) {
+    M.note.textContent = `✅ 완료 — 성공 ${ok} / 실패 ${fail}`;
+    M.note.classList.add(fail ? "bulk-bg-fail" : "bulk-bg-done");
   }
   status.textContent = `완료 · 성공 ${ok} / 실패 ${fail}`;
   toast(`일괄 적용 완료 — 성공 ${ok} / 실패 ${fail}`, fail ? "err" : "ok");

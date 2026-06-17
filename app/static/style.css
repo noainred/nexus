@@ -181,6 +181,19 @@ th.sortable.sorted { color: var(--accent); }
 .update-grid .update-edges { grid-column: 1 / -1; }
 .update-grid .update-edges textarea { width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; }
 .update-grid .form-actions { grid-column: 1 / -1; }
+.step-list { display: flex; flex-direction: column; gap: 7px; margin: 10px 0; }
+.step-row { display: flex; align-items: center; gap: 9px; font-size: 14px; }
+.step-ic { width: 18px; text-align: center; color: var(--muted); }
+.step-ic.active { color: var(--amber); }
+.step-ic.done { color: var(--green); }
+.bulk-big { font-size: 30px; font-weight: 700; text-align: center; margin: 12px 0 10px; }
+.bulk-bar { height: 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.bulk-bar-fill { height: 100%; width: 0; background: var(--accent); transition: width .25s ease; }
+.bulk-bg-note { background: rgba(79,157,222,.10); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 12px 0; }
+.bulk-bg-note.bulk-bg-done { background: rgba(63,185,80,.14); border-color: var(--green); color: var(--text); font-weight: 600; }
+.bulk-bg-note.bulk-bg-fail { background: rgba(248,81,73,.14); border-color: var(--red); color: var(--text); font-weight: 600; }
+.bulk-rows { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow: auto; margin-top: 6px; }
+.bulk-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
 .bulk-tgt-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .bulk-tgt-cell {
   display: flex; flex-direction: column; align-items: center; gap: 5px;
