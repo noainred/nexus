@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.11",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "포탈 '지금 적용' 버튼이 sudo 없이도 동작하도록 변경 — 매니저(비root)가 $INSTALL_DIR/.update-now 트리거 파일을 기록하면, 새로 추가된 root systemd .path 유닛(nexus-manager-update.path)이 이를 감시해 업데이트를 즉시 실행한다. sudo가 nosuid 마운트로 막힌 환경에서도 버튼이 에러 없이 적용된다(미설치 시엔 타이머가 폴백). install-service.sh가 .path 유닛 등록 + 트리거 파일 정리(ExecStartPre)를 포함"},
+        ],
+    },
+    {
         "version": "1.7.10",
         "date": "2026-06-17",
         "changes": [

@@ -317,29 +317,46 @@ async def update_config(body: UpdateConfig) -> dict:
 
 @router.post("/run")
 async def update_run() -> dict:
-    """Trigger the systemd update unit (non-blocking — it restarts the app)."""
-    # When the manager already runs as root, call systemctl directly — this
-    # avoids sudo entirely (sudo is unusable when /usr/bin/sudo sits on a
-    # `nosuid` mount). Otherwise fall back to the sudoers-allowed `sudo -n`.
+    """Trigger the systemd update unit.
+
+    Privilege-free first: drop a ``.update-now`` marker that the root systemd
+    ``.path`` unit watches — this works even when sudo is unusable (``/usr/bin/
+    sudo`` on a ``nosuid`` mount) and when the manager runs as a non-root user.
+    Then best-effort start the unit directly for immediacy (root → no sudo;
+    otherwise the sudoers-allowed ``sudo -n``).
+    """
+    triggered = False
+    try:
+        marker = _abs(".update-now")
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(datetime.now().isoformat(), encoding="utf-8")
+        triggered = True
+    except OSError:
+        pass
+
     unit = ["systemctl", "start", "--no-block", "nexus-manager-update.service"]
     is_root = hasattr(os, "geteuid") and os.geteuid() == 0
     cmd = unit if is_root else (["sudo", "-n"] + unit)
+    err = b""
+    started = False
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
         _, err = await asyncio.wait_for(proc.communicate(), timeout=15)
-    except FileNotFoundError:
-        raise HTTPException(status_code=503, detail="sudo/systemctl 을 찾을 수 없습니다(미설치 환경).")
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=503, detail=f"업데이트 실행 불가: {exc}")
-    if proc.returncode == 0:
+        started = proc.returncode == 0
+    except Exception:  # noqa: BLE001 - sudo/systemctl missing or blocked (nosuid)
+        started = False
+
+    if started:
         return {"ok": True, "detail": "업데이트를 시작했습니다. 새 버전이 있으면 곧 자동 재시작됩니다."}
+    if triggered:
+        return {"ok": True, "detail": ("업데이트를 예약했습니다 — 감시(.path) 유닛 또는 타이머가 곧 "
+                                       "적용합니다. sudo가 막힌(nosuid) 환경에서도 동작합니다.")}
     raise HTTPException(
         status_code=503,
-        detail=("업데이트 트리거 실패 — 권한(sudo) 또는 systemd 서비스가 없습니다. "
-                "sudo가 nosuid 마운트로 막힌 경우, root로 "
-                "'systemctl start nexus-manager-update.service' 를 실행하거나 "
-                "감시 폴더에 zip을 넣으면 root 타이머가 적용합니다. "
+        detail=("업데이트 트리거 실패 — 트리거 파일 기록도 sudo 실행도 불가합니다. "
+                "root로 'systemctl start nexus-manager-update.service' 를 실행하거나 "
+                "감시 폴더에 zip을 넣으세요. "
                 f"{(err or b'').decode(errors='ignore')[:200]}"),
     )

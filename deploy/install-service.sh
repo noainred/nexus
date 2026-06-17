@@ -149,8 +149,23 @@ Environment=PORT=$PORT
 ${UPDATE_URL:+Environment=UPDATE_URL=$UPDATE_URL}
 ${UPDATE_TAG:+Environment=UPDATE_TAG=$UPDATE_TAG}
 ${GITHUB_TOKEN:+Environment=GITHUB_TOKEN=$GITHUB_TOKEN}
+ExecStartPre=-/bin/rm -f $INSTALL_DIR/.update-now
 ExecStart=/usr/bin/env bash $INSTALL_DIR/deploy/auto-update.sh
 UPDEOF
+  # Path unit: the portal "지금 적용" button (non-root app) just writes
+  # $INSTALL_DIR/.update-now; this root-owned watcher starts the update unit
+  # immediately — no sudo needed (works on nosuid mounts).
+  cat > /etc/systemd/system/nexus-manager-update.path <<UPPEOF
+[Unit]
+Description=Watch for a portal-triggered Nexus Manager update
+
+[Path]
+PathExists=$INSTALL_DIR/.update-now
+Unit=nexus-manager-update.service
+
+[Install]
+WantedBy=multi-user.target
+UPPEOF
   cat > /etc/systemd/system/nexus-manager-update.timer <<UPTEOF
 [Unit]
 Description=Check for Nexus Manager updates periodically
@@ -165,6 +180,7 @@ WantedBy=timers.target
 UPTEOF
   systemctl daemon-reload
   systemctl enable --now nexus-manager-update.timer
+  systemctl enable --now nexus-manager-update.path
 
   # Let the app process (SERVICE_USER) trigger the update unit from the portal
   # button — exactly one command, NOPASSWD.
