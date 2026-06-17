@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.5",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "포탈 '지금 적용'이 매니저가 root로 실행 중이면 sudo 없이 systemctl을 직접 호출하도록 변경 — /usr/bin/sudo가 nosuid 마운트로 막힌 환경에서도 동작. 실패 메시지에 'root로 systemctl start nexus-manager-update.service 실행 또는 감시 폴더 zip→root 타이머 적용' 안내 추가"},
+        ],
+    },
+    {
         "version": "1.7.4",
         "date": "2026-06-17",
         "changes": [

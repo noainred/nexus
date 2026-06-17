@@ -318,7 +318,12 @@ async def update_config(body: UpdateConfig) -> dict:
 @router.post("/run")
 async def update_run() -> dict:
     """Trigger the systemd update unit (non-blocking — it restarts the app)."""
-    cmd = ["sudo", "-n", "systemctl", "start", "--no-block", "nexus-manager-update.service"]
+    # When the manager already runs as root, call systemctl directly — this
+    # avoids sudo entirely (sudo is unusable when /usr/bin/sudo sits on a
+    # `nosuid` mount). Otherwise fall back to the sudoers-allowed `sudo -n`.
+    unit = ["systemctl", "start", "--no-block", "nexus-manager-update.service"]
+    is_root = hasattr(os, "geteuid") and os.geteuid() == 0
+    cmd = unit if is_root else (["sudo", "-n"] + unit)
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
@@ -333,6 +338,8 @@ async def update_run() -> dict:
     raise HTTPException(
         status_code=503,
         detail=("업데이트 트리거 실패 — 권한(sudo) 또는 systemd 서비스가 없습니다. "
-                "감시 폴더에 zip을 넣으면 타이머가 적용합니다. "
+                "sudo가 nosuid 마운트로 막힌 경우, root로 "
+                "'systemctl start nexus-manager-update.service' 를 실행하거나 "
+                "감시 폴더에 zip을 넣으면 root 타이머가 적용합니다. "
                 f"{(err or b'').decode(errors='ignore')[:200]}"),
     )
