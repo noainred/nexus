@@ -4883,6 +4883,47 @@ async function setupReleaseNotes() {
   document.getElementById("release-modal").addEventListener("click", (ev) => {
     if (ev.target.id === "release-modal") ev.currentTarget.classList.add("hidden");
   });
+  maybeShowUpdatePopup();
+}
+
+// After an upgrade, show a one-time "what's new" popup per browser (so every
+// user sees it once when the version changes). First-ever visit just records
+// the version silently — no popup.
+function maybeShowUpdatePopup() {
+  const data = state.releaseNotes;
+  if (!data || !data.notes || !data.notes.length) return;
+  const cur = data.version;
+  let seen = null;
+  try { seen = localStorage.getItem("seenVersion"); } catch (e) { /* ignore */ }
+  if (seen && seen !== cur) showUpdatePopup(data.notes[0]);
+  try { localStorage.setItem("seenVersion", cur); } catch (e) { /* ignore */ }
+}
+
+function showUpdatePopup(entry) {
+  const list = el("ul", { class: "rel-list" });
+  (entry.changes || []).forEach((c) => {
+    const [label, cls] = RELEASE_LABELS[c.type] || ["기타", ""];
+    list.append(el("li", {}, [el("span", { class: `badge ${cls} rel-tag` }, label), " ", c.text]));
+  });
+  const closeBtn = el("button", { type: "button", class: "modal-x", title: "닫기" }, "✕");
+  const okBtn = el("button", { type: "button", style: "margin-top:10px" }, "확인");
+  const overlay = el("div", { class: "modal" }, [
+    el("div", { class: "modal-box", style: "max-width:580px" }, [
+      el("div", { class: "modal-head" }, [
+        el("h3", {}, `🎉 v${entry.version} 으로 업데이트되었습니다`), closeBtn,
+      ]),
+      el("div", { class: "modal-body" }, [
+        el("p", { class: "hint", style: "margin:8px 0" }, `${entry.date} · 주요 변경사항`),
+        list, okBtn,
+      ]),
+    ]),
+  ]);
+  const close = () => overlay.remove();
+  closeBtn.addEventListener("click", close);
+  okBtn.addEventListener("click", close);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  document.body.append(overlay);
+  makeModalDraggable(overlay.querySelector(".modal-box"), overlay.querySelector(".modal-head"));
 }
 
 const HISTORY_LIMIT = 5;
