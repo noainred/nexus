@@ -16,7 +16,9 @@ router = APIRouter(prefix="/api", tags=["monitoring"])
 
 async def _status_for(instance) -> InstanceStatus:
     """Probe a single instance, never raising — failures become status fields."""
-    client = NexusClient(instance, timeout=get_settings().request_timeout)
+    # Dashboard status should stay snappy: cap the per-node probe so one
+    # unreachable/slow node can't drag the overview out to request_timeout.
+    client = NexusClient(instance, timeout=min(get_settings().request_timeout, 8.0))
     base = InstanceStatus(
         id=instance.id,
         name=instance.name,

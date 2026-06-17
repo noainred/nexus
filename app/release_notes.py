@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.12",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "인스턴스 상태 탭이 '측정 중…'에서 오래 멈추던 문제 개선 — 단일 /api/status(전체 묶음) 응답을 통째로 기다리지 않고, 노드별로 개별 조회해 끝나는 대로 카드를 채운다. 안 닿는 노드 하나가 전체 보드를 묶지 않는다"},
+            {"type": "changed", "text": "대시보드 상태 점검 타임아웃을 최대 8초로 단축(connect는 6초) — 느리거나 닿지 못하는 노드가 개요를 끌지 않도록"},
+        ],
+    },
+    {
         "version": "1.7.11",
         "date": "2026-06-17",
         "changes": [

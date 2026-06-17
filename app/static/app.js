@@ -506,27 +506,47 @@ async function loadOverview() {
     cards.append(el("div", { class: "empty" }, "불러오는 중…"));
   }
 
-  // 2) Fetch the real status + group order, then re-render with data.
-  let statuses, order;
+  // 2) Group order (fast), then probe each node *independently* so one slow or
+  //    unreachable node can't freeze the whole board at "측정 중…".
+  let order = state.groupOrder || [];
   try {
-    const [st, ord] = await Promise.all([
-      api("/api/status"),
-      api("/api/instances/group-order"),
-    ]);
-    statuses = st;
+    const ord = await api("/api/instances/group-order");
     order = (ord && ord.groups) || [];
     state.groupOrder = order;
-  } catch (e) {
-    cards.innerHTML = "";
-    cards.append(el("div", { class: "empty" }, `상태를 불러올 수 없습니다: ${e.message}`));
+  } catch (e) { /* keep previous order */ }
+
+  const insts = state.instances || [];
+  if (!insts.length) {
+    // No known instance list — fall back to the aggregate endpoint.
+    try {
+      const st = await api("/api/status");
+      if (!st.length) {
+        cards.innerHTML = "";
+        cards.append(el("div", { class: "empty" }, "구성된 인스턴스가 없습니다. instances.yaml을 확인하세요."));
+        return;
+      }
+      renderStatusCards(st, order);
+    } catch (e) {
+      cards.innerHTML = "";
+      cards.append(el("div", { class: "empty" }, `상태를 불러올 수 없습니다: ${e.message}`));
+    }
     return;
   }
-  if (!statuses.length) {
-    cards.innerHTML = "";
-    cards.append(el("div", { class: "empty" }, "구성된 인스턴스가 없습니다. instances.yaml을 확인하세요."));
-    return;
-  }
-  renderStatusCards(statuses, order);
+
+  const statusMap = new Map(insts.map((i) => [i.id, { ...i, loading: true }]));
+  const token = (state.overviewToken = (state.overviewToken || 0) + 1);
+  const draw = () => {
+    if (state.overviewToken === token) renderStatusCards([...statusMap.values()], order);
+  };
+  draw();
+  await Promise.allSettled(insts.map(async (i) => {
+    try {
+      statusMap.set(i.id, await api(`/api/instances/${encodeURIComponent(i.id)}/status`));
+    } catch (e) {
+      statusMap.set(i.id, { ...i, reachable: false, healthy: false, error: e.message });
+    }
+    draw();
+  }));
 }
 
 function fleetSummary(items) {
