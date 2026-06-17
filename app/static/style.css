@@ -181,6 +181,12 @@ th.sortable.sorted { color: var(--accent); }
 .update-grid .update-edges { grid-column: 1 / -1; }
 .update-grid .update-edges textarea { width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; }
 .update-grid .form-actions { grid-column: 1 / -1; }
+.topo-skel { display: flex; flex-direction: column; gap: 8px; padding: 6px 0; }
+.topo-skel-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.topo-skel-group { color: var(--muted); font-size: 12px; min-width: 56px; }
+.topo-skel-node { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); font-size: 13px; }
+.topo-skel-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; transition: background .2s; }
+.topo-skel-ip { color: var(--muted); font-size: 11px; }
 .update-grid .update-help-chk { grid-column: 1 / -1; }
 .update-grid .update-help { grid-column: 1 / -1; margin: 2px 0 0; line-height: 1.6; }
 .update-grid .update-help code { background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: 12px; overflow-wrap: anywhere; word-break: break-word; }

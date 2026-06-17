@@ -477,14 +477,66 @@ document.getElementById("status-modal").addEventListener("click", (ev) => {
   if (ev.target.id === "status-modal") ev.currentTarget.classList.add("hidden");
 });
 
+// Immediate skeleton: show every node right away (grouped chips) so the board
+// is never blank while the (single) /api/topology probe runs.
+function renderTopoSkeleton(insts) {
+  const wrap = document.getElementById("topo-tree");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  wrap.append(el("p", { class: "hint", style: "margin:0 0 8px" },
+    "계위 상황판 불러오는 중 — 응답 오는 노드부터 표시됩니다…"));
+  const groups = new Map();
+  insts.forEach((i) => {
+    const g = (i.group || "").trim() || "(그룹 미지정)";
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(i);
+  });
+  const grid = el("div", { class: "topo-skel" });
+  [...groups.keys()].forEach((g) => {
+    const row = el("div", { class: "topo-skel-row" }, [el("span", { class: "topo-skel-group" }, g)]);
+    groups.get(g).forEach((i) => {
+      row.append(el("span", { class: "topo-skel-node", "data-node-id": i.id, title: i.base_url }, [
+        el("span", { class: "topo-skel-dot", style: "background:var(--muted)" }),
+        el("b", {}, i.name),
+        el("span", { class: "topo-skel-ip" }, hostOf(i.base_url) || i.base_url),
+      ]));
+    });
+    grid.append(row);
+  });
+  wrap.append(grid);
+}
+
+function colorTopoChip(id, s) {
+  const dot = document.querySelector(
+    `#topo-tree .topo-skel-node[data-node-id="${(window.CSS && CSS.escape) ? CSS.escape(id) : id}"] .topo-skel-dot`);
+  if (!dot) return;
+  dot.style.background = (!s || !s.reachable)
+    ? "var(--red)" : (s.healthy === false ? "var(--amber)" : "var(--green)");
+}
+
 // The tier wallboard lives on the overview tab; it draws from /api/topology.
 async function loadOverviewTree() {
   const wrap = document.getElementById("topo-tree");
   if (!wrap) return;
+  const insts = state.instances || [];
+  const token = (state.treeToken = (state.treeToken || 0) + 1);
+  // 1) Render every node immediately, then color each as its probe answers —
+  //    a slow node only delays its own chip, not the whole board.
+  if (insts.length >= 2) {
+    renderTopoSkeleton(insts);
+    insts.forEach(async (i) => {
+      let s = null;
+      try { s = await api(`/api/instances/${encodeURIComponent(i.id)}/status`); }
+      catch (e) { s = { reachable: false }; }
+      if (state.treeToken === token) colorTopoChip(i.id, s);
+    });
+  }
+  // 2) Full tier tree (edges + layout) replaces the skeleton when ready.
   try {
     const data = await api("/api/topology");
-    renderTopoTree(data);
+    if (state.treeToken === token) renderTopoTree(data);
   } catch (e) {
+    if (state.treeToken !== token) return;
     wrap.innerHTML = "";
     wrap.append(el("p", { class: "hint" }, `상황판 로드 실패: ${e.message}`));
   }
