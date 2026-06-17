@@ -165,32 +165,32 @@ PY
       if [ -z "$rver" ] || [ -z "$durl" ]; then log "GitHub 브랜치 폴더에서 버전 식별 실패: $UPDATE_URL"; return 0; fi
       if ! ver_gt "$rver" "$cur"; then log "원격 새 버전 없음 (현재 $cur · 원격 $rver)"; return 0; fi
       log "원격(GitHub 브랜치) 새 버전 $rver 다운로드... ($fname)"
-      curl -fsSL "${auth[@]}" -H "Accept: application/vnd.github.raw" -o "$WATCH_DIR/$fname" "$durl" \
+      curl -fsSL ${auth[@]+"${auth[@]}"} -H "Accept: application/vnd.github.raw" -o "$WATCH_DIR/$fname" "$durl" \
         && log "다운로드 완료 → 감시 폴더" || log "다운로드 실패"
       ;;
     github:*|*github.com*)
       local repo tag="${UPDATE_TAG:-latest}" json rver durl
       repo=$(printf '%s' "$UPDATE_URL" | sed -E 's#^github:##; s#https?://github.com/##; s#\.git$##; s#/$##')
-      json=$(curl -fsSL "${auth[@]}" "https://api.github.com/repos/$repo/releases/tags/$tag" 2>/dev/null) \
+      json=$(curl -fsSL ${auth[@]+"${auth[@]}"} "https://api.github.com/repos/$repo/releases/tags/$tag" 2>/dev/null) \
         || { log "GitHub 릴리스 조회 실패: $repo@$tag"; return 0; }
       rver=$(printf '%s' "$json" | grep -oE 'ver_[0-9]+\.[0-9]+\.[0-9]+\.md' | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
       durl=$(printf '%s' "$json" | grep -oE 'https://[^"]*nexus-manager-offline\.zip' | head -1 || true)
       if [ -z "$rver" ] || [ -z "$durl" ]; then log "릴리스 자산 식별 실패"; return 0; fi
       if ! ver_gt "$rver" "$cur"; then log "원격 새 버전 없음 (현재 $cur · 원격 $rver)"; return 0; fi
       log "원격(GitHub) 새 버전 $rver 다운로드..."
-      curl -fsSL "${auth[@]}" -o "$WATCH_DIR/nexus-manager-offline-v$rver.zip" "$durl" \
+      curl -fsSL ${auth[@]+"${auth[@]}"} -o "$WATCH_DIR/nexus-manager-offline-v$rver.zip" "$durl" \
         && log "다운로드 완료 → 감시 폴더" || log "다운로드 실패"
       ;;
     http://*|https://*)
       local base="${UPDATE_URL%/}/" rver vj file
       # Prefer a versions.json manifest (internal mirror), else parse the index.
-      vj=$(curl -fsSL "${auth[@]}" "${base}versions.json" 2>/dev/null || true)
+      vj=$(curl -fsSL ${auth[@]+"${auth[@]}"} "${base}versions.json" 2>/dev/null || true)
       if [ -n "$vj" ]; then
         rver=$(printf '%s' "$vj" | grep -oE '"(version|latest)"[[:space:]]*:[[:space:]]*"[0-9]+\.[0-9]+\.[0-9]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
         file=$(printf '%s' "$vj" | grep -oE '"file"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"file"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' | head -1 || true)
       fi
       if [ -z "${rver:-}" ]; then
-        local idx; idx=$(curl -fsSL "${auth[@]}" "$UPDATE_URL" 2>/dev/null) || { log "원격 조회 실패: $UPDATE_URL"; return 0; }
+        local idx; idx=$(curl -fsSL ${auth[@]+"${auth[@]}"} "$UPDATE_URL" 2>/dev/null) || { log "원격 조회 실패: $UPDATE_URL"; return 0; }
         rver=$(printf '%s' "$idx" | grep -oE 'nexus-manager-offline-v[0-9]+\.[0-9]+\.[0-9]+\.zip' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 || true)
       fi
       if [ -z "${rver:-}" ]; then log "원격에 버전 정보 없음"; return 0; fi
@@ -200,7 +200,7 @@ PY
       # the relative path for the URL but save under the watch folder by name.
       local fname; fname=$(basename "$file")
       log "원격 새 버전 $rver 다운로드... ($file)"
-      curl -fsSL "${auth[@]}" -o "$WATCH_DIR/$fname" "${base}${file}" \
+      curl -fsSL ${auth[@]+"${auth[@]}"} -o "$WATCH_DIR/$fname" "${base}${file}" \
         && log "다운로드 완료 → 감시 폴더" || log "다운로드 실패"
       ;;
     *) log "알 수 없는 UPDATE_URL 형식: $UPDATE_URL" ;;

@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.6",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "auto-update.sh 원격 조회 실패 버그 수정 — 토큰이 없을 때 빈 배열 \"${auth[@]}\" 가 set -u(bash 4.2, CentOS/RHEL 7)에서 'unbound variable'로 죽어 사내 미러 조회가 매번 '원격 조회 실패'로 끝나던 문제를 ${auth[@]+\"${auth[@]}\"} 안전 확장으로 해결. 토큰 없는 공개/사내 Nexus 미러에서 root 타이머 자동 업데이트가 정상 동작"},
+        ],
+    },
+    {
         "version": "1.7.5",
         "date": "2026-06-17",
         "changes": [
