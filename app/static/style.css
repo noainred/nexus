@@ -568,7 +568,7 @@ table.matrix td.ref-col { box-shadow: inset 2px 0 0 var(--accent), inset -2px 0 
 .sw.missing { background: rgba(139,155,171,.12); border: 1px dashed var(--muted); }
 .sw.unknown { background: repeating-linear-gradient(45deg, #2a3640, #2a3640 4px, #222e3a 4px, #222e3a 8px); border: 1px solid var(--border); }
 
-.matrix-wrap { overflow-x: auto; }
+.matrix-wrap { overflow: auto; max-height: calc(100vh - 210px); }
 table.matrix { border-collapse: separate; border-spacing: 0; min-width: 100%; }
 table.matrix th, table.matrix td {
   border-bottom: 1px solid var(--border);
@@ -580,10 +580,12 @@ table.matrix thead th {
   background: var(--panel);
   position: sticky;
   top: 0;
+  z-index: 2;
   padding: 10px 12px;
   font-size: 13px;
   white-space: nowrap;
 }
+table.matrix thead th.rowhead { z-index: 3; }   /* top-left corner above both axes */
 table.matrix th.rowhead, table.matrix td.rowhead {
   text-align: left;
   padding: 8px 12px;

@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.21",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "비교 매트릭스(및 콘텐츠 동기화) 표에서 아래로 스크롤해도 열 헤더가 상단에 고정되도록 수정 — 표 영역에 높이를 주어 본문만 스크롤되고 헤더(및 좌측 저장소 열)는 sticky로 유지. 헤더가 페이지와 함께 사라지던 문제 해결"},
+        ],
+    },
+    {
         "version": "1.7.20",
         "date": "2026-06-17",
         "changes": [
