@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.8",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "자동 업그레이드 후 서비스가 자동 재시작되지 않던 버그 수정 — install-service.sh가 'systemctl enable --now'(이미 실행 중이면 재시작 안 함) 대신 'enable + restart'를 호출하도록 변경. 이제 업그레이드 시 수동 'systemctl restart nexus-manager' 없이 새 코드로 바로 재시작된다(최초 설치도 정상)"},
+        ],
+    },
+    {
         "version": "1.7.7",
         "date": "2026-06-17",
         "changes": [

@@ -120,7 +120,12 @@ WantedBy=multi-user.target
 UNITEOF
 
 systemctl daemon-reload
-systemctl enable --now nexus-manager
+systemctl enable nexus-manager
+# `restart` (not `enable --now`) so an *already-running* service actually
+# reloads the new code after an upgrade — `--now` only starts a stopped unit,
+# which left the old process running until a manual restart. restart also
+# starts the unit on a fresh install.
+systemctl restart nexus-manager
 sleep 1
 systemctl --no-pager --full status nexus-manager | head -n 12 || true
 
