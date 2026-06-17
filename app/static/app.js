@@ -2479,13 +2479,18 @@ function repoBulkPanel() {
   const cols = (state.repoDiff && state.repoDiff.columns) || [];
   if (cols.length < 2) return el("div", {});
   const src = el("select", { id: "bulk-src" }, cols.map((c) => el("option", { value: c.id }, c.name)));
-  const targetBox = el("div", { class: "pick-chips", id: "bulk-targets" });
+  const targetBox = el("div", { class: "bulk-tgt-grid", id: "bulk-targets" });
   const renderTargets = () => {
     targetBox.innerHTML = "";
     cols.forEach((c) => {
       if (c.id === src.value) return;
+      // Name on top, checkbox underneath — so it's unambiguous which box
+      // belongs to which server. Clicking the whole cell toggles it.
       const cb = el("input", { type: "checkbox", class: "bulk-tgt", "data-id": c.id });
-      targetBox.append(el("label", { class: "chk" }, [cb, ` ${c.name}`]));
+      targetBox.append(el("label", { class: "bulk-tgt-cell" }, [
+        el("span", { class: "bulk-tgt-name" }, c.name),
+        cb,
+      ]));
     });
   };
   src.addEventListener("change", renderTargets);
