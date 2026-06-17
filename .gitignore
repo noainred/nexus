@@ -35,3 +35,7 @@ ver_*.md
 
 backups/
 audit.log
+
+# runtime UI/config state
+column-order.json
+update-config.json

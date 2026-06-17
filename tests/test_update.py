@@ -61,3 +61,18 @@ def test_config_rejects_bogus_github_url(tmp_path, monkeypatch):
     client = TestClient(app)
     resp = client.post("/api/update/config", json={"source": "github", "url": "http://not-github/x"})
     assert resp.status_code == 400
+
+
+def test_column_order_roundtrip(tmp_path, monkeypatch):
+    from pathlib import Path
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.routers import instances as inst
+
+    monkeypatch.setattr(inst, "_order_path", lambda: Path(tmp_path) / "column-order.json")
+    client = TestClient(app)
+    assert client.get("/api/instances/column-order").json() == {"order": []}
+    r = client.put("/api/instances/column-order", json={"order": ["b", "a", "c"]})
+    assert r.status_code == 200 and r.json() == {"order": ["b", "a", "c"]}
+    # Persisted: a fresh GET returns the saved order.
+    assert client.get("/api/instances/column-order").json() == {"order": ["b", "a", "c"]}

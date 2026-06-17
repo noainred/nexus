@@ -1727,13 +1727,18 @@ function evaluateRow(row, columns, refId) {
   return { status, matches, refMissing: false };
 }
 
-// User-defined column (instance) order, persisted per-browser in localStorage.
+// User-defined column (instance) order. Saved **server-side** so the same order
+// loads on every browser/session; localStorage is a fast local fallback.
 function loadMatrixColOrder() {
+  if (Array.isArray(state.matrixColOrder)) return state.matrixColOrder;
   try { return JSON.parse(localStorage.getItem("matrixColOrder") || "[]"); }
   catch (e) { return []; }
 }
 function saveMatrixColOrder(ids) {
-  localStorage.setItem("matrixColOrder", JSON.stringify(ids));
+  state.matrixColOrder = ids;
+  try { localStorage.setItem("matrixColOrder", JSON.stringify(ids)); } catch (e) { /* ignore */ }
+  api("/api/instances/column-order", { method: "PUT", body: JSON.stringify({ order: ids }) })
+    .catch(() => toast("순서 서버 저장 실패(로컬에는 저장됨)", "err"));
 }
 // Sort columns by the saved order; ids not in it keep their original order at
 // the end (so newly added servers still appear).
@@ -2242,10 +2247,25 @@ function renderMatrix() {
           href: base,
           target: "_blank",
           rel: "noopener noreferrer",
+          draggable: "false",   // let the <th> own the drag for reordering
           title: `새 탭에서 ${col.name} Nexus 열기`,
         }, label)
       : label;
-    headCells.push(el("th", { class: col.id === refId ? "ref-col" : "", title: col.error || col.name }, labelNode));
+    // Drag a column header onto another to reorder; saved server-side.
+    headCells.push(el("th", {
+      class: (col.id === refId ? "ref-col " : "") + "matrix-col-head",
+      title: (col.error || col.name) + " · 헤더를 드래그해 순서 변경",
+      draggable: "true",
+      ondragstart: (e) => { e.dataTransfer.setData("text/plain", col.id); e.dataTransfer.effectAllowed = "move"; },
+      ondragover: (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; e.currentTarget.classList.add("col-drop"); },
+      ondragleave: (e) => e.currentTarget.classList.remove("col-drop"),
+      ondrop: (e) => {
+        e.preventDefault();
+        e.currentTarget.classList.remove("col-drop");
+        const src = e.dataTransfer.getData("text/plain");
+        if (src && src !== col.id) reorderMatrixCol(src, col.id);
+      },
+    }, labelNode));
   });
   const thead = el("thead", {}, el("tr", {}, headCells));
 
@@ -2354,12 +2374,14 @@ function populateMatrixRef() {
 async function loadMatrix() {
   const container = document.getElementById("matrix-table");
   try {
-    const [matrix, cf] = await Promise.all([
+    const [matrix, cf, ord] = await Promise.all([
       api("/api/matrix"),
       api("/api/instances/compare-fields"),
+      api("/api/instances/column-order").catch(() => ({ order: [] })),
     ]);
     state.matrix = matrix;
     state.compareFields = (cf && cf.fields) || [];
+    state.matrixColOrder = (ord && ord.order) || [];   // server-saved column order
     // A fresh matrix load means server configs may have changed — drop the
     // derived caches so hover tooltips/badges don't show stale slave-diff info.
     state.slaveDiffCache = {};
@@ -2387,6 +2409,8 @@ document.getElementById("matrix-repo-all").addEventListener("click", () => setAl
 document.getElementById("matrix-repo-none").addEventListener("click", () => setAllMatrixRepos(false));
 document.getElementById("matrix-col-reset").addEventListener("click", () => {
   localStorage.removeItem("matrixColOrder");
+  state.matrixColOrder = [];
+  api("/api/instances/column-order", { method: "PUT", body: JSON.stringify({ order: [] }) }).catch(() => {});
   toast("열 순서를 기본값으로 되돌렸습니다");
   renderMatrixPickers();
   renderMatrix();

@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -69,6 +71,45 @@ async def set_group_order(
 ) -> GroupOrder:
     registry.set_group_order(body.groups)
     return GroupOrder(groups=registry.group_order())
+
+
+# --- Instance (column) order — persisted server-side so the order a user sets
+# is the same on every browser/session, not just one localStorage. Kept in a
+# small JSON file, independent of the instances.yaml schema. ----------------
+def _order_path() -> Path:
+    s = get_settings()
+    p = Path(getattr(s, "column_order_file", "column-order.json"))
+    return p if p.is_absolute() else Path(os.getcwd()) / p
+
+
+def _load_order() -> List[str]:
+    p = _order_path()
+    if p.is_file():
+        try:
+            d = json.loads(p.read_text("utf-8"))
+            seq = d.get("order") if isinstance(d, dict) else d
+            if isinstance(seq, list):
+                return [str(x) for x in seq if x]
+        except Exception:  # noqa: BLE001
+            pass
+    return []
+
+
+@router.get("/column-order")
+async def get_column_order() -> dict:
+    return {"order": _load_order()}
+
+
+@router.put("/column-order")
+async def set_column_order(body: dict) -> dict:
+    order = [str(x) for x in (body.get("order") or []) if x]
+    p = _order_path()
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps({"order": order}, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"순서 저장 실패: {exc}")
+    return {"order": order}
 
 
 @router.get("/compare-fields", response_model=CompareFields)

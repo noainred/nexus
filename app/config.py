@@ -71,6 +71,8 @@ class Settings(BaseSettings):
     instances_file: str = "instances.yaml"
     request_timeout: float = 15.0
     verify_tls: bool = True
+    # Server-saved instance/column order (비교 매트릭스 등 공통 순서).
+    column_order_file: str = "column-order.json"
     # Background status poller: how often (seconds) to refresh the cached
     # node status the dashboard reads instantly.
     status_poll_interval: float = 20.0

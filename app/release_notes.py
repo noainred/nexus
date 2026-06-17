@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.20",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "added", "text": "비교 매트릭스 열(인스턴스) 순서를 직접 지정·저장 — 열 헤더를 드래그해 순서를 바꾸면 서버에 저장(column-order.json)되어 어느 브라우저/세션에서 열어도 동일한 순서로 불러온다. 기존 인스턴스 칩 드래그도 동일하게 서버 저장. '열 순서 기본값' 버튼으로 초기화"},
+        ],
+    },
+    {
         "version": "1.7.19",
         "date": "2026-06-17",
         "changes": [
