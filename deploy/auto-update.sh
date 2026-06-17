@@ -88,6 +88,86 @@ remote_fetch() {
   local cur auth=(); cur=$(current_version)
   [ -n "${GITHUB_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
   case "$UPDATE_URL" in
+    *raw.githubusercontent.com/*|*github.com/*/raw/*|*github.com/*/tree/*|*github.com/*/blob/*)
+      # GitHub branch *download folder* (no Release needed, works on private
+      # repos with a token): convert the raw/tree URL to the contents API and
+      # resolve the newest bundle (versions.json, else a directory listing).
+      if ! command -v python3 >/dev/null 2>&1; then log "python3 없음 — GitHub 폴더 조회 건너뜀"; return 0; fi
+      local out rver fname durl
+      out=$(UPDATE_URL="$UPDATE_URL" GITHUB_TOKEN="${GITHUB_TOKEN:-}" python3 - <<'PY' 2>/dev/null || true
+import json, os, re, sys, urllib.request
+url = os.environ.get("UPDATE_URL", "")
+token = os.environ.get("GITHUB_TOKEN", "")
+RAW = re.compile(r"^https?://raw\.githubusercontent\.com/([^/]+)/([^/]+)/(.+)$")
+DIR = re.compile(r"^https?://github\.com/([^/]+)/([^/]+)/(?:raw|tree|blob)/(.+)$")
+m = RAW.match(url) or DIR.match(url)
+if not m:
+    sys.exit(0)
+owner, repo, rest = m.groups()
+ref, _, dirpath = rest.rpartition("/")
+if not ref or not dirpath:
+    sys.exit(0)
+api = "https://api.github.com/repos/%s/%s/contents/%s?ref=%s" % (owner, repo, dirpath, ref)
+def join(base, name):
+    head, _, q = base.partition("?")
+    return head.rstrip("/") + "/" + name + (("?" + q) if q else "")
+def req(u, raw=False):
+    h = {"Accept": "application/vnd.github.raw" if raw else "application/vnd.github+json"}
+    if token:
+        h["Authorization"] = "Bearer " + token
+    return urllib.request.Request(u, headers=h)
+VER = re.compile(r"(\d+)\.(\d+)\.(\d+)")
+def vkey(v):
+    mm = VER.search(v or "")
+    return tuple(int(x) for x in mm.groups()) if mm else (0, 0, 0)
+rver = ""; file = ""
+try:
+    with urllib.request.urlopen(req(join(api, "versions.json"), raw=True), timeout=10) as r:
+        d = json.loads(r.read(4 * 1024 * 1024).decode("utf-8"))
+    v = str(d.get("version") or d.get("latest") or "")
+    mm = VER.search(v)
+    if mm:
+        rver = ".".join(mm.groups())
+        file = d.get("file") or ""
+        if not file:
+            for e in (d.get("versions") or []):
+                if str(e.get("version")) == v:
+                    file = e.get("file") or e.get("zip") or ""
+                    break
+        if not file:
+            file = "nexus-manager-offline-v%s.zip" % rver
+except Exception:
+    pass
+if not rver:
+    try:
+        with urllib.request.urlopen(req(api), timeout=10) as r:
+            arr = json.loads(r.read(2 * 1024 * 1024).decode("utf-8"))
+        best = None
+        for it in (arr if isinstance(arr, list) else []):
+            n = it.get("name", "")
+            if re.fullmatch(r"nexus-manager-offline-v\d+\.\d+\.\d+\.zip", n):
+                if best is None or vkey(n) > vkey(best):
+                    best = n
+        if best:
+            rver = ".".join(VER.search(best).groups()); file = best
+    except Exception:
+        pass
+if not rver:
+    sys.exit(0)
+print("RVER=%s" % rver)
+print("FILE=%s" % os.path.basename(file))
+print("DURL=%s" % join(api, file))
+PY
+)
+      rver=$(printf '%s\n' "$out" | sed -n 's/^RVER=//p')
+      fname=$(printf '%s\n' "$out" | sed -n 's/^FILE=//p')
+      durl=$(printf '%s\n' "$out" | sed -n 's/^DURL=//p')
+      if [ -z "$rver" ] || [ -z "$durl" ]; then log "GitHub 브랜치 폴더에서 버전 식별 실패: $UPDATE_URL"; return 0; fi
+      if ! ver_gt "$rver" "$cur"; then log "원격 새 버전 없음 (현재 $cur · 원격 $rver)"; return 0; fi
+      log "원격(GitHub 브랜치) 새 버전 $rver 다운로드... ($fname)"
+      curl -fsSL "${auth[@]}" -H "Accept: application/vnd.github.raw" -o "$WATCH_DIR/$fname" "$durl" \
+        && log "다운로드 완료 → 감시 폴더" || log "다운로드 실패"
+      ;;
     github:*|*github.com*)
       local repo tag="${UPDATE_TAG:-latest}" json rver durl
       repo=$(printf '%s' "$UPDATE_URL" | sed -E 's#^github:##; s#https?://github.com/##; s#\.git$##; s#/$##')

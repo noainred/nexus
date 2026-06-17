@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.2",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "added", "text": "자동 업그레이드 소스에 'GitHub 브랜치 download 폴더' 방식 추가 — GitHub Release를 만들지 않고도, raw.githubusercontent.com/<owner>/<repo>/<브랜치>/download (또는 github.com/.../tree/<브랜치>/download) 주소를 그대로 넣으면 자동으로 contents API로 변환해 인증 조회한다. 비공개(사설) 레포는 토큰(PAT)을 함께 저장하면 동작하며, 브랜치명에 '/'가 있어도 안전하다. 폴더의 versions.json을 우선 읽고, 없으면 폴더 목록에서 가장 높은 nexus-manager-offline-vX.Y.Z.zip을 자동 선택(앱 버전 확인 + auto-update.sh 다운로드 양쪽 지원)"},
+        ],
+    },
+    {
         "version": "1.7.1",
         "date": "2026-06-17",
         "changes": [

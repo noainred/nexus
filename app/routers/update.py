@@ -37,6 +37,40 @@ def _vkey(v: str):
     return tuple(int(x) for x in m.groups()) if m else (0, 0, 0)
 
 
+_RAW_GH_RE = re.compile(r"^https?://raw\.githubusercontent\.com/([^/]+)/([^/]+)/(.+)$")
+_DIR_GH_RE = re.compile(r"^https?://github\.com/([^/]+)/([^/]+)/(?:raw|tree|blob)/(.+)$")
+
+
+def _gh_contents_api(url: str) -> Optional[str]:
+    """Convert a GitHub raw / branch-folder URL to the contents API base.
+
+    ``raw.githubusercontent.com/{o}/{r}/{ref...}/{dir}`` or
+    ``github.com/{o}/{r}/(raw|tree|blob)/{ref...}/{dir}`` →
+    ``api.github.com/repos/{o}/{r}/contents/{dir}?ref={ref...}``.
+
+    The last path segment is the directory and the rest is the ref, so branch
+    names containing '/' (e.g. ``claude/foo-bar``) work. This lets a *private*
+    repo's ``download/`` folder be read with a token — no GitHub Release needed.
+    Returns None when the URL is not a GitHub branch-folder URL.
+    """
+    m = _RAW_GH_RE.match(url or "") or _DIR_GH_RE.match(url or "")
+    if not m:
+        return None
+    owner, repo, rest = m.groups()
+    ref, _, dirpath = rest.rpartition("/")
+    if not ref or not dirpath:
+        return None
+    return "https://api.github.com/repos/%s/%s/contents/%s?ref=%s" % (owner, repo, dirpath, ref)
+
+
+def _gh_join(base: str, name: str) -> str:
+    """Append a filename to a contents-API base, keeping any ``?ref=…`` query."""
+    if "?" in base:
+        head, _, query = base.partition("?")
+        return head.rstrip("/") + "/" + name + "?" + query
+    return base.rstrip("/") + "/" + name
+
+
 def _abs(path: str) -> Path:
     p = Path(path)
     return p if p.is_absolute() else Path(os.getcwd()) / p
@@ -96,6 +130,40 @@ async def _remote_latest(cfg: dict) -> Optional[str]:
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     async with httpx.AsyncClient(timeout=8.0, follow_redirects=True, verify=False) as c:
         if cfg.get("source") == "github" or url.startswith("github:"):
+            api = _gh_contents_api(url)
+            if api:
+                # Private/public branch *download folder* — no Release needed.
+                # Prefer versions.json (read raw via contents API), else list the
+                # folder for the highest nexus-manager-offline-vX.Y.Z.zip.
+                gh = {"Accept": "application/vnd.github.raw"}
+                if token:
+                    gh["Authorization"] = f"Bearer {token}"
+                try:
+                    vr = await c.get(_gh_join(api, "versions.json"), headers=gh)
+                    if vr.status_code == 200:
+                        data = vr.json()
+                        v = data.get("version") or data.get("latest")
+                        if v and _VER_RE.search(str(v)):
+                            return ".".join(_VER_RE.search(str(v)).groups())
+                except Exception:  # noqa: BLE001 - fall back to a directory listing
+                    pass
+                lh = {"Accept": "application/vnd.github+json"}
+                if token:
+                    lh["Authorization"] = f"Bearer {token}"
+                r = await c.get(api, headers=lh)
+                r.raise_for_status()
+                listing = r.json()
+                items = listing if isinstance(listing, list) else []
+                vers = [mm.group(1)
+                        for it in items if isinstance(it, dict)
+                        for mm in [re.fullmatch(r"nexus-manager-offline-v(\d+\.\d+\.\d+)\.zip", it.get("name", ""))]
+                        if mm]
+                if vers:
+                    return max(vers, key=_vkey)
+                raise RuntimeError(
+                    "GitHub 폴더에서 versions.json 또는 nexus-manager-offline-vX.Y.Z.zip 을 "
+                    "찾지 못했습니다 — 브랜치/폴더 경로와 토큰(비공개 레포) 권한을 확인하세요."
+                )
             repo = url[len("github:"):] if url.startswith("github:") else url
             m = re.search(r"github\.com[:/]+([^/]+/[^/]+?)(?:\.git|/|$)", repo)
             if m:
@@ -216,8 +284,10 @@ async def update_config(body: UpdateConfig) -> dict:
     src = body.source if body.source in ("server", "github") else "server"
     url = (body.url or "").strip()
     if url and src == "github":
-        if not (url.startswith("github:") or "github.com" in url):
-            raise HTTPException(status_code=400, detail="GitHub 소스는 'github:owner/repo' 또는 github.com 주소여야 합니다.")
+        if not (url.startswith("github:") or "github.com" in url or "raw.githubusercontent.com" in url):
+            raise HTTPException(
+                status_code=400,
+                detail="GitHub 소스는 'github:owner/repo', github.com 또는 raw.githubusercontent.com 주소여야 합니다.")
     if url and src == "server" and not (url.startswith("http://") or url.startswith("https://")):
         raise HTTPException(status_code=400, detail="Update Server 소스는 http(s):// 주소여야 합니다.")
     cur = _load_cfg()
