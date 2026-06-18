@@ -3034,6 +3034,40 @@ function renderDltForIp(ip, repoFilter) {
   box.append(buildTable(["시각", "저장소", "경로", "크기"], rows));
 }
 
+// Server-side: the manager reads a request.log it has access to (configured in
+// settings.request_log_paths) and analyzes it — no manual upload needed.
+async function dltServerRender() {
+  const box = document.getElementById("dlt-result");
+  const path = state.dltServerPath;
+  if (!box || !path) return;
+  const ip = (document.getElementById("dlt-ip").value || "").trim();
+  const repo = (document.getElementById("dlt-repo").value || "").trim();
+  box.innerHTML = "";
+  box.append(el("p", { class: "hint" }, "서버에서 분석 중…"));
+  try {
+    const q = `path=${encodeURIComponent(path)}&ip=${encodeURIComponent(ip)}&repo=${encodeURIComponent(repo)}`;
+    const r = await api(`/api/access-log/analyze?${q}`);
+    box.innerHTML = "";
+    if (ip) {
+      box.append(el("button", { class: "ghost", onclick: () => { document.getElementById("dlt-ip").value = ""; dltServerRender(); } }, "← 최근 IP 목록"));
+      box.append(el("p", { class: "hint" }, `IP ${ip} — 받은 패키지 ${r.total}건 (표시 ${r.detail.length})`));
+      box.append(buildTable(["시각", "저장소", "경로", "크기"],
+        r.detail.map((x) => el("tr", {}, [el("td", {}, x.ts), el("td", {}, x.repo), el("td", {}, x.path), el("td", {}, fmtBytes(x.bytes))]))));
+    } else {
+      box.append(el("p", { class: "hint" }, `최근 접속 IP ${r.ip_count}개 — 행을 클릭하면 그 IP가 받은 패키지를 봅니다`));
+      box.append(buildTable(["IP", "다운로드 수", "마지막 시각", "주요 저장소"],
+        (r.ips || []).map((e) => el("tr", {
+          style: "cursor:pointer",
+          onclick: () => { document.getElementById("dlt-ip").value = e.ip; dltServerRender(); },
+        }, [el("td", {}, e.ip), el("td", {}, String(e.count)), el("td", {}, e.last),
+            el("td", {}, (e.top_repos || []).map((t) => `${t[0]}(${t[1]})`).join(", "))]))));
+    }
+  } catch (e) {
+    box.innerHTML = "";
+    box.append(el("div", { class: "empty" }, `서버 분석 실패: ${e.message}`));
+  }
+}
+
 function setupDlTrack() {
   const btn = document.getElementById("dlt-analyze");
   if (!btn) return;
@@ -3046,6 +3080,7 @@ function setupDlTrack() {
       try { text = await readLogFile(f); } catch (e) { stat.textContent = `파일 읽기 실패: ${e.message}`; return; }
     }
     if (!text.trim()) { stat.textContent = "로그 파일을 선택하거나 붙여넣은 뒤 [분석]을 누르세요."; return; }
+    state.dltServerPath = null;   // switch to client/file mode
     state.dltData = parseRequestLog(text);
     const total = [...state.dltData.values()].reduce((a, e) => a + e.count, 0);
     stat.textContent = state.dltData.size
@@ -3054,9 +3089,26 @@ function setupDlTrack() {
     renderDltRecent();
   };
   btn.addEventListener("click", analyze);
-  const reRender = () => { if (state.dltData) renderDltRecent(); };
+  const reRender = () => { if (state.dltServerPath) dltServerRender(); else if (state.dltData) renderDltRecent(); };
   document.getElementById("dlt-ip").addEventListener("input", reRender);
   document.getElementById("dlt-repo").addEventListener("input", reRender);
+
+  // Server-side log sources (when the manager has access to request.log files).
+  const serverBtn = document.getElementById("dlt-server");
+  const srcSel = document.getElementById("dlt-source");
+  api("/api/access-log/sources").then((r) => {
+    const list = (r && r.sources) || [];
+    if (!list.length || !srcSel) return;
+    srcSel.innerHTML = "";
+    list.forEach((s) => srcSel.append(el("option", { value: s.path }, `${s.label}${s.exists ? "" : " (없음)"}`)));
+    document.getElementById("dlt-server-row").style.display = "";
+  }).catch(() => { /* no server sources */ });
+  if (serverBtn) serverBtn.addEventListener("click", () => {
+    state.dltServerPath = srcSel.value;
+    state.dltData = null;
+    if (stat) stat.textContent = `서버 로그 분석: ${srcSel.value}`;
+    dltServerRender();
+  });
 }
 
 // ---- repositories --------------------------------------------------------

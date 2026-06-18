@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     verify_tls: bool = True
     # Server-saved instance/column order (비교 매트릭스 등 공통 순서).
     column_order_file: str = "column-order.json"
+    # Nexus request.log files the manager may read server-side for the
+    # download-tracking (IP) tab. Comma/newline-separated "라벨=경로" or just
+    # paths (absolute, glob allowed). Only files listed here are readable.
+    request_log_paths: str = ""
     # Background status poller: how often (seconds) to refresh the cached
     # node status the dashboard reads instantly.
     status_poll_interval: float = 20.0

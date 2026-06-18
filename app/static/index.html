@@ -282,6 +282,11 @@
       <section id="dl-track" class="panel">
         <h2>다운로드 추적 — IP별 받아간 패키지</h2>
         <p class="hint">Nexus의 접속 로그(<code>request.log</code>)를 불러와 어느 IP가 어떤 패키지를 받아갔는지 분석합니다. 로그는 <b>브라우저에서만</b> 처리되어 서버로 전송되지 않습니다. (Nexus 관리 → <b>Support → Logging</b>에서 request.log 다운로드, 또는 서버의 <code>sonatype-work/nexus3/log/request.log</code>)</p>
+        <div class="dl-controls" id="dlt-server-row" style="display:none">
+          <label>서버 로그 <select id="dlt-source"></select></label>
+          <button id="dlt-server" type="button">서버에서 분석</button>
+          <span class="hint" style="margin:0">매니저가 접근 가능한 로그를 직접 읽어 분석합니다(설정 request_log_paths).</span>
+        </div>
         <div class="dl-controls">
           <label>로그 파일 <input type="file" id="dlt-file" accept=".log,.txt,.gz" /></label>
           <button id="dlt-analyze" type="button">분석</button>

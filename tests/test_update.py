@@ -95,3 +95,31 @@ def test_portal_hidden_tabs_roundtrip(tmp_path, monkeypatch):
     # title-only PUT keeps hidden_tabs
     client.put("/api/portal", json={"title": "T2"})
     assert client.get("/api/portal").json()["hidden_tabs"] == ["search", "alerts"]
+
+
+def test_access_log_analyze(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.routers import accesslog
+
+    log = tmp_path / "request.log"
+    log.write_text(
+        '192.168.1.50 - admin [17/Jun/2026:15:00:01 +0900] "GET /repository/yum/7/vim.rpm HTTP/1.1" 200 1048576 "-" "yum" 12\n'
+        '10.0.0.9 - - [17/Jun/2026:15:01:02 +0900] "HEAD /repository/yum/repomd.xml HTTP/1.1" 200 12 "-" "curl" 3\n'
+        '10.0.0.9 - - [17/Jun/2026:15:01:03 +0900] "GET /repository/rocky9/BaseOS/rsync.rpm HTTP/1.1" 206 50000 "-" "dnf" 8\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(accesslog, "_configured", lambda: [("nexus", str(log))])
+    client = TestClient(app)
+
+    src = client.get("/api/access-log/sources").json()
+    assert src["sources"][0]["path"] == str(log) and src["sources"][0]["exists"]
+
+    recent = client.get(f"/api/access-log/analyze?path={log}").json()
+    assert recent["ip_count"] == 2  # HEAD ignored; both IPs have a GET 200/206
+
+    detail = client.get(f"/api/access-log/analyze?path={log}&ip=10.0.0.9").json()
+    assert detail["total"] == 1 and detail["detail"][0]["repo"] == "rocky9"
+
+    # path not in the allowlist is rejected
+    assert client.get("/api/access-log/analyze?path=/etc/passwd").status_code == 400

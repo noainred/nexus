@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.31",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "added", "text": "다운로드 추적(IP)을 서버에서 자동 분석 — 매니저가 접근 가능한 request.log를 직접 읽어 IP별 다운로드를 분석한다(파일 업로드 불필요). 설정 request_log_paths(env NEXUS_MANAGER_REQUEST_LOG_PATHS, '라벨=경로' 콤마/줄 구분, glob·.gz 지원)에 등록한 경로만 읽으며, 다운로드 추적 탭의 '서버 로그' 드롭다운에서 선택해 분석한다. /api/access-log/sources·/analyze 엔드포인트 추가(허용 경로만, 경로 탈출 차단)"},
+        ],
+    },
+    {
         "version": "1.7.30",
         "date": "2026-06-17",
         "changes": [

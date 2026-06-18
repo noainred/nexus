@@ -23,6 +23,7 @@ from .routers.sync import run_loop as sync_run_loop
 from .routers import (
     alerts,
     accounts,
+    accesslog,
     auth,
     backup,
     bulk,
@@ -157,6 +158,7 @@ app.include_router(cleanup.router)
 app.include_router(monitoring.router)
 app.include_router(matrix.router)
 app.include_router(downloads.router)
+app.include_router(accesslog.router)
 app.include_router(tasks.router)
 app.include_router(security.router)
 app.include_router(content.router)
