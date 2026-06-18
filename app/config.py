@@ -73,6 +73,8 @@ class Settings(BaseSettings):
     verify_tls: bool = True
     # Server-saved instance/column order (비교 매트릭스 등 공통 순서).
     column_order_file: str = "column-order.json"
+    # Server-saved tier-board (topology) node layout — shared by all users.
+    topo_layout_file: str = "topo-layout.json"
     # Nexus request.log files the manager may read server-side for the
     # download-tracking (IP) tab. Comma/newline-separated "라벨=경로" or just
     # paths (absolute, glob allowed). Only files listed here are readable.

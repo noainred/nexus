@@ -112,6 +112,49 @@ async def set_column_order(body: dict) -> dict:
     return {"order": order}
 
 
+# --- Tier-board (topology) node layout — persisted server-side so the drag
+# arrangement one admin makes is the same for everyone. ---------------------
+def _topo_path() -> Path:
+    s = get_settings()
+    p = Path(getattr(s, "topo_layout_file", "topo-layout.json"))
+    return p if p.is_absolute() else Path(os.getcwd()) / p
+
+
+def _load_topo() -> dict:
+    p = _topo_path()
+    if p.is_file():
+        try:
+            d = json.loads(p.read_text("utf-8"))
+            pos = d.get("pos") if isinstance(d, dict) else None
+            return pos if isinstance(pos, dict) else {}
+        except Exception:  # noqa: BLE001
+            pass
+    return {}
+
+
+@router.get("/topology-layout")
+async def get_topology_layout() -> dict:
+    return {"pos": _load_topo()}
+
+
+@router.put("/topology-layout")
+async def set_topology_layout(body: dict) -> dict:
+    raw = body.get("pos") if isinstance(body, dict) else None
+    clean: dict = {}
+    if isinstance(raw, dict):
+        for k, v in raw.items():
+            if (isinstance(v, dict) and isinstance(v.get("x"), (int, float))
+                    and isinstance(v.get("y"), (int, float))):
+                clean[str(k)] = {"x": float(v["x"]), "y": float(v["y"])}
+    p = _topo_path()
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps({"pos": clean}, ensure_ascii=False), encoding="utf-8")
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"배치 저장 실패: {exc}")
+    return {"pos": clean}
+
+
 @router.get("/compare-fields", response_model=CompareFields)
 async def get_compare_fields(
     registry: InstanceRegistry = Depends(get_registry),

@@ -103,6 +103,7 @@ _PUBLIC_READ_RE = re.compile(
     r"|release-notes"
     r"|portal"
     r"|instances/group-order"
+    r"|instances/topology-layout"
     r"|instances/[^/]+/(?:status|blobstores)"
     r")$"
 )

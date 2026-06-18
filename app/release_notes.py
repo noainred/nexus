@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.33",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "계위 상황판(토폴로지) 노드 배치를 서버에 저장해 모든 사용자가 동일한 배치를 보도록 변경 — 한 사람이 드래그로 배치하면 전체 노드 좌표가 서버(topo-layout.json)에 저장되고, 다른 브라우저/사용자도 같은 배치로 로드된다. '배치 초기화'는 공통 배치를 자동 배치로 되돌린다(localStorage는 빠른 폴백)"},
+        ],
+    },
+    {
         "version": "1.7.32",
         "date": "2026-06-17",
         "changes": [

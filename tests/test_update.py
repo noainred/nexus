@@ -123,3 +123,21 @@ def test_access_log_analyze(tmp_path, monkeypatch):
 
     # path not in the allowlist is rejected
     assert client.get("/api/access-log/analyze?path=/etc/passwd").status_code == 400
+
+
+def test_topology_layout_roundtrip(tmp_path, monkeypatch):
+    from pathlib import Path
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.routers import instances as inst
+
+    monkeypatch.setattr(inst, "_topo_path", lambda: Path(tmp_path) / "topo-layout.json")
+    client = TestClient(app)
+    assert client.get("/api/instances/topology-layout").json() == {"pos": {}}
+    pos = {"a": {"x": 10, "y": 20}, "b": {"x": 30.5, "y": 40}}
+    r = client.put("/api/instances/topology-layout", json={"pos": pos})
+    assert r.status_code == 200
+    assert client.get("/api/instances/topology-layout").json()["pos"]["a"] == {"x": 10.0, "y": 20.0}
+    # bad entries are dropped
+    r2 = client.put("/api/instances/topology-layout", json={"pos": {"c": {"x": "bad"}, "d": {"x": 1, "y": 2}}})
+    assert r2.json()["pos"] == {"d": {"x": 1.0, "y": 2.0}}

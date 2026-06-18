@@ -557,9 +557,9 @@ async function loadOverviewTree() {
       if (state.treeToken === token) colorTopoChip(i.id, s);
     });
   }
-  // 2) Full tier tree (edges + layout) replaces the skeleton when ready.
+  // 2) Full tier tree (edges + shared layout) replaces the skeleton when ready.
   try {
-    const data = await api("/api/topology");
+    const [data] = await Promise.all([api("/api/topology"), loadTopoPos()]);
     if (state.treeToken === token) renderTopoTree(data);
   } catch (e) {
     if (state.treeToken !== token) return;
@@ -1198,9 +1198,29 @@ function setupTopology() {
   document.getElementById("pxs-problem-only").addEventListener("change", renderProxyStatus);
   document.getElementById("topo-reset").addEventListener("click", () => {
     localStorage.removeItem("topoPos");
-    toast("배치를 초기화했습니다 (자동 배치)");
+    saveTopoPos({});   // clear the shared (server) layout too
+    toast("배치를 초기화했습니다 (자동 배치 · 모든 사용자 공통)");
     loadOverviewTree();
   });
+}
+
+// Tier-board node layout is shared via the server so everyone sees the same
+// arrangement; localStorage is a fast local fallback.
+function topoPosStore() {
+  if (state.topoPos && typeof state.topoPos === "object") return state.topoPos;
+  try { return JSON.parse(localStorage.getItem("topoPos") || "{}"); } catch (e) { return {}; }
+}
+function saveTopoPos(store) {
+  state.topoPos = store;
+  try { localStorage.setItem("topoPos", JSON.stringify(store)); } catch (e) { /* quota */ }
+  api("/api/instances/topology-layout", { method: "PUT", body: JSON.stringify({ pos: store }) })
+    .catch(() => toast("배치 서버 저장 실패(로컬에는 저장됨)", "err"));
+}
+async function loadTopoPos() {
+  try {
+    const r = await api("/api/instances/topology-layout");
+    if (r && r.pos && typeof r.pos === "object") state.topoPos = r.pos;
+  } catch (e) { /* keep localStorage fallback */ }
 }
 
 // Hierarchical status board: tiers derived from internal proxy links
@@ -1314,8 +1334,7 @@ function renderTopoTree(data) {
   // User-arranged positions (drag & drop) override the automatic layout.
   // Only accept FINITE coordinates — typeof NaN === "number", so a corrupt
   // saved value would otherwise poison width/height and collapse the board.
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem("topoPos") || "{}"); } catch (e) { saved = {}; }
+  const saved = topoPosStore();   // server-shared layout (localStorage fallback)
   nodes.forEach((n) => {
     const sp = saved[n.id];
     if (sp && Number.isFinite(sp.x) && Number.isFinite(sp.y)) pos[n.id] = { x: sp.x, y: sp.y };
@@ -1512,12 +1531,16 @@ function renderTopoTree(data) {
       if (!dragging) return;
       dragging = false;
       if (moved) {
-        let store = {};
-        try { store = JSON.parse(localStorage.getItem("topoPos") || "{}"); } catch (e) { store = {}; }
-        if (Number.isFinite(pos[id].x) && Number.isFinite(pos[id].y)) {
-          store[id] = { x: Math.round(pos[id].x), y: Math.round(pos[id].y) };
-          localStorage.setItem("topoPos", JSON.stringify(store));
-        }
+        // Persist the FULL arrangement (every node's current position) to the
+        // server so all users see exactly the same board.
+        const store = {};
+        nodes.forEach((n) => {
+          const p = pos[n.id];
+          if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+            store[n.id] = { x: Math.round(p.x), y: Math.round(p.y) };
+          }
+        });
+        saveTopoPos(store);
       } else {
         const n = byId[id];
         if (n) window.open(n.base_url, "_blank", "noopener,noreferrer");
