@@ -3979,25 +3979,38 @@ function renderSettingsTable(list) {
 
 async function loadSettings() {
   const container = document.getElementById("settings-table");
-  container.innerHTML = "";
-  let list = state.instances;
+  // 1) Render instantly from the already-loaded instance list so the table
+  //    never waits on a slow/cold server (the list is just metadata).
+  const renderAll = (list) => {
+    renderSettingsTable(list);
+    loadGroupOrder();
+    loadCompareFields();
+    loadPingConfig();
+    loadBackupConfig();
+    loadSyncJobs();
+  };
+  if (state.instances && state.instances.length) {
+    renderAll(state.instances);
+  } else {
+    container.innerHTML = "";
+    container.append(el("div", { class: "empty" }, "불러오는 중…"));
+  }
+  // 2) Refresh in the background; only show an error if we have nothing cached.
   try {
-    list = await api("/api/instances");
+    const list = await api("/api/instances");
     state.instances = list;
+    if (!list.length) {
+      container.innerHTML = "";
+      container.append(el("div", { class: "empty" }, "등록된 서버가 없습니다. 아래에서 추가하세요."));
+      return;
+    }
+    renderAll(list);
   } catch (e) {
-    container.append(el("div", { class: "empty" }, `목록 조회 실패: ${e.message}`));
-    return;
+    if (!(state.instances && state.instances.length)) {
+      container.innerHTML = "";
+      container.append(el("div", { class: "empty" }, `목록 조회 실패: ${e.message}`));
+    }
   }
-  if (!list.length) {
-    container.append(el("div", { class: "empty" }, "등록된 서버가 없습니다. 아래에서 추가하세요."));
-    return;
-  }
-  renderSettingsTable(list);
-  loadGroupOrder();
-  loadCompareFields();
-  loadPingConfig();
-  loadBackupConfig();
-  loadSyncJobs();
 }
 
 function downloadInstanceConfig(inst) {

@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.32",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "서버 설정(노드 관리) 화면의 서버 목록이 뜨는 데 오래 걸리던 문제 개선 — 이미 로딩된 인스턴스 목록(캐시)으로 표를 즉시 그리고, 서버 갱신은 백그라운드로 처리한다. 매니저 재시작 직후 서버가 바빠도 목록이 바로 보인다"},
+        ],
+    },
+    {
         "version": "1.7.31",
         "date": "2026-06-17",
         "changes": [
