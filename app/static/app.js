@@ -2953,6 +2953,112 @@ async function runCompare() {
 document.getElementById("cmp-run").addEventListener("click", runCompare);
 document.getElementById("cmp-diff-only").addEventListener("change", renderCompare);
 
+// ---- 다운로드 추적: Nexus request.log를 브라우저에서 IP별로 분석 -----------
+
+const DLT_RE = /^(\S+)\s+\S+\s+(\S+)\s+\[([^\]]+)\]\s+"(\S+)\s+(\S+)[^"]*"\s+(\d{3})\s+(\S+)/;
+
+function parseRequestLog(text) {
+  const byIp = new Map();
+  let idx = 0;
+  text.split(/\r?\n/).forEach((line) => {
+    if (!line) return;
+    const m = DLT_RE.exec(line);
+    if (!m) return;
+    const ip = m[1], method = m[4], url = m[5], code = +m[6];
+    if (method !== "GET") return;
+    if (url.indexOf("/repository/") !== 0) return;
+    if (code !== 200 && code !== 206) return;   // successful downloads only
+    idx++;
+    const rest = url.slice("/repository/".length);
+    const slash = rest.indexOf("/");
+    const repo = slash < 0 ? rest : rest.slice(0, slash);
+    let path = slash < 0 ? "" : rest.slice(slash + 1);
+    try { path = decodeURIComponent(path); } catch (e) { /* keep raw */ }
+    let e = byIp.get(ip);
+    if (!e) { e = { count: 0, last: m[3], lastIdx: idx, repos: new Map(), entries: [] }; byIp.set(ip, e); }
+    e.count++; e.last = m[3]; e.lastIdx = idx;
+    e.repos.set(repo, (e.repos.get(repo) || 0) + 1);
+    if (e.entries.length < 5000) {
+      const b = m[7];
+      e.entries.push({ ts: m[3], repo, path, status: code, bytes: b === "-" ? 0 : (+b || 0), user: m[2] });
+    }
+  });
+  return byIp;
+}
+
+async function readLogFile(f) {
+  if (/\.gz$/i.test(f.name) && "DecompressionStream" in window) {
+    const stream = f.stream().pipeThrough(new DecompressionStream("gzip"));
+    return await new Response(stream).text();
+  }
+  return await f.text();
+}
+
+function renderDltRecent() {
+  const box = document.getElementById("dlt-result");
+  if (!box) return;
+  const byIp = state.dltData;
+  if (!byIp) { box.innerHTML = ""; return; }
+  const ipFilter = (document.getElementById("dlt-ip").value || "").trim();
+  const repoFilter = (document.getElementById("dlt-repo").value || "").trim().toLowerCase();
+  if (ipFilter) { renderDltForIp(ipFilter, repoFilter); return; }
+  const rows = [...byIp.entries()]
+    .sort((a, b) => b[1].lastIdx - a[1].lastIdx)
+    .slice(0, 300)
+    .map(([ip, e]) => {
+      const top = [...e.repos.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4)
+        .map(([r, c]) => `${r}(${c})`).join(", ");
+      return el("tr", {
+        style: "cursor:pointer",
+        title: "클릭하면 이 IP가 받은 패키지를 봅니다",
+        onclick: () => { document.getElementById("dlt-ip").value = ip; renderDltRecent(); },
+      }, [el("td", {}, ip), el("td", {}, String(e.count)), el("td", {}, e.last), el("td", {}, top)]);
+    });
+  box.innerHTML = "";
+  box.append(el("p", { class: "hint" }, `최근 접속 IP ${byIp.size}개 — 행을 클릭하면 그 IP가 받은 패키지를 봅니다`));
+  box.append(buildTable(["IP", "다운로드 수", "마지막 시각", "주요 저장소"], rows));
+}
+
+function renderDltForIp(ip, repoFilter) {
+  const box = document.getElementById("dlt-result");
+  box.innerHTML = "";
+  box.append(el("button", { class: "ghost", onclick: () => { document.getElementById("dlt-ip").value = ""; renderDltRecent(); } }, "← 최근 IP 목록"));
+  const e = state.dltData.get(ip);
+  if (!e) { box.append(el("div", { class: "empty" }, `IP ${ip} 의 다운로드 기록이 없습니다.`)); return; }
+  let entries = e.entries;
+  if (repoFilter) entries = entries.filter((x) => x.repo.toLowerCase().includes(repoFilter) || x.path.toLowerCase().includes(repoFilter));
+  const rows = entries.slice().reverse().slice(0, 1000).map((x) => el("tr", {}, [
+    el("td", {}, x.ts), el("td", {}, x.repo), el("td", {}, x.path), el("td", {}, fmtBytes(x.bytes)),
+  ]));
+  box.append(el("p", { class: "hint" }, `IP ${ip} — 받은 패키지 ${entries.length}건${repoFilter ? ` (필터: ${repoFilter})` : ""}${e.entries.length >= 5000 ? " · ※5000건까지만 보관" : ""}`));
+  box.append(buildTable(["시각", "저장소", "경로", "크기"], rows));
+}
+
+function setupDlTrack() {
+  const btn = document.getElementById("dlt-analyze");
+  if (!btn) return;
+  const stat = document.getElementById("dlt-stat");
+  const analyze = async () => {
+    let text = document.getElementById("dlt-text").value || "";
+    const f = document.getElementById("dlt-file").files[0];
+    if (f) {
+      stat.textContent = "읽는 중…";
+      try { text = await readLogFile(f); } catch (e) { stat.textContent = `파일 읽기 실패: ${e.message}`; return; }
+    }
+    if (!text.trim()) { stat.textContent = "로그 파일을 선택하거나 붙여넣은 뒤 [분석]을 누르세요."; return; }
+    state.dltData = parseRequestLog(text);
+    const total = [...state.dltData.values()].reduce((a, e) => a + e.count, 0);
+    stat.textContent = state.dltData.size
+      ? `분석 완료 — IP ${state.dltData.size}개 · 다운로드 ${total.toLocaleString()}건`
+      : "인식된 다운로드가 없습니다(형식 확인: Nexus request.log).";
+    renderDltRecent();
+  };
+  btn.addEventListener("click", analyze);
+  const reRender = () => { if (state.dltData) renderDltRecent(); };
+  document.getElementById("dlt-ip").addEventListener("input", reRender);
+  document.getElementById("dlt-repo").addEventListener("input", reRender);
+}
+
 // ---- repositories --------------------------------------------------------
 
 function buildTable(headers, rows) {
@@ -5243,6 +5349,7 @@ async function init() {
   setupSettingsSubtabs();
   setupPortalTitle();
   setupTabVisibility();
+  setupDlTrack();
   setupAccounts();
   setupUpdate();
   setupBulk();

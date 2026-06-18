@@ -40,6 +40,7 @@
       <button class="tab" data-tab="matrix">비교 매트릭스</button>
       <button class="tab" data-tab="repositories">저장소 관리</button>
       <button class="tab" data-tab="downloads">다운로드 현황</button>
+      <button class="tab" data-tab="dl-track">다운로드 추적(IP)</button>
       <button class="tab" data-tab="search">통합 검색</button>
       <button class="tab" data-tab="blobstore">Blob Store</button>
       <button class="tab" data-tab="metrics">JVM / 리소스</button>
@@ -276,6 +277,25 @@
         <div id="dl-summary" class="cards"></div>
         <div id="dl-note" class="hint"></div>
         <div id="dl-table"></div>
+      </section>
+
+      <section id="dl-track" class="panel">
+        <h2>다운로드 추적 — IP별 받아간 패키지</h2>
+        <p class="hint">Nexus의 접속 로그(<code>request.log</code>)를 불러와 어느 IP가 어떤 패키지를 받아갔는지 분석합니다. 로그는 <b>브라우저에서만</b> 처리되어 서버로 전송되지 않습니다. (Nexus 관리 → <b>Support → Logging</b>에서 request.log 다운로드, 또는 서버의 <code>sonatype-work/nexus3/log/request.log</code>)</p>
+        <div class="dl-controls">
+          <label>로그 파일 <input type="file" id="dlt-file" accept=".log,.txt,.gz" /></label>
+          <button id="dlt-analyze" type="button">분석</button>
+          <span id="dlt-stat" class="hint" style="margin:0"></span>
+        </div>
+        <details style="margin:6px 0">
+          <summary class="hint" style="cursor:pointer">또는 로그를 직접 붙여넣기</summary>
+          <textarea id="dlt-text" rows="5" placeholder="request.log 내용을 붙여넣고 [분석]을 누르세요" style="width:100%;margin-top:6px;background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px"></textarea>
+        </details>
+        <div class="dl-controls" style="margin-top:8px">
+          <label>IP 조회 <input type="text" id="dlt-ip" placeholder="예: 192.168.1.50 (입력 시 그 IP가 받은 패키지)" style="min-width:280px" /></label>
+          <label>저장소 필터 <input type="text" id="dlt-repo" placeholder="예: yum, rocky" /></label>
+        </div>
+        <div id="dlt-result"></div>
       </section>
 
       <section id="cleanup-candidates" class="panel">
