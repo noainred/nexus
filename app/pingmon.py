@@ -108,6 +108,50 @@ def _color(value: float, baseline: Optional[float], warn_ratio: float, crit_rati
     return "ok"
 
 
+def _lines_since(path: Path, cutoff: str, chunk: int = 1 << 20) -> List[str]:
+    """Return CSV lines whose timestamp >= ``cutoff``, reading only the tail.
+
+    The ping log is appended chronologically, so scanning the file backwards and
+    stopping once a line is older than the cutoff avoids reading the whole
+    (year-long, possibly huge) file for a 1일/7일 view. The timestamp is the
+    first field (fixed-width ISO), so a plain string compare on ``line[:20]``
+    works. Returns lines in chronological order.
+    """
+    out: List[str] = []
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, 2)
+            pos = fh.tell()
+            carry = b""
+            while pos > 0:
+                read = min(chunk, pos)
+                pos -= read
+                fh.seek(pos)
+                data = fh.read(read) + carry
+                nl = data.find(b"\n")
+                if pos > 0 and nl != -1:
+                    carry = data[:nl]          # partial first line → earlier chunk
+                    block = data[nl + 1:]
+                else:
+                    carry = b""
+                    block = data
+                stop = False
+                for raw in reversed(block.split(b"\n")):
+                    if not raw:
+                        continue
+                    line = raw.decode("utf-8", "ignore")
+                    if line[:20] < cutoff:
+                        stop = True
+                        break
+                    out.append(line)
+                if stop:
+                    break
+    except OSError:
+        return []
+    out.reverse()
+    return out
+
+
 def query(
     days: int,
     names: Dict[str, str],
@@ -132,7 +176,7 @@ def query(
     by_inst: Dict[str, List[Tuple[float, Optional[float]]]] = {}
 
     if path.exists():
-        for ln in path.read_text(encoding="utf-8").splitlines():
+        for ln in _lines_since(path, cutoff):
             parts = ln.split(",")
             if len(parts) != 3:
                 continue

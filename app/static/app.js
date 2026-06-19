@@ -1058,10 +1058,49 @@ function setupInfra() {
   if (first) first.classList.add("active");
 }
 
+// Group instances and draw the frame (group heads + per-node placeholders)
+// immediately so the 네트워크 체크 화면이 빈 "불러오는 중"으로 머물지 않는다.
+function _infraGroups(items, keyFn) {
+  const order = state.groupOrder || [];
+  const groups = new Map();
+  items.forEach((s) => {
+    const g = (keyFn(s) || "").trim() || "(그룹 미지정)";
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(s);
+  });
+  const rank = (g) => (g === "(그룹 미지정)" ? 1e9 : (order.indexOf(g) === -1 ? 1e8 : order.indexOf(g)));
+  const names = [...groups.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, "ko"));
+  return { groups, names, showHeads: names.length > 1 || (names.length === 1 && names[0] !== "(그룹 미지정)") };
+}
+
+function renderInfraSkeleton(insts) {
+  const container = document.getElementById("infra-charts");
+  if (!container) return;
+  if (!insts || !insts.length) {
+    container.innerHTML = "";
+    container.append(el("div", { class: "empty" }, "불러오는 중…"));
+    return;
+  }
+  const { groups, names, showHeads } = _infraGroups(insts, (i) => i.group);
+  const grid = el("div", { class: "infra-grid" });
+  names.forEach((g) => {
+    if (showHeads) grid.append(el("div", { class: "infra-grouphead" }, g));
+    groups.get(g).forEach((i) => grid.append(el("div", { class: "infra-chart" }, [
+      el("div", { class: "infra-chart-head" }, [
+        el("span", { class: "infra-name" }, i.name),
+        el("span", { class: "url" }, "측정 데이터 불러오는 중…"),
+      ]),
+      el("div", { class: "empty" }, "…"),
+    ])));
+  });
+  container.innerHTML = "";
+  container.append(grid);
+}
+
 async function loadInfra() {
   const container = document.getElementById("infra-charts");
-  container.innerHTML = "";
-  container.append(el("div", { class: "empty" }, "불러오는 중…"));
+  // 1) Frame first — group heads + placeholders from the known instance list.
+  renderInfraSkeleton(state.instances);
   const days = state.infraDays || 1;
   let data;
   try {

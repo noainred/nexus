@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.34",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "changed", "text": "네트워크 체크(서버 Ping) 화면 로딩 속도 개선 — ① 그룹·차트 자리(프레임)를 즉시 표시하고 데이터가 오면 채운다(빈 '불러오는 중' 제거). ② 서버가 1년치 ping CSV 전체를 읽지 않고 파일 끝에서부터 필요한 최근 구간만 읽도록(tail-read) 변경해, 1일/7일 보기가 파일 크기와 무관하게 빨라진다"},
+        ],
+    },
+    {
         "version": "1.7.33",
         "date": "2026-06-17",
         "changes": [

@@ -141,3 +141,19 @@ def test_topology_layout_roundtrip(tmp_path, monkeypatch):
     # bad entries are dropped
     r2 = client.put("/api/instances/topology-layout", json={"pos": {"c": {"x": "bad"}, "d": {"x": 1, "y": 2}}})
     assert r2.json()["pos"] == {"d": {"x": 1.0, "y": 2.0}}
+
+
+def test_pingmon_tail_read_and_query(tmp_path):
+    from app import pingmon
+    p = tmp_path / "ping.csv"
+    p.write_text("\n".join([
+        "2025-01-01T00:00:00Z,a,10",       # very old → excluded for days=1
+        "2026-06-19T07:00:00Z,a,30",
+        "2026-06-19T07:00:05Z,b,40",
+    ]) + "\n", encoding="utf-8")
+    # tail-read returns only lines >= cutoff, in chronological order
+    got = pingmon._lines_since(p, "2026-06-19T00:00:00Z")
+    assert got == ["2026-06-19T07:00:00Z,a,30", "2026-06-19T07:00:05Z,b,40"]
+    # future cutoff → nothing; past cutoff → all
+    assert pingmon._lines_since(p, "2099-01-01T00:00:00Z") == []
+    assert len(pingmon._lines_since(p, "2000-01-01T00:00:00Z")) == 3
