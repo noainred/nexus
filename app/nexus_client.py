@@ -126,6 +126,24 @@ class NexusClient:
 
         return {"response_ms": round(elapsed_ms, 1), "checks": checks}
 
+    async def server_version(self) -> Optional[str]:
+        """Nexus version from the ``Server`` response header.
+
+        Nexus answers e.g. ``Server: Nexus/3.68.0-04 (OSS)`` on the read-only
+        ``/status`` endpoint. Returns None when a reverse proxy stripped the
+        header or the node is unreachable — callers degrade gracefully (no
+        version means "not scanned", never "safe").
+        """
+        try:
+            resp = await self._request("GET", "/status")
+        except NexusError:
+            return None
+        srv = (resp.headers.get("Server") or "").strip()
+        if not srv:
+            return None
+        # Drop the "Nexus/" prefix for a cleaner display ("3.68.0-04 (OSS)").
+        return srv[6:].strip() if srv.lower().startswith("nexus/") else srv
+
     async def list_blobstores(self) -> list[BlobStore]:
         resp = await self._request("GET", "/blobstores")
         result: list[BlobStore] = []

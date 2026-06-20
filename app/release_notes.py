@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.38",
+        "date": "2026-06-20",
+        "changes": [
+            {"type": "added", "text": "취약 버전 탐지기 — 보안 점검에서 각 Nexus 인스턴스의 버전(Server 헤더)을 읽어 알려진 CVE(CVE-2024-4956 Path Traversal, CVE-2024-5764 하드코딩 암호화 키, CVE-2025-13488 Stored XSS) 룰과 대조해 ⚠️ CVE 뱃지·'취약 버전' 항목으로 표시(버전 미확인 시 '미스캔'으로 안전 단정 안 함). 요약 카드에 '취약 버전(CVE)' 추가"},
+            {"type": "changed", "text": "보안 강화 — ① 모든 응답에 보안 헤더(X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy, CSP frame-ancestors 'none') 추가(클릭재킹·MIME 스니핑 방어). ② 세션 쿠키를 만료시각이 서명에 포함된 토큰으로 변경해 유출 시 TTL(12h) 경과 후 자동 무효화(비밀번호 변경 시 전체 무효화는 유지). ③ 로그인 브루트포스 레이트리밋(IP당 5분 내 8회 실패 시 429)"},
+        ],
+    },
+    {
         "version": "1.7.37",
         "date": "2026-06-20",
         "changes": [

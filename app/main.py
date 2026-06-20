@@ -186,17 +186,32 @@ app.include_router(update.router)
 app.include_router(accounts.router)
 
 
+# Hardening headers applied to every response. The SPA loads no CDN/inline
+# scripts, so a strict CSP is safe; inline *style attributes* in the HTML need
+# 'unsafe-inline' for style-src. frame-ancestors/X-Frame-Options block
+# clickjacking; nosniff blocks MIME confusion.
+_CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; object-src 'none'; base-uri 'self'; "
+    "frame-ancestors 'none'"
+)
+
+
 @app.middleware("http")
 async def no_cache_dashboard(request: Request, call_next):
-    """Tell browsers to always revalidate the SPA assets.
+    """Revalidate SPA assets + apply security response headers.
 
-    Without this, a cached app.js/style.css can keep showing an old UI after
-    the code is updated. ETags still allow 304s, so this is cheap.
+    Without no-cache, a cached app.js/style.css can keep showing an old UI
+    after an update. ETags still allow 304s, so this is cheap.
     """
     response = await call_next(request)
     path = request.url.path
     if path == "/" or path.startswith("/static"):
         response.headers["Cache-Control"] = "no-cache"
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Content-Security-Policy", _CSP)
     return response
 
 

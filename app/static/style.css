@@ -722,3 +722,7 @@ table.matrix td.rowhead .row-status { margin-left: 8px; }
   .about-cards, .about-features { grid-template-columns: 1fr; }
   .about-hero-title { font-size: 24px; }
 }
+
+/* CVE badges in the security table: small gap + pointer for the tooltip. */
+.cve-badge { margin-left: 6px; cursor: help; }
+.cve-badge:first-of-type { margin-left: 8px; }

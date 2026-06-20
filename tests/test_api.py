@@ -834,6 +834,10 @@ def test_security_check(http_client):
             ],
         )
     )
+    # Server header drives the CVE version scan (3.68.0 -> two known CVEs).
+    respx.get(f"{API}/status").mock(
+        return_value=httpx.Response(200, headers={"Server": "Nexus/3.68.0-04 (OSS)"})
+    )
     resp = http_client.get("/api/security")
     assert resp.status_code == 200
     s = resp.json()[0]
@@ -844,6 +848,10 @@ def test_security_check(http_client):
     # anonymous access + default admin active -> flagged for review
     assert s["risk"] == "warn"
     assert "익명 접근 허용" in s["issues"]
+    # CVE scan surfaced the vulnerable version.
+    assert s["version"] == "3.68.0-04 (OSS)"
+    assert {v["id"] for v in s["vulns"]} == {"CVE-2024-4956", "CVE-2024-5764"}
+    assert any("취약 버전" in i for i in s["issues"])
 
 
 def test_compare_unknown_instance_404(http_client):

@@ -171,6 +171,8 @@ class InstanceSecurity(BaseModel):
     user_count: Optional[int] = None
     issues: List[str] = Field(default_factory=list)
     risk: str = "ok"   # ok | warn | unknown
+    version: Optional[str] = None          # Nexus version (Server header), if known
+    vulns: List[dict] = Field(default_factory=list)  # matched CVEs for that version
 
 
 class Repository(BaseModel):

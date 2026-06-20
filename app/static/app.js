@@ -3795,12 +3795,14 @@ async function loadSecurity() {
   if (summary) {
     const warn = list.filter((s) => s.risk === "warn").length;
     const anon = list.filter((s) => s.anonymous_enabled).length;
+    const vuln = list.filter((s) => s.vulns && s.vulns.length).length;
     const unk = list.filter((s) => !s.reachable || s.risk === "unknown").length;
     summary.innerHTML = "";
     summary.append(
       summaryCard("서버", String(list.length)),
       summaryCard("점검 필요", String(warn)),
       summaryCard("익명 접근 허용", String(anon)),
+      summaryCard("취약 버전(CVE)", String(vuln)),
       summaryCard("조회 불가", String(unk)),
     );
   }
@@ -3809,7 +3811,7 @@ async function loadSecurity() {
       return el("tr", {}, [
         el("td", {}, s.name),
         el("td", {}, el("span", { class: "badge warn" }, "조회 불가")),
-        el("td", { colspan: "4", class: "site-error" }, s.error || ""),
+        el("td", { colspan: "5", class: "site-error" }, s.error || ""),
       ]);
     }
     const adminList = s.admin_users && s.admin_users.length ? s.admin_users.join(", ") : "—";
@@ -3818,6 +3820,17 @@ async function loadSecurity() {
       : (s.risk === "unknown"
           ? el("span", { class: "badge warn", title: s.error || "" }, "확인불가")
           : el("span", { class: "badge up" }, "양호"));
+    // Version + CVE badges. Each CVE badge tooltips its summary + fixed version.
+    const verCell = el("td", {});
+    verCell.append(el("span", { class: "muted" }, s.version || "—"));
+    (s.vulns || []).forEach((v) => {
+      verCell.append(
+        el("span", {
+          class: "badge down cve-badge",
+          title: `${v.summary} (수정: ${v.fixed})`,
+        }, v.id),
+      );
+    });
     return el("tr", {}, [
       el("td", {}, s.name),
       el("td", {}, riskBadge),
@@ -3825,10 +3838,11 @@ async function loadSecurity() {
       el("td", {}, yesNoBadge(s.admin_active, true, ["활성", "비활성"])),
       el("td", { title: adminList }, `${s.admin_users ? s.admin_users.length : "—"}${adminList !== "—" ? " (" + adminList + ")" : ""}`),
       el("td", { class: "num" }, s.user_count != null ? s.user_count.toLocaleString() : "—"),
+      verCell,
     ]);
   });
   container.append(buildTable(
-    ["서버", "상태", "익명 접근", "기본 admin 계정", "관리자 권한 계정", "사용자 수"], rows
+    ["서버", "상태", "익명 접근", "기본 admin 계정", "관리자 권한 계정", "사용자 수", "버전 / 취약점"], rows
   ));
 }
 
