@@ -675,11 +675,54 @@
       </section>
 
       <section id="about" class="panel">
-        <h2>About</h2>
-        <div class="settings-card">
-          <p><b>Nexus Repository 통합 관리</b> <span id="about-version" class="version-badge"></span></p>
-          <p class="hint">여러 Sonatype Nexus Repository 인스턴스를 한곳에서 모니터링·비교·관리하는 대시보드입니다.</p>
+        <div class="about-hero">
+          <div class="about-hero-top">
+            <div class="about-hero-icon">📦</div>
+            <div>
+              <h1 class="about-hero-title">Nexus Repository 통합 관리</h1>
+              <p class="about-hero-sub">The Davinci Platform · 전세계 분산 Nexus Repository 통합 관리</p>
+            </div>
+          </div>
+          <p class="about-tagline">⭐ 최고의 <b>Nexus Repository</b> 관리 솔루션 · <i>World's Best Nexus Management Solution</i></p>
+          <div class="about-badges">
+            <span class="about-badge v" id="about-version">v…</span>
+            <span class="about-badge a">FastAPI · Vanilla JS</span>
+            <span class="about-badge b">Offline · Air-gapped Edition</span>
+          </div>
         </div>
+
+        <div class="about-cards">
+          <div class="about-card">
+            <div class="about-card-label">저작자 · AUTHOR</div>
+            <div class="about-author">
+              <span class="about-avatar">박</span>
+              <div>
+                <div class="about-author-name">박준호 <span class="muted">(Park Junho)</span></div>
+                <a class="about-author-mail" href="mailto:noainred@lgcns.com">noainred@lgcns.com</a>
+              </div>
+            </div>
+          </div>
+          <div class="about-card">
+            <div class="about-card-label">저작권 · COPYRIGHT</div>
+            <div class="about-copy">© 2026 박준호</div>
+            <div class="about-copy-sub">All rights reserved.</div>
+          </div>
+        </div>
+
+        <div class="about-features-card">
+          <div class="about-card-label">주요 기능 · KEY FEATURES</div>
+          <div class="about-features">
+            <div class="about-feat"><span class="about-feat-ic">🌐</span><div><b>다중 Nexus 통합 모니터링</b><span>전세계 분산 Nexus 인스턴스의 상태·저장소·Blob·JVM을 단일 화면에서 집계</span></div></div>
+            <div class="about-feat"><span class="about-feat-ic">🧩</span><div><b>저장소 구성 비교 (매트릭스)</b><span>서버×저장소 drift 비교, 설정 1:1 비교, 셀 드래그로 대상 서버에 복사</span></div></div>
+            <div class="about-feat"><span class="about-feat-ic">🗺️</span><div><b>계위 상황판 (토폴로지)</b><span>프록시 구조 트리·노드 상태·끊긴 링크 진단, 드래그 배치 서버 공유</span></div></div>
+            <div class="about-feat"><span class="about-feat-ic">⬆️</span><div><b>무인 자동 업그레이드</b><span>사내 Nexus/GitHub 소스, versions.json 자동 게시, root 타이머 무인 적용</span></div></div>
+            <div class="about-feat"><span class="about-feat-ic">📥</span><div><b>다운로드 현황 · IP 추적</b><span>실제 사용 패키지·용량 집계, request.log 기반 IP별 다운로드 분석</span></div></div>
+            <div class="about-feat"><span class="about-feat-ic">🔒</span><div><b>보안 점검</b><span>익명 접근·관리자 계정 활성 점검과 위험 등급, 노드 계정 일괄 관리</span></div></div>
+            <div class="about-feat"><span class="about-feat-ic">💾</span><div><b>백업 · DR · 콘텐츠 동기화</b><span>저장소·Blob·정책 + 포탈 설정 백업, 마스터→사이트 캐시 사전 채움</span></div></div>
+            <div class="about-feat"><span class="about-feat-ic">📦</span><div><b>오프라인 설치 · 에어갭</b><span>wheelhouse 번들 + SHA 검증, 인터넷 차단 폐쇄망 배포 대응</span></div></div>
+          </div>
+        </div>
+
         <div class="settings-card">
           <h3>감사 로그 (변경 작업 기록)</h3>
           <p class="hint">이 매니저로 수행한 쓰기 작업(설정 복사·복구·일괄 실행 등)의 기록입니다. 시각은 UTC입니다.</p>
@@ -694,7 +737,15 @@
           <p class="hint">프로그램이 수정·업데이트될 때마다 버전을 올리고 여기에 기록합니다.</p>
           <div id="about-history"></div>
         </div>
+
+        <div class="about-notice">
+          본 소프트웨어 <b>Nexus Repository 통합 관리</b> 의 모든 저작권은 저작권자 <b>박준호</b> 에게 있습니다.
+          저작권자의 사전 서면 동의 없이 본 프로그램의 전부 또는 일부를 무단으로 복제·배포·수정·역설계할 수 없습니다.
+          <span class="about-notice-en">Copyright © 2026 박준호 (Park Junho). All rights reserved. Unauthorized reproduction or distribution is prohibited.</span>
+        </div>
+        <div class="about-footer">Made with ❤ for global Nexus operations · 2026</div>
       </section>
+
     </main>
 
     <div id="status-modal" class="modal hidden">

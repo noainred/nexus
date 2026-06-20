@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.35",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "added", "text": "About(소개) 화면을 새로 디자인 — 그라데이션 히어로(제목·버전·기술 뱃지), 저작자/저작권 카드, 주요 기능(KEY FEATURES) 2단 그리드, 저작권 고지 박스, 푸터를 추가해 멋지게 구성. 저작자 박준호(noainred@lgcns.com)·© 2026 표기"},
+        ],
+    },
+    {
         "version": "1.7.34",
         "date": "2026-06-17",
         "changes": [
