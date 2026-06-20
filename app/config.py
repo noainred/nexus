@@ -79,6 +79,8 @@ class Settings(BaseSettings):
     # download-tracking (IP) tab. Comma/newline-separated "라벨=경로" or just
     # paths (absolute, glob allowed). Only files listed here are readable.
     request_log_paths: str = ""
+    # Persisted access-log config (template/paths) editable in the UI.
+    access_log_config_file: str = "access-log-config.json"
     # Background status poller: how often (seconds) to refresh the cached
     # node status the dashboard reads instantly.
     status_poll_interval: float = 20.0

@@ -52,8 +52,7 @@
       <button class="tab" data-tab="content">콘텐츠 동기화</button>
       <button class="tab" data-tab="cleanup">정리 정책</button>
       <button class="tab" data-tab="bulk">일괄 적용</button>
-      <button class="tab" data-tab="settings">서버 설정</button>
-      <button class="tab" data-tab="about">About</button>
+      <button class="tab" data-tab="settings">설정</button>
     </nav>
 
     <main>
@@ -282,10 +281,14 @@
       <section id="dl-track" class="panel">
         <h2>다운로드 추적 — IP별 받아간 패키지</h2>
         <p class="hint">Nexus의 접속 로그(<code>request.log</code>)를 불러와 어느 IP가 어떤 패키지를 받아갔는지 분석합니다. 로그는 <b>브라우저에서만</b> 처리되어 서버로 전송되지 않습니다. (Nexus 관리 → <b>Support → Logging</b>에서 request.log 다운로드, 또는 서버의 <code>sonatype-work/nexus3/log/request.log</code>)</p>
+        <div class="dl-controls">
+          <label>Nexus 서버 <select id="dlt-inst"></select></label>
+          <button id="dlt-inst-go" type="button">서버에서 분석</button>
+          <span class="hint" style="margin:0">선택한 서버의 request.log를 매니저가 직접 읽어 분석합니다(경로는 설정 → 모니터링·백업에서 지정).</span>
+        </div>
         <div class="dl-controls" id="dlt-server-row" style="display:none">
-          <label>서버 로그 <select id="dlt-source"></select></label>
-          <button id="dlt-server" type="button">서버에서 분석</button>
-          <span class="hint" style="margin:0">매니저가 접근 가능한 로그를 직접 읽어 분석합니다(설정 request_log_paths).</span>
+          <label>고정 로그 <select id="dlt-source"></select></label>
+          <button id="dlt-server" type="button">분석</button>
         </div>
         <div class="dl-controls">
           <label>로그 파일 <input type="file" id="dlt-file" accept=".log,.txt,.gz" /></label>
@@ -448,6 +451,7 @@
           <button type="button" class="subtab" data-sub="upgrade">⬆ 자동 업그레이드</button>
           <button type="button" class="subtab" data-sub="monitor">📈 모니터링·백업</button>
           <button type="button" class="subtab" data-sub="general">⚙ 일반</button>
+          <button type="button" class="subtab" data-sub="about">ℹ️ About</button>
         </nav>
 
         <div class="settings-card" data-sub="general">
@@ -672,9 +676,24 @@
           <div id="syncjob-list"></div>
         </div>
 
-      </section>
+        <div class="settings-card" data-sub="monitor">
+          <h3>다운로드 추적 — 서버 로그 경로</h3>
+          <p class="hint">'다운로드 추적(IP)' 탭에서 Nexus 서버를 선택하면 매니저가 그 서버의 <code>request.log</code>를 직접 읽어 분석합니다. 매니저가 접근 가능한 경로여야 합니다(같은 호스트·NFS/공유 마운트 등).</p>
+          <form id="acclog-form" class="form" style="max-width:760px">
+            <label>서버별 로그 경로 템플릿
+              <input name="template" id="acclog-template" placeholder="예: /mnt/nexus-logs/{id}/request.log  (치환: {id} {name} {host})" />
+            </label>
+            <label>추가 로그(고정 경로) — '라벨=경로' 콤마/줄바꿈, glob·.gz 지원
+              <textarea name="paths" id="acclog-paths" rows="2" placeholder="예: OC2a=/mnt/oc2a/nexus3/log/request.log"></textarea>
+            </label>
+            <div class="form-actions" style="justify-content:flex-start;gap:8px">
+              <button type="submit">경로 저장</button>
+              <span id="acclog-msg" class="hint" style="margin:0"></span>
+            </div>
+          </form>
+        </div>
 
-      <section id="about" class="panel">
+        <div class="about-wrap" data-sub="about">
         <div class="about-hero">
           <div class="about-hero-top">
             <div class="about-hero-icon">📦</div>
@@ -744,6 +763,7 @@
           <span class="about-notice-en">Copyright © 2026 박준호 (Park Junho). All rights reserved. Unauthorized reproduction or distribution is prohibited.</span>
         </div>
         <div class="about-footer">Made with ❤ for global Nexus operations · 2026</div>
+        </div>
       </section>
 
     </main>

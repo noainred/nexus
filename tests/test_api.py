@@ -871,3 +871,22 @@ def test_summary_aggregate_public(http_client):
     assert d["servers"]["total"] >= 1
     assert isinstance(d["instances"], list) and isinstance(d["groups"], list)
     assert "repository_total" in d and "generated_at" in d
+
+
+def test_access_log_by_instance(tmp_path, monkeypatch, http_client):
+    from app.routers import accesslog
+    monkeypatch.setattr(accesslog, "_cfg_path", lambda: tmp_path / "alc.json")
+    log = tmp_path / "test.log"
+    log.write_text(
+        '1.2.3.4 - - [17/Jun/2026:10:00:00 +0900] "GET /repository/yum/a.rpm HTTP/1.1" 200 100 "-" "x" 1\n',
+        encoding="utf-8",
+    )
+    # save the per-server template (stub instance id="test", so {id}.log)
+    r = http_client.put("/api/access-log/config",
+                        json={"template": str(tmp_path) + "/{id}.log", "paths": ""})
+    assert r.status_code == 200 and r.json()["template"].endswith("/{id}.log")
+    # by-instance resolves the template and analyzes the server's log
+    d = http_client.get("/api/access-log/by-instance?instance_id=test").json()
+    assert d["ip_count"] == 1 and d["path"].endswith("test.log")
+    # unknown instance → 404
+    assert http_client.get("/api/access-log/by-instance?instance_id=nope").status_code == 404

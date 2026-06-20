@@ -8,13 +8,17 @@ from __future__ import annotations
 
 import glob
 import gzip
+import json
 import os
 import re
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..config import get_settings
+from ..deps import InstanceRegistry, get_registry
 
 router = APIRouter(prefix="/api/access-log", tags=["access-log"])
 
@@ -22,9 +26,43 @@ router = APIRouter(prefix="/api/access-log", tags=["access-log"])
 _LOG_RE = re.compile(r'^(\S+)\s+\S+\s+(\S+)\s+\[([^\]]+)\]\s+"(\S+)\s+(\S+)[^"]*"\s+(\d{3})\s+(\S+)')
 
 
+def _cfg_path() -> Path:
+    s = get_settings()
+    p = Path(getattr(s, "access_log_config_file", "access-log-config.json"))
+    return p if p.is_absolute() else Path(os.getcwd()) / p
+
+
+def _load_cfg() -> dict:
+    """{'template': ..., 'paths': ...} — UI-saved file, falling back to env."""
+    cfg = {"template": "", "paths": (get_settings().request_log_paths or "")}
+    p = _cfg_path()
+    if p.is_file():
+        try:
+            d = json.loads(p.read_text("utf-8"))
+            if isinstance(d, dict):
+                cfg["template"] = str(d.get("template") or "")
+                if d.get("paths") is not None:
+                    cfg["paths"] = str(d.get("paths") or "")
+        except Exception:  # noqa: BLE001
+            pass
+    return cfg
+
+
+def _instance_log_path(instance) -> Optional[str]:
+    """Resolve the per-server log path from the template ({id}/{name}/{host})."""
+    tmpl = (_load_cfg().get("template") or "").strip()
+    if not tmpl:
+        return None
+    host = urlparse(instance.base_url).hostname or ""
+    try:
+        return tmpl.format(id=instance.id, name=instance.name, host=host)
+    except Exception:  # noqa: BLE001 - bad template placeholder
+        return None
+
+
 def _configured() -> List[Tuple[str, str]]:
-    """[(label, path)] from settings; 'label=path' or bare path, globs expanded."""
-    raw = (get_settings().request_log_paths or "").strip()
+    """[(label, path)] from saved/env paths; 'label=path' or bare path, globs."""
+    raw = (_load_cfg().get("paths") or "").strip()
     out: List[Tuple[str, str]] = []
     for tok in re.split(r"[,\n]+", raw):
         tok = tok.strip()
@@ -97,6 +135,45 @@ def _parse(path: str, want_ip: Optional[str], repo_filter: str, limit: int) -> d
 async def sources() -> dict:
     return {"sources": [{"label": label, "path": p, "exists": os.path.isfile(p)}
                         for label, p in _configured()]}
+
+
+@router.get("/config")
+async def get_config() -> dict:
+    return _load_cfg()
+
+
+@router.put("/config")
+async def set_config(body: dict) -> dict:
+    cfg = {"template": str((body or {}).get("template") or "").strip(),
+           "paths": str((body or {}).get("paths") or "").strip()}
+    p = _cfg_path()
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"설정 저장 실패: {exc}")
+    return cfg
+
+
+@router.get("/by-instance")
+async def by_instance(
+    instance_id: str = Query(...),
+    ip: str = Query(""),
+    repo: str = Query(""),
+    limit: int = Query(500, ge=1, le=5000),
+    registry: InstanceRegistry = Depends(get_registry),
+) -> dict:
+    """Read+analyze a registered Nexus server's request.log via the per-server
+    path template (settings → 다운로드 로그 경로)."""
+    inst = registry.get(instance_id)   # 404 if unknown
+    path = _instance_log_path(inst)
+    if not path:
+        raise HTTPException(status_code=400, detail="서버별 로그 경로 템플릿이 설정되지 않았습니다(설정 → 모니터링·백업에서 지정).")
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail=f"로그 파일이 없습니다: {path}")
+    out = _parse(path, ip.strip() or None, repo, limit)
+    out["path"] = path
+    return out
 
 
 @router.get("/analyze")

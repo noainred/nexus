@@ -248,7 +248,7 @@ function selectTab(name) {
   if (name === "overview") loadOverviewTree();
   if (name === "instances-status") loadOverview();
   if (name === "bulk") fillBulkInstances();
-  if (name === "about") renderHistory();
+  if (name === "dl-track") fillDltInstances();
   return true;
 }
 
@@ -3100,15 +3100,15 @@ function renderDltForIp(ip, repoFilter) {
 // settings.request_log_paths) and analyzes it — no manual upload needed.
 async function dltServerRender() {
   const box = document.getElementById("dlt-result");
-  const path = state.dltServerPath;
-  if (!box || !path) return;
+  const src = state.dltSource;
+  if (!box || !src) return;
   const ip = (document.getElementById("dlt-ip").value || "").trim();
   const repo = (document.getElementById("dlt-repo").value || "").trim();
   box.innerHTML = "";
   box.append(el("p", { class: "hint" }, "서버에서 분석 중…"));
   try {
-    const q = `path=${encodeURIComponent(path)}&ip=${encodeURIComponent(ip)}&repo=${encodeURIComponent(repo)}`;
-    const r = await api(`/api/access-log/analyze?${q}`);
+    const q = `${src.url}&ip=${encodeURIComponent(ip)}&repo=${encodeURIComponent(repo)}`;
+    const r = await api(q);
     box.innerHTML = "";
     if (ip) {
       box.append(el("button", { class: "ghost", onclick: () => { document.getElementById("dlt-ip").value = ""; dltServerRender(); } }, "← 최근 IP 목록"));
@@ -3130,6 +3130,42 @@ async function dltServerRender() {
   }
 }
 
+function fillDltInstances() {
+  const sel = document.getElementById("dlt-inst");
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = "";
+  (state.instances || []).forEach((i) => sel.append(el("option", { value: i.id }, i.name)));
+  if (cur) sel.value = cur;
+}
+
+function setupAccessLogConfig() {
+  const form = document.getElementById("acclog-form");
+  if (!form) return;
+  api("/api/access-log/config").then((c) => {
+    document.getElementById("acclog-template").value = (c && c.template) || "";
+    document.getElementById("acclog-paths").value = (c && c.paths) || "";
+  }).catch(() => { /* default empty */ });
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const msg = document.getElementById("acclog-msg");
+    try {
+      await api("/api/access-log/config", {
+        method: "PUT",
+        body: JSON.stringify({
+          template: document.getElementById("acclog-template").value,
+          paths: document.getElementById("acclog-paths").value,
+        }),
+      });
+      toast("다운로드 로그 경로를 저장했습니다");
+      if (msg) msg.textContent = "";
+    } catch (e) {
+      if (msg) msg.textContent = e.message;
+      toast(`저장 실패: ${e.message}`, "err");
+    }
+  });
+}
+
 function setupDlTrack() {
   const btn = document.getElementById("dlt-analyze");
   if (!btn) return;
@@ -3142,7 +3178,7 @@ function setupDlTrack() {
       try { text = await readLogFile(f); } catch (e) { stat.textContent = `파일 읽기 실패: ${e.message}`; return; }
     }
     if (!text.trim()) { stat.textContent = "로그 파일을 선택하거나 붙여넣은 뒤 [분석]을 누르세요."; return; }
-    state.dltServerPath = null;   // switch to client/file mode
+    state.dltSource = null;   // switch to client/file mode
     state.dltData = parseRequestLog(text);
     const total = [...state.dltData.values()].reduce((a, e) => a + e.count, 0);
     stat.textContent = state.dltData.size
@@ -3151,11 +3187,24 @@ function setupDlTrack() {
     renderDltRecent();
   };
   btn.addEventListener("click", analyze);
-  const reRender = () => { if (state.dltServerPath) dltServerRender(); else if (state.dltData) renderDltRecent(); };
+  const reRender = () => { if (state.dltSource) dltServerRender(); else if (state.dltData) renderDltRecent(); };
   document.getElementById("dlt-ip").addEventListener("input", reRender);
   document.getElementById("dlt-repo").addEventListener("input", reRender);
 
-  // Server-side log sources (when the manager has access to request.log files).
+  // Nexus 서버 선택 → 서버측 by-instance 분석.
+  const instSel = document.getElementById("dlt-inst");
+  const instGo = document.getElementById("dlt-inst-go");
+  fillDltInstances();
+  if (instGo) instGo.addEventListener("click", () => {
+    if (!instSel || !instSel.value) { if (stat) stat.textContent = "Nexus 서버를 선택하세요."; return; }
+    state.dltData = null;
+    state.dltSource = { url: `/api/access-log/by-instance?instance_id=${encodeURIComponent(instSel.value)}` };
+    if (stat) stat.textContent = `서버 로그 분석: ${instSel.options[instSel.selectedIndex].text}`;
+    document.getElementById("dlt-ip").value = "";
+    dltServerRender();
+  });
+
+  // 고정 경로(설정에 등록된) 소스 — 있으면 드롭다운 노출.
   const serverBtn = document.getElementById("dlt-server");
   const srcSel = document.getElementById("dlt-source");
   api("/api/access-log/sources").then((r) => {
@@ -3166,9 +3215,10 @@ function setupDlTrack() {
     document.getElementById("dlt-server-row").style.display = "";
   }).catch(() => { /* no server sources */ });
   if (serverBtn) serverBtn.addEventListener("click", () => {
-    state.dltServerPath = srcSel.value;
     state.dltData = null;
+    state.dltSource = { url: `/api/access-log/analyze?path=${encodeURIComponent(srcSel.value)}` };
     if (stat) stat.textContent = `서버 로그 분석: ${srcSel.value}`;
+    document.getElementById("dlt-ip").value = "";
     dltServerRender();
   });
 }
@@ -4748,10 +4798,11 @@ function setupSettingsSubtabs() {
   if (!nav) return;
   const show = (sub) => {
     nav.querySelectorAll(".subtab").forEach((b) => b.classList.toggle("active", b.dataset.sub === sub));
-    document.querySelectorAll("#settings .settings-card[data-sub]").forEach((c) => {
+    document.querySelectorAll("#settings > [data-sub]").forEach((c) => {
       c.style.display = c.dataset.sub === sub ? "" : "none";
     });
     state.settingsSub = sub;
+    if (sub === "about") renderHistory();   // About is now a settings sub-tab
   };
   nav.querySelectorAll(".subtab").forEach((b) => b.addEventListener("click", () => show(b.dataset.sub)));
   show(state.settingsSub || "nodes");
@@ -5477,6 +5528,7 @@ async function init() {
   setupPortalTitle();
   setupTabVisibility();
   setupDlTrack();
+  setupAccessLogConfig();
   setupAccounts();
   setupUpdate();
   setupBulk();

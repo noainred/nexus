@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.36",
+        "date": "2026-06-17",
+        "changes": [
+            {"type": "added", "text": "다운로드 추적(IP)에서 Nexus 서버를 선택하면 매니저가 그 서버의 request.log를 직접 읽어 분석(by-instance). 설정 → 모니터링·백업에 '서버별 로그 경로 템플릿'({id}/{name}/{host} 치환)과 고정 경로를 지정하는 항목 추가(access-log-config.json 저장)"},
+            {"type": "changed", "text": "상단 메뉴 '서버 설정'을 '설정'으로 이름 변경하고, 'About'을 별도 탭에서 설정의 하위 메뉴(서브탭)로 이동"},
+        ],
+    },
+    {
         "version": "1.7.35",
         "date": "2026-06-17",
         "changes": [
