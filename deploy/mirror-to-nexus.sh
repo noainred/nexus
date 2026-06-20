@@ -11,7 +11,7 @@
 #
 # Required env:
 #   NEXUS_RAW_URL   업로드할 사내 raw 폴더 주소(끝에 / 무관). 예:
-#                   http://repository.dvc.lgensol.com:8081/repository/manager-upgrade/nexus-manager
+#                   http://<INTERNAL-NEXUS-HOST>:8081/repository/manager-upgrade/nexus-manager
 #   NEXUS_USER / NEXUS_PASS   Nexus 업로드 계정(raw write 권한)
 # Optional env:
 #   GITHUB_REPO     (default noainred/nexus)

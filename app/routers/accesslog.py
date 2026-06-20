@@ -54,6 +54,12 @@ def _instance_log_path(instance) -> Optional[str]:
     if not tmpl:
         return None
     host = urlparse(instance.base_url).hostname or ""
+    # Path-traversal guard: instance id/name are operator-supplied and get
+    # substituted into a filesystem path, so reject separators / parent refs
+    # before they can escape the intended log directory.
+    for val in (str(instance.id), str(instance.name), str(host)):
+        if "/" in val or "\\" in val or ".." in val:
+            return None
     try:
         return tmpl.format(id=instance.id, name=instance.name, host=host)
     except Exception:  # noqa: BLE001 - bad template placeholder

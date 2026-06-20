@@ -79,6 +79,23 @@ if [ ! -f "$INSTALL_DIR/.env" ]; then
   echo "==> .env 생성 (관리자 비밀번호 등은 여기서 설정)"
 fi
 
+# Security: a delivered manager must not run unauthenticated. If no admin
+# password is configured, generate a strong random one so writes are gated.
+# (Existing/explicitly-set passwords are kept untouched.)
+if ! grep -qE '^[[:space:]]*NEXUS_MANAGER_ADMIN_PASSWORD=.+' "$INSTALL_DIR/.env" 2>/dev/null; then
+  GEN_PW="$(head -c 18 /dev/urandom 2>/dev/null | base64 | tr -d '/+=' | cut -c1-22)"
+  [ -z "$GEN_PW" ] && GEN_PW="nexus-$(date +%s)-admin"
+  # drop any empty placeholder line, then append the generated password
+  sed -i '/^[[:space:]]*NEXUS_MANAGER_ADMIN_PASSWORD=[[:space:]]*$/d' "$INSTALL_DIR/.env" 2>/dev/null || true
+  printf 'NEXUS_MANAGER_ADMIN_PASSWORD=%s\n' "$GEN_PW" >> "$INSTALL_DIR/.env"
+  echo "============================================================"
+  echo "  관리자 비밀번호가 자동 생성되었습니다(보안 기본값):"
+  echo "      $GEN_PW"
+  echo "  → $INSTALL_DIR/.env 에 저장됨. 안전한 곳에 기록하세요."
+  echo "  → 변경하려면 .env 의 NEXUS_MANAGER_ADMIN_PASSWORD 수정 후 재시작."
+  echo "============================================================"
+fi
+
 # 3) Virtualenv in the install dir (absolute path → no relocation issues).
 echo "==> 가상환경 생성 ..."
 "$PYTHON" -m venv "$INSTALL_DIR/.venv"

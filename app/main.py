@@ -50,6 +50,16 @@ STATIC_DIR = Path(__file__).parent / "static"
 @contextlib.asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Run the background alert + ping + backup loops for the app's lifetime."""
+    if not get_settings().admin_password:
+        # Delivery safety: with no admin password the API accepts writes from
+        # anyone who can reach the port. Make that loud in the server log so an
+        # operator notices before exposing the manager.
+        import logging
+        logging.getLogger("uvicorn.error").warning(
+            "보안 경고: 관리자 비밀번호(NEXUS_MANAGER_ADMIN_PASSWORD)가 설정되지 "
+            "않았습니다. 이 경우 포트에 접근 가능한 누구나 변경 작업을 수행할 수 "
+            "있습니다. 운영 환경에서는 .env에 비밀번호를 반드시 설정하세요."
+        )
     tasks = [
         asyncio.create_task(run_loop()),
         asyncio.create_task(ping_run_loop()),

@@ -29,16 +29,16 @@
 
 ## 방법 A — 우리 Nexus의 PyPI 프록시로 설치 (권장, 가장 간단)
 
-대상 서버가 Nexus 서버(예: `192.168.139.96:8081`)에 접속만 되면 됩니다.
+대상 서버가 Nexus 서버(예: `<NEXUS-IP>:8081`)에 접속만 되면 됩니다.
 
 ```bash
 # 1) 코드 가져오기 (git 접근이 되면)
 git clone <사내 git 주소>/nexus.git
 cd nexus
-git checkout claude/practical-noether-uPpi9
+git checkout main
 
 # 2) Nexus PyPI 프록시를 패키지 공급원으로 지정해 설치
-NEXUS_PYPI_INDEX="http://192.168.139.96:8081/repository/pypi/simple/" \
+NEXUS_PYPI_INDEX="http://<NEXUS-IP>:8081/repository/pypi/simple/" \
   bash deploy/install-from-nexus.sh
 
 # 3) 인스턴스 설정
@@ -67,7 +67,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```bash
 git clone <사내 git 주소>/nexus.git
 cd nexus
-git checkout claude/practical-noether-uPpi9
+git checkout main
 
 bash deploy/build-offline-bundle.sh
 # -> nexus-manager-offline.tar.gz 생성됨 (소스 + 모든 wheel 포함)

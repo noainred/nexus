@@ -7,6 +7,16 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.37",
+        "date": "2026-06-20",
+        "changes": [
+            {"type": "added", "text": "납품용(대외 배포) 준비 — 독점 소프트웨어 라이선스(LICENSE, 한/영)와 제3자 오픈소스 고지(THIRD-PARTY-NOTICES.md)를 추가하고 오프라인 번들에 포함"},
+            {"type": "added", "text": "보안 기본값 — 설치 스크립트(install-service.sh)가 .env에 관리자 비밀번호가 없으면 무작위 비밀번호를 자동 생성해 출력하고, 비밀번호 미설정으로 기동 시 서버 로그에 보안 경고를 남김"},
+            {"type": "changed", "text": "다운로드 로그 by-instance 경로에 경로 탈출(path traversal) 가드 추가 — 인스턴스 id/name/host에 '/'·'\\\\'·'..'가 포함되면 거부"},
+            {"type": "changed", "text": "납품 문서 내부 정보 치환 — 사내 Nexus 호스트/IP·개발 브랜치명을 placeholder(<INTERNAL-NEXUS-HOST>·<NEXUS-IP>·main)로 변경"},
+        ],
+    },
+    {
         "version": "1.7.36",
         "date": "2026-06-17",
         "changes": [

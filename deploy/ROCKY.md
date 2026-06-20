@@ -36,7 +36,7 @@ cd /opt/nexus-manager
 
 # 사내 git 또는 GitHub에서 클론
 git clone https://github.com/noainred/nexus.git .
-git checkout claude/practical-noether-uPpi9
+git checkout main
 ```
 
 > 폐쇄망이라 git 접근이 안 되면 [`deploy/README.md`](README.md)의 오프라인 번들
@@ -58,7 +58,7 @@ pip install -r requirements.txt
 사내 **Nexus PyPI 프록시**를 쓰는 경우(폐쇄망 권장):
 
 ```bash
-NEXUS_PYPI_INDEX="http://192.168.139.96:8081/repository/pypi/simple/" \
+NEXUS_PYPI_INDEX="http://<NEXUS-IP>:8081/repository/pypi/simple/" \
   bash deploy/install-from-nexus.sh
 ```
 
@@ -77,7 +77,7 @@ nano instances.yaml
 instances:
   - id: front1
     name: "Frontend 1"
-    base_url: http://192.168.139.96:8081
+    base_url: http://<NEXUS-IP>:8081
     username: admin
     password: 실제비밀번호
 ```

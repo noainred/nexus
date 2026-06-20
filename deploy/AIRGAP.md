@@ -43,13 +43,13 @@ sudo dnf install -y python3 python3-pip git
 sudo tee /etc/yum.repos.d/nexus.repo >/dev/null <<'EOF'
 [nexus-baseos]
 name=Rocky BaseOS via Nexus
-baseurl=http://192.168.139.96:8081/repository/rocky/9/BaseOS/x86_64/os/
+baseurl=http://<NEXUS-IP>:8081/repository/rocky/9/BaseOS/x86_64/os/
 enabled=1
 gpgcheck=0
 
 [nexus-appstream]
 name=Rocky AppStream via Nexus
-baseurl=http://192.168.139.96:8081/repository/rocky/9/AppStream/x86_64/os/
+baseurl=http://<NEXUS-IP>:8081/repository/rocky/9/AppStream/x86_64/os/
 enabled=1
 gpgcheck=0
 EOF
@@ -68,7 +68,7 @@ sudo mkdir -p /opt/nexus-manager && cd /opt/nexus-manager
 
 # 사내 git 서버가 있으면:
 git clone <사내-git-주소>/nexus.git .
-git checkout claude/practical-noether-uPpi9
+git checkout main
 
 # git 접근이 안 되면: 코드를 받을 수 있는 PC에서 zip/tar 로 만들어 USB 반입 후 압축 해제
 ```
@@ -77,7 +77,7 @@ git checkout claude/practical-noether-uPpi9
 
 ```bash
 cd /opt/nexus-manager
-NEXUS_PYPI_INDEX="http://192.168.139.96:8081/repository/pypi/simple/" \
+NEXUS_PYPI_INDEX="http://<NEXUS-IP>:8081/repository/pypi/simple/" \
   bash deploy/install-from-nexus.sh
 ```
 
@@ -106,7 +106,7 @@ dnf download --resolve --alldeps --destdir ~/airgap/rpms \
 
 ```bash
 git clone <git-주소>/nexus.git && cd nexus
-git checkout claude/practical-noether-uPpi9
+git checkout main
 bash deploy/build-offline-bundle.sh
 #  -> nexus-manager-offline.tar.gz (앱 소스 + 모든 wheel)
 cp nexus-manager-offline.tar.gz ~/airgap/
@@ -151,7 +151,7 @@ nano instances.yaml          # install 스크립트가 예시에서 자동 생�
 instances:
   - id: front1
     name: "Frontend 1"
-    base_url: http://192.168.139.96:8081
+    base_url: http://<NEXUS-IP>:8081
     username: admin
     password: 실제비밀번호
 ```

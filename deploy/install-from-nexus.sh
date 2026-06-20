@@ -7,7 +7,7 @@
 # talks to Nexus anyway) and your Nexus has a `pypi` proxy repository.
 #
 # Usage:
-#   NEXUS_PYPI_INDEX="http://192.168.139.96:8081/repository/pypi/simple/" \
+#   NEXUS_PYPI_INDEX="http://<NEXUS-IP>:8081/repository/pypi/simple/" \
 #     bash deploy/install-from-nexus.sh
 #
 set -euo pipefail

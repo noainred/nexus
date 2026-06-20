@@ -221,7 +221,7 @@ sudo UPDATE_URL=https://mirror.example/nexus/ bash deploy/install-service.sh
 raw 폴더 주소로 두면 됩니다.
 
 ```bash
-NEXUS_RAW_URL=http://repository.dvc.lgensol.com:8081/repository/manager-upgrade/nexus-manager \
+NEXUS_RAW_URL=http://<INTERNAL-NEXUS-HOST>:8081/repository/manager-upgrade/nexus-manager \
 NEXUS_USER=admin NEXUS_PASS=*** \
   bash deploy/mirror-to-nexus.sh
 # → 포탈 자동 업그레이드 Site Info(URL) 에  …/manager-upgrade/nexus-manager/  입력

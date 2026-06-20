@@ -1,0 +1,51 @@
+Nexus Repository 통합 관리 (Nexus Integrated Manager)
+독점 소프트웨어 라이선스 · Proprietary Software License
+
+Copyright (c) 2026 박준호 (Park Junho). All rights reserved.
+
+────────────────────────────────────────────────────────────────────────
+[한국어]
+
+본 소프트웨어 및 관련 문서(이하 "본 소프트웨어")에 대한 모든 권리는 저작권자에게
+있습니다. 본 소프트웨어는 독점 소프트웨어로서, 저작권자와 고객사(라이선시) 간에
+체결된 납품·라이선스 계약(이하 "계약")에 따라 라이선스가 부여된 고객사에 한하여,
+계약에서 정한 범위·기간·환경 내에서만 사용할 수 있습니다.
+
+저작권자의 사전 서면 동의 없이 다음 행위를 할 수 없습니다.
+  1. 본 소프트웨어의 전부 또는 일부를 복제·배포·전송·대여·재라이선스하는 행위
+  2. 본 소프트웨어를 수정·번역하거나 2차적 저작물을 작성하는 행위
+  3. 본 소프트웨어를 역컴파일·역어셈블·역설계(리버스 엔지니어링)하는 행위
+  4. 계약에서 허락한 범위를 벗어나 제3자가 사용하게 하는 행위
+
+본 소프트웨어는 "있는 그대로(AS IS)" 제공되며, 상품성·특정 목적 적합성·비침해 등
+명시적이거나 묵시적인 어떠한 보증도 하지 않습니다. 본 소프트웨어의 사용으로 인해
+발생하는 어떠한 직접·간접·부수적·결과적 손해에 대해서도 저작권자는 책임을 지지
+않습니다(계약에 달리 정한 경우는 제외).
+
+본 소프트웨어는 오픈소스 구성요소를 포함합니다. 해당 구성요소의 저작권·라이선스
+고지는 THIRD-PARTY-NOTICES.md 를 참조하십시오.
+
+────────────────────────────────────────────────────────────────────────
+[English]
+
+This software and its accompanying documentation ("the Software") are
+proprietary. All rights are reserved by the copyright holder. The Software is
+licensed, not sold, to the customer ("Licensee") solely under the terms of the
+delivery/license agreement between the copyright holder and the Licensee, and
+may be used only within the scope, term, and environment defined therein.
+
+Without the prior written consent of the copyright holder, you may NOT:
+  1. copy, distribute, transmit, rent, or sub-license the Software, in whole or
+     in part;
+  2. modify, translate, or create derivative works of the Software;
+  3. decompile, disassemble, or reverse engineer the Software;
+  4. allow any third party to use the Software beyond the licensed scope.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. EXCEPT AS OTHERWISE
+PROVIDED IN THE AGREEMENT, THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR ANY
+CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
+
+This product includes open-source components; see THIRD-PARTY-NOTICES.md for
+their copyright and license notices.
