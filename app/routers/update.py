@@ -128,7 +128,8 @@ async def _remote_latest(cfg: dict) -> Optional[str]:
         return None
     token = cfg.get("token") or ""
     headers = {"Authorization": f"Bearer {token}"} if token else {}
-    async with httpx.AsyncClient(timeout=8.0, follow_redirects=True, verify=False) as c:
+    verify = get_settings().verify_tls
+    async with httpx.AsyncClient(timeout=8.0, follow_redirects=True, verify=verify) as c:
         if cfg.get("source") == "github" or url.startswith("github:"):
             api = _gh_contents_api(url)
             if api:
@@ -227,7 +228,8 @@ async def _check_edges(urls: List[str], deploy_code: str) -> List[dict]:
     urls = [u.strip() for u in (urls or []) if u and u.strip()]
     if not urls:
         return []
-    async with httpx.AsyncClient(timeout=5.0, follow_redirects=True, verify=False) as c:
+    verify = get_settings().verify_tls
+    async with httpx.AsyncClient(timeout=5.0, follow_redirects=True, verify=verify) as c:
         edges = list(await asyncio.gather(*(_edge_version(c, u) for u in urls)))
     for e in edges:
         e["outdated"] = bool(e["version"] and _vkey(e["version"]) < _vkey(deploy_code))

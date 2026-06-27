@@ -77,3 +77,58 @@ def test_security_headers_present(client):
     assert r.headers.get("X-Content-Type-Options") == "nosniff"
     assert r.headers.get("X-Frame-Options") == "DENY"
     assert "frame-ancestors 'none'" in r.headers.get("Content-Security-Policy", "")
+
+
+# -- Outbound TLS verification honors settings.verify_tls -------------------
+
+class _CapClient:
+    """Fake httpx.AsyncClient that records its kwargs and refuses connections,
+    so we can assert which `verify` value the outbound call used."""
+    captured: dict = {}
+
+    def __init__(self, **kw):
+        import httpx
+        _CapClient.captured = kw
+        self._err = httpx.ConnectError("blocked in test")
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def get(self, *a, **k):
+        raise self._err
+
+    async def post(self, *a, **k):
+        raise self._err
+
+
+@pytest.mark.parametrize("verify_tls", [True, False])
+def test_alert_send_honors_verify_tls(monkeypatch, verify_tls):
+    import asyncio
+    import app.alerts as alerts_mod
+    monkeypatch.setattr(alerts_mod, "get_settings", lambda: Settings(verify_tls=verify_tls))
+    monkeypatch.setattr(alerts_mod.httpx, "AsyncClient", _CapClient)
+    asyncio.run(alerts_mod._send("http://hook.example/x", "hi"))
+    assert _CapClient.captured.get("verify") is verify_tls
+
+
+@pytest.mark.parametrize("verify_tls", [True, False])
+def test_topology_probe_honors_verify_tls(monkeypatch, verify_tls):
+    import asyncio
+    import app.routers.topology as topo_mod
+    monkeypatch.setattr(topo_mod, "get_settings", lambda: Settings(verify_tls=verify_tls))
+    monkeypatch.setattr(topo_mod.httpx, "AsyncClient", _CapClient)
+    assert asyncio.run(topo_mod._probe("https://x.example/", 2.0)) is False
+    assert _CapClient.captured.get("verify") is verify_tls
+
+
+@pytest.mark.parametrize("verify_tls", [True, False])
+def test_update_edge_check_honors_verify_tls(monkeypatch, verify_tls):
+    import asyncio
+    import app.routers.update as upd_mod
+    monkeypatch.setattr(upd_mod, "get_settings", lambda: Settings(verify_tls=verify_tls))
+    monkeypatch.setattr(upd_mod.httpx, "AsyncClient", _CapClient)
+    asyncio.run(upd_mod._check_edges(["http://edge.example/"], "1.0.0"))
+    assert _CapClient.captured.get("verify") is verify_tls

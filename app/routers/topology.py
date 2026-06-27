@@ -58,7 +58,8 @@ async def _fetch_node(instance) -> Tuple[TopologyNode, Optional[List[Repository]
 async def _probe(url: str, timeout: float) -> bool:
     """Best-effort reachability probe of a remote URL (any HTTP reply = up)."""
     try:
-        async with httpx.AsyncClient(timeout=timeout, verify=False, follow_redirects=True) as c:
+        verify = get_settings().verify_tls
+        async with httpx.AsyncClient(timeout=timeout, verify=verify, follow_redirects=True) as c:
             await c.get(url)
         return True
     except httpx.HTTPError:
@@ -252,7 +253,8 @@ async def proxy_diagnose(
     if remote:
         start = _time.perf_counter()
         try:
-            async with httpx.AsyncClient(timeout=10.0, verify=False, follow_redirects=True) as c:
+            verify = get_settings().verify_tls
+            async with httpx.AsyncClient(timeout=10.0, verify=verify, follow_redirects=True) as c:
                 resp = await c.get(remote)
             status_code = resp.status_code
             reachable = True

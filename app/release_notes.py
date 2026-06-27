@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.39",
+        "date": "2026-06-20",
+        "changes": [
+            {"type": "changed", "text": "보안 점검 후속 — 알림 웹훅·토폴로지 원격 프로브·자동업데이트 버전조회/엣지조회의 외부 HTTP 호출이 TLS 인증서 검증을 무조건 끄던(verify=False) 것을 설정값(NEXUS_MANAGER_VERIFY_TLS, 기본 true)을 따르도록 통일. 특히 자동업데이트가 Bearer 토큰을 검증 없이 보내던 중간자(MITM) 토큰 탈취·가짜 버전 응답 위험을 제거(사내 자체서명 인증서 환경은 false로 옵트아웃)"},
+        ],
+    },
+    {
         "version": "1.7.38",
         "date": "2026-06-20",
         "changes": [

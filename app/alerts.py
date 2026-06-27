@@ -98,7 +98,8 @@ async def _drift_alerts(registry, settings: Settings) -> List[Alert]:
 
 async def _send(webhook: str, text: str) -> None:
     try:
-        async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+        verify = get_settings().verify_tls
+        async with httpx.AsyncClient(timeout=10.0, verify=verify) as client:
             await client.post(webhook, json={"text": text})
     except httpx.HTTPError:
         pass  # never let notification failure break the loop
