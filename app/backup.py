@@ -57,7 +57,13 @@ def _write_portal_backup(out: Path, settings: Settings) -> dict:
         if not uc.is_absolute():
             uc = Path.cwd() / uc
         if uc.is_file():
-            payload["update_config"] = json.loads(uc.read_text(encoding="utf-8"))
+            ucfg = json.loads(uc.read_text(encoding="utf-8"))
+            # Never write the update token (a GitHub PAT / private-repo secret)
+            # into a backup file — it must be re-entered on restore.
+            if isinstance(ucfg, dict) and ucfg.get("token"):
+                ucfg["token"] = ""
+                ucfg["token_redacted"] = True
+            payload["update_config"] = ucfg
     except Exception as exc:  # noqa: BLE001
         payload["update_config_error"] = str(exc)
     fname = "_portal.json"

@@ -79,7 +79,8 @@ def _prune(settings: Settings) -> None:
     lines = path.read_text(encoding="utf-8").splitlines()
     kept = [ln for ln in lines if ln[:20] >= cutoff]
     if len(kept) != len(lines):
-        path.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
+        from .storage import atomic_write_text
+        atomic_write_text(path, "\n".join(kept) + ("\n" if kept else ""))
 
 
 def purge(instance_id: str, settings: Optional[Settings] = None) -> int:
@@ -93,8 +94,22 @@ def purge(instance_id: str, settings: Optional[Settings] = None) -> int:
     kept = [ln for ln in lines if ln.split(",", 2)[1:2] != [instance_id]]
     removed = len(lines) - len(kept)
     if removed:
-        path.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
+        from .storage import atomic_write_text
+        atomic_write_text(path, "\n".join(kept) + ("\n" if kept else ""))
     return removed
+
+
+def _epoch(ts: str) -> float:
+    """Fast parse of the fixed ``YYYY-MM-DDTHH:MM:SSZ`` timestamp to a UTC epoch.
+
+    Equivalent to ``strptime(ts, _TS_FMT)`` but avoids the format-string parsing
+    overhead, which dominates when a 7일/30일 window has thousands of samples.
+    """
+    return datetime(
+        int(ts[0:4]), int(ts[5:7]), int(ts[8:10]),
+        int(ts[11:13]), int(ts[14:16]), int(ts[17:19]),
+        tzinfo=timezone.utc,
+    ).timestamp()
 
 
 def _color(value: float, baseline: Optional[float], warn_ratio: float, crit_ratio: float) -> str:
@@ -184,7 +199,7 @@ def query(
             if ts < cutoff:
                 continue
             try:
-                t = datetime.strptime(ts, _TS_FMT).replace(tzinfo=timezone.utc).timestamp()
+                t = _epoch(ts)
             except ValueError:
                 continue
             v = float(val) if val else None

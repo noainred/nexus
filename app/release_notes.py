@@ -7,6 +7,16 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.40",
+        "date": "2026-06-20",
+        "changes": [
+            {"type": "changed", "text": "[안정성] 크래시 안전 저장 도입(app/storage.py) — 설정/토큰/레이아웃 파일과 ping·disk 이력 정리(prune/purge)를 임시파일+fsync+os.replace 원자적 쓰기로 변경. 정전·강제종료 중 저장이 겹쳐도 공유 설정이 깨지지 않음(instances.yaml, update-config, access-log-config, column-order, topo-layout, portal-config, ping/disk CSV)"},
+            {"type": "changed", "text": "[보안] 자격증명 파일 권한 강화 — 노드 비밀번호가 담긴 instances.yaml을 0600으로 저장, 감사 로그(audit.log)도 0600 생성. 자동업데이트 토큰(GitHub PAT)은 포탈 백업(_portal.json)에 평문으로 담기지 않도록 마스킹(복원 시 재입력)"},
+            {"type": "changed", "text": "[버그] 노드 삭제 시 disk 이력 행도 정리 — 기존에는 ping 이력·상태 캐시만 지우고 disk-history CSV의 행이 영구 누적되던 것을 diskmon.purge로 함께 제거"},
+            {"type": "changed", "text": "[최적화] 네트워크 체크 로딩 개선 — ping 시계열 파싱을 고정형식 정수 파싱으로 대체(대량 구간 strptime 오버헤드 제거). disk 이력은 파일 변경(mtime/size) 기준 파싱 캐시를 두어 예측/이력 화면의 반복 조회 시 전체 CSV 재파싱을 생략"},
+        ],
+    },
+    {
         "version": "1.7.39",
         "date": "2026-06-20",
         "changes": [

@@ -154,8 +154,8 @@ async def set_config(body: dict) -> dict:
            "paths": str((body or {}).get("paths") or "").strip()}
     p = _cfg_path()
     try:
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+        from ..storage import atomic_write_text
+        atomic_write_text(p, json.dumps(cfg, ensure_ascii=False, indent=2))
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f"설정 저장 실패: {exc}")
     return cfg

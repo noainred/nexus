@@ -130,8 +130,13 @@ def _audit_path(settings: Settings) -> Path:
 def write_audit(settings: Settings, entry: dict) -> None:
     p = _audit_path(settings)
     p.parent.mkdir(parents=True, exist_ok=True)
+    new = not p.exists()
     with open(p, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    if new:
+        # Audit lines record client IPs and request paths — keep them private.
+        from ..storage import restrict_mode
+        restrict_mode(p, 0o600)
 
 
 @router.get("/audit")

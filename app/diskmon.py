@@ -55,11 +55,25 @@ async def sample_once(registry, settings: Settings) -> int:
     return len(lines)
 
 
+_read_cache: dict = {}  # {"key": (path, mtime_ns, size), "data": parsed}
+
+
 def _read(settings: Settings) -> Dict[Tuple[str, str], List[Tuple[datetime, int, int]]]:
     p = _path(settings)
     out: Dict[Tuple[str, str], List[Tuple[datetime, int, int]]] = {}
     if not p.is_file():
         return out
+    # Cache the parsed history keyed by (path, mtime, size): /disk-forecast and
+    # /disk-history both re-parse the whole CSV otherwise, and a new sample only
+    # lands every 6h — so between samples the parse is reused. Consumers only
+    # read the returned structure, so sharing it is safe.
+    try:
+        st = p.stat()
+        key = (str(p), st.st_mtime_ns, st.st_size)
+    except OSError:
+        key = None
+    if key is not None and _read_cache.get("key") == key:
+        return _read_cache["data"]
     for line in p.read_text(encoding="utf-8").splitlines():
         parts = line.strip().split(",")
         if len(parts) != 5:
@@ -72,6 +86,8 @@ def _read(settings: Settings) -> Dict[Tuple[str, str], List[Tuple[datetime, int,
         out.setdefault((parts[1], parts[2]), []).append((dt, used, total))
     for v in out.values():
         v.sort(key=lambda x: x[0])
+    if key is not None:
+        _read_cache["key"], _read_cache["data"] = key, out
     return out
 
 
@@ -154,6 +170,24 @@ def history(registry, settings: Settings, days: int = 60) -> List[dict]:
     return out
 
 
+def purge(instance_id: str, settings: Optional[Settings] = None) -> int:
+    """Drop all disk-history rows for one instance (call when it's deleted).
+    Returns the number of removed samples. Without this, a deleted node's rows
+    accumulate in the CSV forever (they are filtered from views but never freed).
+    """
+    settings = settings or get_settings()
+    p = _path(settings)
+    if not p.is_file():
+        return 0
+    lines = p.read_text(encoding="utf-8").splitlines()
+    kept = [ln for ln in lines if ln.split(",", 2)[1:2] != [instance_id]]
+    removed = len(lines) - len(kept)
+    if removed:
+        from .storage import atomic_write_text
+        atomic_write_text(p, "\n".join(kept) + ("\n" if kept else ""))
+    return removed
+
+
 def _prune(settings: Settings) -> None:
     p = _path(settings)
     if not p.is_file():
@@ -167,7 +201,8 @@ def _prune(settings: Settings) -> None:
             continue
         if dt >= cutoff:
             kept.append(line + "\n")
-    p.write_text("".join(kept), encoding="utf-8")
+    from .storage import atomic_write_text
+    atomic_write_text(p, "".join(kept))
 
 
 async def run_loop() -> None:

@@ -70,6 +70,6 @@ async def set_portal(body: PortalConfig) -> dict:
     if body.hidden_tabs is not None:
         cfg["hidden_tabs"] = [str(x) for x in body.hidden_tabs if x]
     p = _portal_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
+    from ..storage import atomic_write_text
+    atomic_write_text(p, json.dumps(cfg, ensure_ascii=False))
     return {"title": cfg["title"], "hidden_tabs": cfg.get("hidden_tabs") or []}

@@ -308,12 +308,9 @@ async def update_config(body: UpdateConfig) -> dict:
         "edges": edges,
     }
     p = _cfg_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
-    try:
-        os.chmod(p, 0o600)   # may hold a token
-    except OSError:
-        pass
+    # May hold a token → atomic + 0600.
+    from ..storage import atomic_write_text
+    atomic_write_text(p, json.dumps(cfg, ensure_ascii=False, indent=2), mode=0o600)
     return {"ok": True, "config": _masked(cfg)}
 
 

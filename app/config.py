@@ -274,8 +274,12 @@ def save_instances(
     """Persist the managed instances (and view prefs) back to the YAML file."""
     settings = settings or get_settings()
     path = _instance_path(settings)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    # instances.yaml holds per-node passwords in plaintext → atomic + 0600 so a
+    # crash mid-write can't corrupt the whole server list and the credentials
+    # aren't left world-readable.
+    from .storage import atomic_write_text
+    atomic_write_text(
+        path,
         instances_to_yaml(instances, group_order, compare_fields, ping, backup, sync_jobs),
-        encoding="utf-8",
+        mode=0o600,
     )

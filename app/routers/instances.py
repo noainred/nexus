@@ -105,8 +105,8 @@ async def set_column_order(body: dict) -> dict:
     order = [str(x) for x in (body.get("order") or []) if x]
     p = _order_path()
     try:
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps({"order": order}, ensure_ascii=False, indent=2), encoding="utf-8")
+        from ..storage import atomic_write_text
+        atomic_write_text(p, json.dumps({"order": order}, ensure_ascii=False, indent=2))
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f"순서 저장 실패: {exc}")
     return {"order": order}
@@ -148,8 +148,8 @@ async def set_topology_layout(body: dict) -> dict:
                 clean[str(k)] = {"x": float(v["x"]), "y": float(v["y"])}
     p = _topo_path()
     try:
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps({"pos": clean}, ensure_ascii=False), encoding="utf-8")
+        from ..storage import atomic_write_text
+        atomic_write_text(p, json.dumps({"pos": clean}, ensure_ascii=False))
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f"배치 저장 실패: {exc}")
     return {"pos": clean}
@@ -394,11 +394,13 @@ async def delete_instance(
     instance_id: str, registry: InstanceRegistry = Depends(get_registry)
 ) -> Response:
     registry.remove(instance_id)  # 404 if unknown
-    # Clean up trailing data so a deleted node never reappears on charts/cards.
-    from .. import pingmon, statusmon
-    try:
-        pingmon.purge(instance_id)
-    except Exception:  # noqa: BLE001 - best-effort cleanup
-        pass
+    # Clean up trailing data so a deleted node never reappears on charts/cards
+    # and its history rows don't accumulate forever.
+    from .. import diskmon, pingmon, statusmon
+    for purge in (pingmon.purge, diskmon.purge):
+        try:
+            purge(instance_id)
+        except Exception:  # noqa: BLE001 - best-effort cleanup
+            pass
     statusmon.drop(instance_id)
     return Response(status_code=204)
