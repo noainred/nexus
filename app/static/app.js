@@ -85,7 +85,10 @@ function setupAuth() {
       try {
         await api("/api/login", {
           method: "POST",
-          body: JSON.stringify({ password: document.getElementById("login-pw").value }),
+          body: JSON.stringify({
+            username: (document.getElementById("login-user") || {}).value || "",
+            password: document.getElementById("login-pw").value,
+          }),
         });
         // Full page refresh so the whole UI re-initialises with authenticated
         // data. (Revealing tabs in place left protected screens like 서버 설정
@@ -134,6 +137,101 @@ async function loadAudit() {
     el("td", { class: "num" }, String(a.status ?? "")),
   ]));
   table.append(buildTable(["시각(UTC)", "IP", "메서드", "경로", "결과"], rows));
+}
+
+// ---- manager login accounts (id/pw) ---------------------------------------
+
+async function setupManagerAccounts() {
+  let me;
+  try { me = await api("/api/me"); } catch (e) { return; }
+  state.me = me;
+  const isAdmin = me.role === "admin";
+  const note = document.getElementById("muser-note");
+  if (note) {
+    note.textContent = me.bootstrap
+      ? "현재 환경변수 관리자(부트스트랩)로 로그인했습니다. 이 비밀번호는 서버 .env에서 변경합니다."
+      : (me.username ? `현재 로그인: ${me.username} (${isAdmin ? "관리자" : "조회전용"})` : "");
+  }
+  // "내 비밀번호 변경" — only for a named account (env-password admin can't).
+  const pwForm = document.getElementById("mypw-form");
+  if (pwForm) {
+    if (me.authenticated && !me.bootstrap) {
+      pwForm.classList.remove("hidden");
+      if (!pwForm._wired) {
+        pwForm._wired = true;
+        pwForm.addEventListener("submit", async (ev) => {
+          ev.preventDefault();
+          const fd = new FormData(pwForm);
+          const msg = document.getElementById("mypw-msg");
+          try {
+            await api("/api/me/password", { method: "POST", body: JSON.stringify({
+              old_password: fd.get("old_password"), new_password: fd.get("new_password") }) });
+            msg.textContent = "변경되었습니다."; pwForm.reset();
+          } catch (e) { msg.textContent = e.message; }
+        });
+      }
+    } else {
+      pwForm.classList.add("hidden");
+    }
+  }
+  const adminBox = document.getElementById("muser-admin");
+  if (!adminBox) return;
+  if (!isAdmin) { adminBox.classList.add("hidden"); return; }
+  adminBox.classList.remove("hidden");
+  await renderManagerUsers();
+  const form = document.getElementById("muser-create");
+  if (form && !form._wired) {
+    form._wired = true;
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(form);
+      const msg = document.getElementById("muser-msg");
+      try {
+        await api("/api/manager-users", { method: "POST", body: JSON.stringify({
+          username: fd.get("username"), password: fd.get("password"), role: fd.get("role") }) });
+        msg.textContent = "추가되었습니다."; form.reset();
+        await renderManagerUsers();
+      } catch (e) { msg.textContent = e.message; }
+    });
+  }
+}
+
+async function renderManagerUsers() {
+  const box = document.getElementById("muser-table");
+  if (!box) return;
+  let users;
+  try { users = (await api("/api/manager-users")).users || []; }
+  catch (e) { box.innerHTML = ""; box.append(el("div", { class: "empty" }, e.message)); return; }
+  box.innerHTML = "";
+  if (!users.length) { box.append(el("div", { class: "empty" }, "등록된 계정이 없습니다.")); return; }
+  const call = (u, body, ok) => api(`/api/manager-users/${encodeURIComponent(u)}`, body)
+    .then(() => { toast(ok); return renderManagerUsers(); })
+    .catch((e) => toast(e.message, "err"));
+  const rows = users.map((u) => {
+    const roleSel = el("select", {}, [
+      el("option", u.role === "viewer" ? { value: "viewer", selected: "" } : { value: "viewer" }, "조회전용"),
+      el("option", u.role === "admin" ? { value: "admin", selected: "" } : { value: "admin" }, "관리자"),
+    ]);
+    roleSel.addEventListener("change", () =>
+      call(u.username, { method: "PUT", body: JSON.stringify({ role: roleSel.value }) }, "역할 변경됨"));
+    const reset = el("button", { class: "pick-mini", type: "button" }, "비번 재설정");
+    reset.addEventListener("click", () => {
+      const np = prompt(`'${u.username}' 새 비밀번호(4자 이상):`);
+      if (np) call(u.username, { method: "PUT", body: JSON.stringify({ password: np }) }, "비밀번호 변경됨");
+    });
+    const del = el("button", { class: "pick-mini", type: "button" }, "삭제");
+    del.addEventListener("click", () => {
+      if (confirm(`'${u.username}' 계정을 삭제할까요?`))
+        call(u.username, { method: "DELETE" }, "삭제됨");
+    });
+    return el("tr", {}, [
+      el("td", {}, u.username),
+      el("td", {}, roleSel),
+      el("td", {}, u.created_at || ""),
+      el("td", {}, [reset, document.createTextNode(" "), del]),
+    ]);
+  });
+  box.append(buildTable(["아이디", "역할", "생성(UTC)", "작업"], rows));
 }
 
 // FastAPI returns `detail` as a string (HTTPException) or a list of
@@ -5544,6 +5642,7 @@ async function init() {
   setupDlTrack();
   setupAccessLogConfig();
   setupAccounts();
+  setupManagerAccounts();
   setupUpdate();
   setupBulk();
   setupTopology();

@@ -1,18 +1,25 @@
-"""Manager login (single admin password) + audit-log endpoints.
+"""Manager login + audit-log endpoints.
 
-Authentication is optional: it activates only when ``admin_password`` is set
-(``NEXUS_MANAGER_ADMIN_PASSWORD``). The session is a stateless cookie signed
-with the admin password as the HMAC key and bound to an expiry timestamp:
-changing the password invalidates every session, and a leaked cookie stops
-working after the TTL even without a password change. Because the key is the
-password (not a per-process random), sessions survive a manager restart.
+Two coexisting credential sources:
+  * the single bootstrap ``admin_password`` (``NEXUS_MANAGER_ADMIN_PASSWORD``),
+    always an ``admin`` role — its session cookie is signed with the password
+    itself, so changing it invalidates every bootstrap session;
+  * named id/pw accounts (``app.userstore``) scoped to a role (admin/viewer) —
+    their session cookies are signed with a persisted server secret.
+
+Auth activates when either source exists; otherwise the manager is open (status
+screens only). A leaked cookie stops working after the TTL. Both cookie kinds
+share the ``nm_session`` cookie; :func:`current_principal` resolves whichever
+one is present into a :class:`Principal`.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import json
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -20,6 +27,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from ..config import Settings, get_settings
+from .. import userstore
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
@@ -58,11 +66,70 @@ def verify_token(password: str, tok: str) -> bool:
     return hmac.compare_digest(sig, _sign(password, "nexus-manager-v2|" + exp_hex))
 
 
-def is_authenticated(request: Request, settings: Settings) -> bool:
-    pw = settings.admin_password
-    if not pw:
+@dataclass
+class Principal:
+    username: str
+    role: str            # "admin" | "viewer"
+    bootstrap: bool = False
+
+
+def make_user_token(username: str, role: str, ttl: int = _SESSION_TTL) -> str:
+    """Signed named-account token: ``<payload_b64>.<hmac>`` where payload holds
+    the subject, role and expiry. Signed with the persisted server secret."""
+    exp = int(time.time()) + ttl
+    payload = base64.urlsafe_b64encode(
+        json.dumps({"sub": username, "role": role, "exp": exp}).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    return payload + "." + _sign(userstore.server_secret(), "nexus-user-v1|" + payload)
+
+
+def verify_user_token(tok: str) -> Optional[Principal]:
+    if not tok or "." not in tok:
+        return None
+    payload_b64, sig = tok.rsplit(".", 1)
+    try:
+        pad = "=" * (-len(payload_b64) % 4)
+        data = json.loads(base64.urlsafe_b64decode(payload_b64 + pad))
+        sub, role, exp = data["sub"], data["role"], int(data["exp"])
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+        return None
+    if exp < int(time.time()):
+        return None
+    if not hmac.compare_digest(sig, _sign(userstore.server_secret(), "nexus-user-v1|" + payload_b64)):
+        return None
+    # The stored role is authoritative — a deleted/downgraded user's live token
+    # must not keep elevated access.
+    u = userstore.get(sub)
+    if u is None:
+        return None
+    return Principal(username=sub, role=u.get("role", "viewer"))
+
+
+def auth_enabled(settings: Settings) -> bool:
+    """Auth is on when a bootstrap password is set or any named account exists."""
+    if settings.admin_password:
         return True
-    return verify_token(pw, request.cookies.get(COOKIE, ""))
+    try:
+        return userstore.count() > 0
+    except Exception:  # noqa: BLE001 - never let a store error open the manager
+        return False
+
+
+def current_principal(request: Request, settings: Settings) -> Optional[Principal]:
+    """Resolve the request's session cookie to a Principal, or None."""
+    tok = request.cookies.get(COOKIE, "")
+    if not tok:
+        return None
+    pw = settings.admin_password
+    if pw and verify_token(pw, tok):
+        return Principal(username="admin", role="admin", bootstrap=True)
+    return verify_user_token(tok)
+
+
+def is_authenticated(request: Request, settings: Settings) -> bool:
+    if not auth_enabled(settings):
+        return True
+    return current_principal(request, settings) is not None
 
 
 def _rl_ip(request: Request) -> str:
@@ -80,21 +147,28 @@ def _rl_locked(ip: str) -> Optional[int]:
 
 
 class LoginBody(BaseModel):
+    username: str = ""   # empty = bootstrap admin (admin_password)
     password: str = ""
 
 
 @router.get("/auth-status")
 async def auth_status(request: Request) -> dict:
     settings = get_settings()
-    required = bool(settings.admin_password)
+    required = auth_enabled(settings)
     return {"required": required,
             "authenticated": (not required) or is_authenticated(request, settings)}
+
+
+def _set_session(response: Response, token: str) -> None:
+    response.set_cookie(
+        COOKIE, token, max_age=_SESSION_TTL, httponly=True, samesite="lax",
+    )
 
 
 @router.post("/login")
 async def login(body: LoginBody, request: Request, response: Response) -> dict:
     settings = get_settings()
-    if not settings.admin_password:
+    if not auth_enabled(settings):
         return {"ok": True, "required": False}
     ip = _rl_ip(request)
     wait = _rl_locked(ip)
@@ -103,15 +177,23 @@ async def login(body: LoginBody, request: Request, response: Response) -> dict:
             status_code=429,
             detail=f"로그인 시도가 너무 많습니다. {wait}초 후 다시 시도하세요.",
         )
-    if not hmac.compare_digest(body.password, settings.admin_password):
+    username = (body.username or "").strip()
+    if username:
+        role = userstore.verify(username, body.password)
+        if not role:
+            _LOGIN_FAILS.setdefault(ip, []).append(time.time())
+            raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 올바르지 않습니다.")
+        _LOGIN_FAILS.pop(ip, None)
+        un = userstore.norm_username(username)
+        _set_session(response, make_user_token(un, role))
+        return {"ok": True, "username": un, "role": role, "bootstrap": False}
+    # Bootstrap admin (no username) — the env admin_password.
+    if not settings.admin_password or not hmac.compare_digest(body.password, settings.admin_password):
         _LOGIN_FAILS.setdefault(ip, []).append(time.time())
         raise HTTPException(status_code=401, detail="비밀번호가 올바르지 않습니다.")
     _LOGIN_FAILS.pop(ip, None)  # clear throttle on success
-    response.set_cookie(
-        COOKIE, make_token(settings.admin_password),
-        max_age=_SESSION_TTL, httponly=True, samesite="lax",
-    )
-    return {"ok": True}
+    _set_session(response, make_token(settings.admin_password))
+    return {"ok": True, "username": "admin", "role": "admin", "bootstrap": True}
 
 
 @router.post("/logout")

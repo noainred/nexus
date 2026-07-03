@@ -35,6 +35,7 @@ from .routers import (
     matrix,
     meta,
     monitoring,
+    musers,
     repositories,
     search,
     security,
@@ -89,9 +90,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Auth gate + audit trail. Auth activates only when admin_password is set;
-# every write (POST/PUT/DELETE) to /api is appended to the audit log.
-_AUTH_EXEMPT = {"/api/login", "/api/auth-status"}
+# Auth gate + audit trail. Auth activates when a bootstrap password is set OR
+# any named account exists; every write (POST/PUT/DELETE) to /api is appended to
+# the audit log.
+_AUTH_EXEMPT = {"/api/login", "/api/auth-status", "/api/me"}
+# Writes any *authenticated* principal may perform (incl. a read-only viewer):
+# logging out and changing one's own password.
+_SELF_WRITE = {"/api/logout", "/api/me/password"}
 
 # Public read-only "service status" surface: even when a password is set, these
 # GET endpoints stay open so a global health/monitoring view needs no login.
@@ -128,23 +133,34 @@ def _is_public_read(method: str, path: str) -> bool:
 async def auth_and_audit(request: Request, call_next):
     settings = get_settings()
     path = request.url.path
-    if (
-        settings.admin_password
-        and path.startswith("/api")
-        and path not in _AUTH_EXEMPT
-        and not _is_public_read(request.method, path)
-        and not auth.is_authenticated(request, settings)
-    ):
-        # 'auth_required' marks this as the MANAGER login gate, so the SPA can
-        # tell it apart from an upstream Nexus 401 (a managed instance with bad
-        # credentials) and avoid wrongly popping the login overlay.
-        return JSONResponse(
-            {"detail": "로그인이 필요합니다.", "auth_required": True},
-            status_code=401,
-        )
+    method = request.method
+    principal = None
+    if auth.auth_enabled(settings) and path.startswith("/api") and path not in _AUTH_EXEMPT:
+        principal = auth.current_principal(request, settings)
+        if principal is None and not _is_public_read(method, path):
+            # 'auth_required' marks this as the MANAGER login gate, so the SPA can
+            # tell it apart from an upstream Nexus 401 (a managed instance with
+            # bad credentials) and avoid wrongly popping the login overlay.
+            return JSONResponse(
+                {"detail": "로그인이 필요합니다.", "auth_required": True},
+                status_code=401,
+            )
+        if principal is not None:
+            # Account management is admin-only (covers reads too — the listing
+            # exposes usernames/roles).
+            if path.startswith("/api/manager-users") and principal.role != "admin":
+                return JSONResponse(
+                    {"detail": "관리자만 접근할 수 있습니다."}, status_code=403)
+            # A viewer is read-only: block every write except self-service ones.
+            if (principal.role == "viewer"
+                    and method in ("POST", "PUT", "DELETE")
+                    and path not in _SELF_WRITE):
+                return JSONResponse(
+                    {"detail": "조회 전용 계정입니다(변경 권한이 없습니다)."},
+                    status_code=403)
     response = await call_next(request)
     if (
-        request.method in ("POST", "PUT", "DELETE")
+        method in ("POST", "PUT", "DELETE")
         and path.startswith("/api")
         and path not in ("/api/login", "/api/logout")
     ):
@@ -152,7 +168,8 @@ async def auth_and_audit(request: Request, call_next):
             auth.write_audit(settings, {
                 "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "ip": request.client.host if request.client else "",
-                "method": request.method,
+                "user": principal.username if principal else "",
+                "method": method,
                 "path": path,
                 "query": str(request.url.query or ""),
                 "status": response.status_code,
@@ -184,6 +201,7 @@ app.include_router(cleanup.fleet_router)
 app.include_router(meta.router)
 app.include_router(update.router)
 app.include_router(accounts.router)
+app.include_router(musers.router)
 
 
 # Hardening headers applied to every response. The SPA loads no CDN/inline

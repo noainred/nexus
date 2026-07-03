@@ -107,6 +107,8 @@ class Settings(BaseSettings):
     # call requires login; write operations are appended to audit_file.
     admin_password: str = ""
     audit_file: str = "audit.log"
+    # Manager login accounts (id/pw, PBKDF2-hashed) — coexist with admin_password.
+    accounts_file: str = "accounts.json"
 
     # Portal-driven auto-update view (mirrors the deploy/auto-update.sh watcher).
     update_dir: str = "updates"
