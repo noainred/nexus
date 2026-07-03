@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.43",
+        "date": "2026-06-20",
+        "changes": [
+            {"type": "changed", "text": "공개 상태 랜딩 계위 상황판의 데이터 흐름 방향을 허브 중심으로 조정 — 인그레스(DMZ) 노드는 허브(OC2a)로 들어오는 방향(DMZ1·DMZ2 → OC2a), 그 외 노드는 허브에서 나가는 방향(OC2a → 각 노드)으로 화살표·흐름 애니메이션을 표시. HUB 뱃지·중앙 배치를 허브 노드에 부여(상태 페이지 표현이며, 관리자 토폴로지 탭은 실제 프록시 방향을 그대로 유지)"},
+        ],
+    },
+    {
         "version": "1.7.42",
         "date": "2026-06-20",
         "changes": [

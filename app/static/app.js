@@ -5803,19 +5803,56 @@ async function plFetch() {
   });
 }
 
+// Regex identifying the central hub (HQ) and the internet-facing ingress
+// nodes (DMZ). The public board orients data flow hub-centrically: ingress
+// nodes feed INTO the hub, and the hub distributes OUT to every other node —
+// so DMZ1/DMZ2 → OC2a and OC2a → 그 외 노드. (This is a status-page
+// presentation choice; the admin 토폴로지 탭은 실제 프록시 방향을 그대로 표시.)
+const PL_HUB_RE = /oc2/i;
+const PL_INGRESS_RE = /dmz/i;
+
+function plPickHub(nodes, byId, deg) {
+  const named = nodes.find((n) => PL_HUB_RE.test(n.id) || PL_HUB_RE.test(n.name || ""));
+  if (named) return named.id;
+  const ids = Object.keys(deg);
+  if (!ids.length) return null;
+  return ids.sort((a, b) => deg[b] - deg[a])[0];   // highest-degree node
+}
+
 function plComputeEdges(nodes) {
   const byId = {}; nodes.forEach((n) => { byId[n.id] = n; });
-  const edges = []; const seen = {};
-  nodes.forEach((n) => {
-    (n.proxies || []).forEach((p) => {
-      if (p.internal && p.target_id && byId[p.target_id] && p.target_id !== n.id) {
-        const key = p.target_id + ">" + n.id;
-        if (seen[key]) return; seen[key] = 1;
-        edges.push({ from: p.target_id, to: n.id, key, broken: !!p.broken, lat: byId[n.id].ms });
-      }
-    });
+  // Collapse proxy relations into unique undirected links first, so a mutual
+  // proxy pair doesn't draw two overlapping arrows.
+  const links = new Map();
+  nodes.forEach((n) => (n.proxies || []).forEach((p) => {
+    if (p.internal && p.target_id && byId[p.target_id] && p.target_id !== n.id) {
+      const a = p.target_id, b = n.id;
+      const k = a < b ? a + "~" + b : b + "~" + a;
+      const cur = links.get(k) || { a, b, broken: false };
+      if (p.broken) cur.broken = true;
+      links.set(k, cur);
+    }
+  }));
+  const linkArr = [...links.values()];
+  const deg = {};
+  linkArr.forEach((l) => { deg[l.a] = (deg[l.a] || 0) + 1; deg[l.b] = (deg[l.b] || 0) + 1; });
+  const hub = plPickHub(nodes, byId, deg);
+  PL._hub = hub;
+  const isIngress = (id) => {
+    const n = byId[id];
+    return PL_INGRESS_RE.test(id) || PL_INGRESS_RE.test(n && n.name || "");
+  };
+  return linkArr.map((l) => {
+    let from = l.a, to = l.b;
+    if (hub && (l.a === hub || l.b === hub)) {
+      const other = l.a === hub ? l.b : l.a;
+      if (isIngress(other)) { from = other; to = hub; }   // ingress(DMZ) → hub
+      else { from = hub; to = other; }                     // hub → 그 외 노드
+    }
+    const lat = (byId[to] && byId[to].ms != null) ? byId[to].ms
+      : (byId[from] && byId[from].ms != null ? byId[from].ms : null);
+    return { from, to, key: from + ">" + to, broken: l.broken, lat };
   });
-  return edges;
 }
 
 function plLoadSaved() {
@@ -5840,7 +5877,12 @@ function plComputePositions(nodes, edges) {
     (adj[u] || []).forEach((v) => { if (depth[v] == null) { depth[v] = depth[u] + 1; q.push(v); } });
   }
   nodes.forEach((n) => { if (depth[n.id] == null) depth[n.id] = 0; });
-  const hubSet = new Set(roots.filter((r) => (adj[r] || []).length));
+  // HUB badge + emphasis goes to the central hub (OC2a) when known, else the
+  // top-of-hierarchy roots that actually have children.
+  const hubKnown = PL._hub && nodes.some((n) => n.id === PL._hub);
+  const hubSet = hubKnown
+    ? new Set([PL._hub])
+    : new Set(roots.filter((r) => (adj[r] || []).length));
   const byDepth = {}; nodes.forEach((n) => { (byDepth[depth[n.id]] = byDepth[depth[n.id]] || []).push(n); });
   const depths = Object.keys(byDepth).map(Number).sort((a, b) => a - b);
   const pos = {};
