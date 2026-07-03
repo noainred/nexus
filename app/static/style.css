@@ -726,3 +726,17 @@ table.matrix td.rowhead .row-status { margin-left: 8px; }
 /* CVE badges in the security table: small gap + pointer for the tooltip. */
 .cve-badge { margin-left: 6px; cursor: help; }
 .cve-badge:first-of-type { margin-left: 8px; }
+
+/* ===== 공개 상태 랜딩(비로그인) — Nexus Service Dashboard ===== */
+#public-landing { position: fixed; inset: 0; z-index: 60; overflow-y: auto; background: #0A0F17;
+  color: #E6EDF3; font-family: 'Apple SD Gothic Neo', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased; }
+#public-landing *, #public-landing *::before, #public-landing *::after { box-sizing: border-box; }
+#public-landing a { text-decoration: none; }
+@keyframes pl-pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.72); } }
+@keyframes pl-ripple { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(2.05); opacity: 0; } }
+@keyframes pl-edgeflow { from { stroke-dashoffset: 54; } to { stroke-dashoffset: 0; } }
+@media (max-width: 780px) {
+  #public-landing .pl-login-grid { grid-template-columns: 1fr !important; gap: 32px !important; padding-top: 48px !important; }
+  #public-landing h1 { font-size: 30px !important; }
+}

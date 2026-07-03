@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="/static/style.css" />
   </head>
   <body>
+    <!-- 비로그인 공개 상태 랜딩(Nexus Service Dashboard). 인증이 필요한데 미로그인일
+         때 JS가 이 전체 화면 오버레이를 채워 표시한다(내부 로그인 폼으로 진입). -->
+    <div id="public-landing" class="hidden"></div>
     <header class="topbar">
       <div class="title-wrap">
         <h1 id="app-title">Nexus Repository 통합 관리</h1>

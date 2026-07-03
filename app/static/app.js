@@ -5607,6 +5607,546 @@ function setupBulk() {
   document.getElementById("bulk-filter").addEventListener("input", renderBulkTable);
 }
 
+// ==== 비로그인 공개 상태 랜딩 (Nexus Service Dashboard) =====================
+// A full-screen public page shown when auth is required but the visitor is not
+// logged in. Wired to live /api/topology + /api/status (both public reads); an
+// admin can log in via the form inside it. Node layout is percentage-based and
+// draggable, saved to this browser's localStorage (public users can't write the
+// server-shared layout). Air-gapped: system fonts only (no web-font CDN).
+
+const PL = {
+  KEY: "nexus-pl-node-pos-v1",
+  MONO: "ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace",
+  ZONES: [
+    { label: "폴란드", tz: "Europe/Warsaw" },
+    { label: "중국", tz: "Asia/Shanghai" },
+    { label: "한국", tz: "Asia/Seoul", accent: true },
+    { label: "애리조나", tz: "America/Phoenix" },
+    { label: "오하이오", tz: "America/New_York" },
+    { label: "온타리오 윈저", tz: "America/Toronto" },
+  ],
+  nodes: [], byId: {}, edges: [], pos: {}, hubSet: new Set(),
+  els: {}, edgeEls: {}, board: null, svg: null, drag: null, hoverName: null,
+  timers: [], ro: null, wired: false,
+};
+
+function plColors(state) {
+  if (state === "down") return ["rgba(248,81,73,0.6)", "#F85149", "rgba(248,81,73,0.9)"];
+  if (state === "warn") return ["rgba(210,153,34,0.55)", "#D29922", "rgba(210,153,34,0.9)"];
+  return ["rgba(63,185,80,0.5)", "#3FB950", "rgba(63,185,80,0.85)"];
+}
+
+function plShell() {
+  const m = PL.MONO;
+  return `
+  <div style="min-height:100vh; display:flex; flex-direction:column; background:#0A0F17;">
+    <header style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 32px; border-bottom:1px solid rgba(148,170,197,0.1);">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+          <path d="M13 13 L13 5.5 M13 13 L5.5 20.5 M13 13 L20.5 20.5" stroke="#4C7DD0" stroke-width="1.6" fill="none"></path>
+          <circle cx="13" cy="13" r="3" fill="#3FB950"></circle>
+          <circle cx="13" cy="5.5" r="2.2" fill="#152233" stroke="#3FB950" stroke-width="1.4"></circle>
+          <circle cx="5.5" cy="20.5" r="2.2" fill="#152233" stroke="#3FB950" stroke-width="1.4"></circle>
+          <circle cx="20.5" cy="20.5" r="2.2" fill="#152233" stroke="#3FB950" stroke-width="1.4"></circle>
+        </svg>
+        <span style="font-size:15.5px; font-weight:700; letter-spacing:0.2px;">Nexus Service Dashboard</span>
+        <span style="font-family:${m}; font-size:10px; font-weight:700; letter-spacing:2px; color:#58C773; border:1px solid rgba(63,185,80,0.4); border-radius:999px; padding:3px 9px 2px;">STATUS</span>
+      </div>
+      <a href="#pl-login" style="display:inline-flex; align-items:center; gap:7px; color:#B7C5D3; font-size:13.5px; font-weight:600; border:1px solid rgba(148,170,197,0.22); border-radius:999px; padding:8px 18px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10 V 7 a 4 4 0 0 1 8 0 v 3"></path></svg>
+        관리자 로그인
+      </a>
+    </header>
+
+    <section style="position:relative; text-align:center; padding:58px 24px 26px; overflow:hidden;">
+      <div style="position:absolute; left:50%; top:-140px; transform:translateX(-50%); width:920px; height:430px; background:radial-gradient(closest-side, rgba(63,185,80,0.10), transparent 72%); pointer-events:none;"></div>
+      <div id="pl-orb" style="position:relative; width:78px; height:78px; margin:0 auto 22px;"></div>
+      <div id="pl-statusline" style="font-family:${m}; font-size:11.5px; font-weight:700; letter-spacing:3.5px; color:#58C773; margin-bottom:13px;">CHECKING…</div>
+      <h1 id="pl-headline" style="margin:0; font-size:44px; font-weight:700; letter-spacing:-0.8px; line-height:1.25;">상태를 확인하는 중입니다</h1>
+      <p id="pl-sub" style="margin:14px auto 0; max-width:580px; font-size:15.5px; line-height:1.7; color:#93A5B7;">Nexus Repository 계위 노드 상태를 불러오는 중입니다.</p>
+      <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:10px; margin-top:26px;">
+        <div style="display:flex; align-items:center; gap:8px; padding:8px 16px; border:1px solid rgba(148,170,197,0.16); border-radius:999px; background:rgba(148,170,197,0.05); font-size:13.5px; color:#B7C5D3;">
+          <span id="pl-nodedot" style="width:8px; height:8px; border-radius:50%; background:#3FB950; box-shadow:0 0 8px rgba(63,185,80,0.9); animation:pl-pulseDot 2.4s ease-in-out infinite;"></span>
+          <span id="pl-nodecount" style="font-family:${m}; font-weight:700; color:#E6EDF3;">– / –</span>
+          노드 정상
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; padding:8px 16px; border:1px solid rgba(148,170,197,0.16); border-radius:999px; background:rgba(148,170,197,0.05); font-size:13.5px; color:#B7C5D3;">
+          평균 응답
+          <span id="pl-avg" style="font-family:${m}; font-weight:700; color:#E6EDF3;">– ms</span>
+        </div>
+      </div>
+      <div id="pl-zones" style="display:flex; justify-content:center; flex-wrap:wrap; gap:8px; margin-top:12px;"></div>
+    </section>
+
+    <main style="flex:1; width:100%; max-width:1560px; margin:10px auto 0; padding:0 28px 64px;">
+      <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:12px;">
+        <div>
+          <h2 style="margin:0 0 10px; font-size:20px; font-weight:700; letter-spacing:-0.2px;">계위 상황판</h2>
+          <div style="display:flex; align-items:center; flex-wrap:wrap; gap:20px; font-size:13px; color:#93A5B7;">
+            <span style="display:inline-flex; align-items:center; gap:7px;"><span style="width:11px; height:11px; border-radius:3px; background:#3FB950;"></span>정상 노드</span>
+            <span style="display:inline-flex; align-items:center; gap:7px;"><span style="width:11px; height:11px; border-radius:3px; background:#D29922;"></span>권한 경고(도달 O, 조회 X)</span>
+            <span style="display:inline-flex; align-items:center; gap:7px;"><span style="width:11px; height:11px; border-radius:3px; background:#F85149;"></span>다운 노드</span>
+            <span style="display:inline-flex; align-items:center; gap:7px;"><span style="width:22px; border-top:2px dashed #F85149; display:inline-block;"></span>끊긴 링크</span>
+            <span style="color:#7E8B9B;">노드를 드래그하면 원하는 위치로 배치됩니다 (이 브라우저에 저장)</span>
+          </div>
+        </div>
+        <button type="button" id="pl-reset" style="background:transparent; border:1px solid rgba(148,170,197,0.22); color:#9FB0C0; font-family:inherit; font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;">기본 배치로 초기화</button>
+      </div>
+      <div id="pl-board" style="position:relative; height:clamp(560px, 66vh, 720px); border:1px solid rgba(148,170,197,0.12); border-radius:16px; background-color:#0E141D; background-image:radial-gradient(rgba(148,170,197,0.085) 1px, transparent 1.3px); background-size:26px 26px; overflow:hidden; user-select:none; box-shadow:inset 0 0 60px rgba(4,8,14,0.5); touch-action:none;">
+        <div style="position:absolute; inset:0; background:radial-gradient(1100px 460px at 50% 0%, rgba(88,166,255,0.05), transparent 70%); pointer-events:none;"></div>
+        <svg id="pl-svg" style="position:absolute; inset:0; z-index:1; overflow:visible; pointer-events:none;"></svg>
+        <div id="pl-empty" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; color:#7E8B9B; font-size:14px; padding:0 24px; text-align:center;"></div>
+      </div>
+    </main>
+
+    <section id="pl-login" style="border-top:1px solid rgba(148,170,197,0.1); background:#0B1119;">
+      <div class="pl-login-grid" style="max-width:1080px; margin:0 auto; padding:80px 28px 90px; display:grid; grid-template-columns:1.05fr 0.95fr; gap:64px; align-items:center;">
+        <div>
+          <div style="font-family:${m}; font-size:11px; font-weight:700; letter-spacing:3px; color:#58C773; margin-bottom:14px;">ADMIN CONSOLE</div>
+          <h2 style="margin:0; font-size:32px; font-weight:700; letter-spacing:-0.5px; line-height:1.3;">관리자 콘솔 로그인</h2>
+          <p style="margin:16px 0 0; font-size:15px; line-height:1.75; color:#93A5B7;">노드 배치 저장, 권한 설정, 저장소 관리는 관리자 계정으로 로그인한 뒤 이용할 수 있습니다.<br>일반 사용자는 로그인 없이 이 페이지에서 서비스 상태를 확인할 수 있습니다.</p>
+          <div style="display:flex; align-items:center; gap:9px; margin-top:22px; font-size:13px; color:#7E8B9B;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3 l 7 3 v 5 c 0 4.5 -3 8.5 -7 10 c -4 -1.5 -7 -5.5 -7 -10 V 6 l 7 -3 z"></path></svg>
+            사내망 전용 · 접속 문제는 시스템 관리자에게 문의하세요
+          </div>
+        </div>
+        <div style="background:#111927; border:1px solid rgba(148,170,197,0.14); border-radius:16px; padding:30px; box-shadow:0 18px 44px rgba(0,0,0,0.42);">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+            <span style="font-size:17px; font-weight:700;">관리자 로그인</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#58C773" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10 V 7 a 4 4 0 0 1 8 0 v 3"></path></svg>
+          </div>
+          <div style="font-size:13px; color:#7E8B9B; margin-bottom:24px;">운영 담당자 전용 콘솔</div>
+          <form id="pl-login-form" style="margin:0;">
+            <div style="margin-bottom:18px;">
+              <label for="pl-id" style="display:block; font-size:12.5px; font-weight:600; color:#9FB0C0; margin-bottom:7px;">아이디</label>
+              <input id="pl-id" name="username" type="text" autocomplete="username" placeholder="관리자 비밀번호만 쓰면 비워두세요" style="width:100%; height:46px; padding:0 14px; border-radius:10px; border:1px solid rgba(148,170,197,0.2); background:#0C1220; color:#E6EDF3; font-size:14.5px; font-family:inherit; outline:none;">
+            </div>
+            <div>
+              <label for="pl-pw" style="display:block; font-size:12.5px; font-weight:600; color:#9FB0C0; margin-bottom:7px;">비밀번호</label>
+              <input id="pl-pw" name="password" type="password" autocomplete="current-password" placeholder="••••••••" style="width:100%; height:46px; padding:0 14px; border-radius:10px; border:1px solid rgba(148,170,197,0.2); background:#0C1220; color:#E6EDF3; font-size:14.5px; font-family:inherit; outline:none;">
+            </div>
+            <button type="submit" style="width:100%; height:48px; margin-top:24px; border:none; border-radius:10px; background:#238636; color:#FFFFFF; font-size:15.5px; font-weight:700; font-family:inherit; cursor:pointer;">로그인</button>
+            <div id="pl-login-msg" style="min-height:20px; margin-top:14px; font-size:13px; line-height:1.5; color:#8FA3B8;"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <footer style="border-top:1px solid rgba(148,170,197,0.1); padding:22px 32px; display:flex; align-items:center; justify-content:center; gap:14px; font-size:12.5px; color:#71808F;">
+      <span>Nexus Repository 계위 모니터링</span>
+      <span style="width:3px; height:3px; border-radius:50%; background:#3A4654;"></span>
+      <span>지연 시간(ms)은 수 초 간격으로 자동 갱신됩니다</span>
+    </footer>
+  </div>`;
+}
+
+function plOrb(worst) {
+  const map = {
+    ok: { a: "#53CD69", b: "#1E7A33", ring: "rgba(63,185,80,0.5)", glow: "rgba(63,185,80,0.5)", d: "M4.5 12.5 l 4.8 4.8 L 19.5 7" },
+    warn: { a: "#E3B341", b: "#8A6D1B", ring: "rgba(210,153,34,0.5)", glow: "rgba(210,153,34,0.45)", d: "M12 6.5 V 13.5 M12 17.4 l 0.02 0" },
+    down: { a: "#F87171", b: "#8A1F1F", ring: "rgba(248,81,73,0.5)", glow: "rgba(248,81,73,0.45)", d: "M7.5 7.5 L 16.5 16.5 M16.5 7.5 L 7.5 16.5" },
+  }[worst] || {};
+  return `
+    <span style="position:absolute; inset:0; border:1.5px solid ${map.ring}; border-radius:50%; animation:pl-ripple 3s ease-out infinite;"></span>
+    <span style="position:absolute; inset:0; border:1.5px solid ${map.ring}; border-radius:50%; animation:pl-ripple 3s ease-out 1.5s infinite;"></span>
+    <div style="position:absolute; inset:9px; border-radius:50%; background:radial-gradient(circle at 35% 28%, ${map.a}, ${map.b} 78%); box-shadow:0 0 36px ${map.glow}, inset 0 -8px 16px rgba(0,0,0,0.28); display:flex; align-items:center; justify-content:center;">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="${map.d}"></path></svg>
+    </div>`;
+}
+
+function plApplyHero(nodes) {
+  const total = nodes.length;
+  const down = nodes.filter((n) => n.state === "down").length;
+  const warn = nodes.filter((n) => n.state === "warn").length;
+  const up = total - down;
+  const mss = nodes.map((n) => n.ms).filter((v) => v != null);
+  const avg = mss.length ? Math.round(mss.reduce((a, b) => a + b, 0) / mss.length) : null;
+  const worst = down ? "down" : (warn ? "warn" : "ok");
+  const tone = { ok: "#58C773", warn: "#D29922", down: "#F85149" }[worst];
+  const line = { ok: "ALL SYSTEMS OPERATIONAL", warn: "PARTIAL — PERMISSION WARNINGS", down: "SERVICE DEGRADED" }[worst];
+  const head = {
+    ok: "모든 시스템이 정상 운영 중입니다",
+    warn: "일부 노드에 권한 경고가 있습니다",
+    down: "일부 노드가 응답하지 않습니다",
+  }[worst];
+  const sub = {
+    ok: "Nexus Repository 전 계위 노드가 정상적으로 응답하고 있습니다.<br>별도 조치 없이 서비스를 이용하실 수 있습니다.",
+    warn: "도달은 되지만 조회 권한이 제한된 노드가 있습니다.<br>서비스 이용에는 영향이 없을 수 있습니다.",
+    down: `${down}개 노드가 응답하지 않습니다.<br>지속되면 시스템 관리자에게 문의하세요.`,
+  }[worst];
+  const set = (id, prop, val) => { const e = document.getElementById(id); if (e) e[prop] = val; };
+  const orb = document.getElementById("pl-orb"); if (orb) orb.innerHTML = plOrb(worst);
+  const sl = document.getElementById("pl-statusline"); if (sl) { sl.textContent = line; sl.style.color = tone; }
+  set("pl-headline", "textContent", head);
+  const s = document.getElementById("pl-sub"); if (s) s.innerHTML = sub;
+  set("pl-nodecount", "textContent", `${up} / ${total}`);
+  set("pl-avg", "textContent", avg != null ? `${avg} ms` : "– ms");
+  const dot = document.getElementById("pl-nodedot");
+  if (dot) { const c = { ok: "#3FB950", warn: "#D29922", down: "#F85149" }[worst]; dot.style.background = c; dot.style.boxShadow = `0 0 8px ${c}`; }
+}
+
+async function plFetch() {
+  const [topo, status] = await Promise.all([
+    api("/api/topology"),
+    api("/api/status").catch(() => []),
+  ]);
+  const st = {}; (status || []).forEach((s) => { st[s.id] = s; });
+  return (topo.nodes || []).map((n) => {
+    const s = st[n.id] || {};
+    const reachable = (n.reachable !== false) && (s.reachable !== false);
+    const err = n.error || s.error;
+    return {
+      id: n.id, name: n.name, proxies: n.proxies || [], tier: n.tier || 0,
+      state: !reachable ? "down" : (err ? "warn" : "ok"),
+      ms: (s.response_ms != null) ? Math.round(s.response_ms) : null,
+    };
+  });
+}
+
+function plComputeEdges(nodes) {
+  const byId = {}; nodes.forEach((n) => { byId[n.id] = n; });
+  const edges = []; const seen = {};
+  nodes.forEach((n) => {
+    (n.proxies || []).forEach((p) => {
+      if (p.internal && p.target_id && byId[p.target_id] && p.target_id !== n.id) {
+        const key = p.target_id + ">" + n.id;
+        if (seen[key]) return; seen[key] = 1;
+        edges.push({ from: p.target_id, to: n.id, key, broken: !!p.broken, lat: byId[n.id].ms });
+      }
+    });
+  });
+  return edges;
+}
+
+function plLoadSaved() {
+  try { return JSON.parse(localStorage.getItem(PL.KEY) || "{}") || {}; } catch (e) { return {}; }
+}
+
+function plComputePositions(nodes, edges) {
+  const parentOf = {};
+  edges.forEach((e) => { if (parentOf[e.to] == null) parentOf[e.to] = e.from; });
+  let roots = nodes.filter((n) => parentOf[n.id] == null).map((n) => n.id);
+  if (!roots.length && nodes.length) {
+    const indeg = {}; edges.forEach((e) => { indeg[e.from] = (indeg[e.from] || 0) + 1; });
+    const top = Math.max(0, ...Object.values(indeg));
+    roots = Object.keys(indeg).filter((k) => indeg[k] === top);
+    if (!roots.length) roots = [nodes[0].id];
+  }
+  const adj = {}; edges.forEach((e) => { (adj[e.from] = adj[e.from] || []).push(e.to); });
+  const depth = {}; const q = [];
+  roots.forEach((r) => { depth[r] = 0; q.push(r); });
+  while (q.length) {
+    const u = q.shift();
+    (adj[u] || []).forEach((v) => { if (depth[v] == null) { depth[v] = depth[u] + 1; q.push(v); } });
+  }
+  nodes.forEach((n) => { if (depth[n.id] == null) depth[n.id] = 0; });
+  const hubSet = new Set(roots.filter((r) => (adj[r] || []).length));
+  const byDepth = {}; nodes.forEach((n) => { (byDepth[depth[n.id]] = byDepth[depth[n.id]] || []).push(n); });
+  const depths = Object.keys(byDepth).map(Number).sort((a, b) => a - b);
+  const pos = {};
+  depths.forEach((d, ri) => {
+    const row = byDepth[d].slice().sort((a, b) => a.name.localeCompare(b.name));
+    const y = depths.length <= 1 ? 42 : 12 + (80 * ri) / (depths.length - 1);
+    row.forEach((node, ci) => {
+      const x = row.length === 1 ? 50 : 9 + (82 * ci) / (row.length - 1);
+      pos[node.id] = [x, y];
+    });
+  });
+  const saved = plLoadSaved();
+  nodes.forEach((n) => {
+    const sp = saved[n.id];
+    if (Array.isArray(sp) && isFinite(sp[0]) && isFinite(sp[1])) pos[n.id] = [sp[0], sp[1]];
+  });
+  return { pos, hubSet };
+}
+
+function plNodeCss(pos, hub, state) {
+  const [bc, , strong] = plColors(state);
+  const border = hub ? strong : bc;
+  return `position:absolute; left:${pos[0]}%; top:${pos[1]}%; transform:translate(-50%,-50%); z-index:${hub ? 3 : 2}; background:${hub ? "#16202D" : "#151E2A"}; border:1px solid ${border}; border-radius:${hub ? 13 : 12}px; padding:${hub ? "11px 24px 10px" : "9px 20px 8px"}; cursor:grab; touch-action:none; box-shadow:0 8px 20px rgba(0,0,0,0.35), 0 0 14px rgba(63,185,80,0.08); transition:border-color 0.15s, box-shadow 0.15s;`;
+}
+
+function plNodeInner(n, hub) {
+  const dot = plColors(n.state)[1];
+  const badge = hub ? `<span style="font-family:${PL.MONO}; font-size:9px; font-weight:700; letter-spacing:1.5px; color:#58C773; border:1px solid rgba(63,185,80,0.35); padding:1px 6px; border-radius:999px;">HUB</span>` : "";
+  return `<div style="display:flex; align-items:center; justify-content:center; gap:8px;">
+    <span style="font-size:${hub ? 16 : 15}px; font-weight:700; letter-spacing:0.4px; color:${hub ? "#F2F7FC" : "#EAF2F9"};">${escapeHtml(n.name)}</span>
+    ${badge}
+    <span data-dot style="width:8px; height:8px; border-radius:50%; background:${dot}; box-shadow:0 0 8px ${dot}; animation:pl-pulseDot 2.6s ease-in-out infinite;"></span>
+  </div>`;
+}
+
+function plRestyleNode(n) {
+  const el = PL.els[n.id]; if (!el) return;
+  const hub = PL.hubSet.has(n.id);
+  const [bc, dotC, strong] = plColors(n.state);
+  el.style.borderColor = hub ? strong : bc;
+  const dot = el.querySelector("[data-dot]");
+  if (dot) { dot.style.background = dotC; dot.style.boxShadow = `0 0 8px ${dotC}`; }
+}
+
+function plEl(name) {
+  if (PL.els[name] && PL.els[name].isConnected) return PL.els[name];
+  PL.els[name] = PL.board ? PL.board.querySelector('[data-pl-node="' + name + '"]') : null;
+  return PL.els[name];
+}
+
+function plEdgePoint(nodeC, otherC, el, pad) {
+  const dx = otherC.x - nodeC.x, dy = otherC.y - nodeC.y;
+  const adx = Math.abs(dx), ady = Math.abs(dy);
+  const hw = el.offsetWidth / 2 + pad, hh = el.offsetHeight / 2 + pad;
+  const s = Math.min(adx > 0 ? hw / adx : 1e9, ady > 0 ? hh / ady : 1e9);
+  const t = Math.min(s, 0.48);
+  return { x: nodeC.x + dx * t, y: nodeC.y + dy * t };
+}
+
+function plBuildSvg() {
+  const svg = PL.svg; if (!svg) return;
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const NS = "http://www.w3.org/2000/svg";
+  const defs = document.createElementNS(NS, "defs");
+  const mk = (id, fill) => {
+    const marker = document.createElementNS(NS, "marker");
+    marker.setAttribute("id", id); marker.setAttribute("viewBox", "0 0 10 10");
+    marker.setAttribute("refX", "7"); marker.setAttribute("refY", "5");
+    marker.setAttribute("markerWidth", "6.5"); marker.setAttribute("markerHeight", "6.5");
+    marker.setAttribute("orient", "auto-start-reverse");
+    const mp = document.createElementNS(NS, "path");
+    mp.setAttribute("d", "M 0 1.2 L 8.8 5 L 0 8.8 z"); mp.setAttribute("fill", fill);
+    marker.appendChild(mp); defs.appendChild(marker);
+  };
+  mk("plArrow", "#7FA6DF"); mk("plArrowBroken", "#F85149");
+  svg.appendChild(defs);
+  PL.edgeEls = {};
+  PL.edges.forEach((e) => {
+    const g = document.createElementNS(NS, "g");
+    const base = document.createElementNS(NS, "path");
+    base.setAttribute("fill", "none");
+    base.setAttribute("stroke", e.broken ? "rgba(248,81,73,0.75)" : "rgba(96,141,205,0.5)");
+    base.setAttribute("stroke-width", "1.6");
+    if (e.broken) base.setAttribute("stroke-dasharray", "6 6");
+    base.setAttribute("marker-end", e.broken ? "url(#plArrowBroken)" : "url(#plArrow)");
+    g.appendChild(base);
+    let flow = null;
+    if (!e.broken) {
+      flow = document.createElementNS(NS, "path");
+      flow.setAttribute("fill", "none");
+      flow.setAttribute("stroke", "rgba(133,196,255,0.85)");
+      flow.setAttribute("stroke-width", "1.6");
+      flow.setAttribute("stroke-dasharray", "5 22");
+      flow.setAttribute("stroke-linecap", "round");
+      flow.style.animation = "pl-edgeflow 1.9s linear infinite";
+      flow.style.animationDelay = (-(((e.from.length + e.to.length) % 19) / 10)).toFixed(2) + "s";
+      g.appendChild(flow);
+    }
+    let label = null;
+    if (e.lat != null) {
+      label = document.createElementNS(NS, "text");
+      label.setAttribute("font-size", "11");
+      label.setAttribute("font-family", PL.MONO);
+      label.setAttribute("font-weight", "500");
+      label.setAttribute("fill", "#8FA6C0");
+      label.setAttribute("text-anchor", "middle");
+      label.setAttribute("paint-order", "stroke");
+      label.setAttribute("stroke", "#0E141D");
+      label.setAttribute("stroke-width", "5");
+      label.textContent = e.lat;
+      g.appendChild(label);
+    }
+    svg.appendChild(g);
+    PL.edgeEls[e.key] = { base, flow, label };
+  });
+}
+
+function plLayout() {
+  const b = PL.board, svg = PL.svg; if (!b || !svg) return;
+  svg.setAttribute("width", b.clientWidth); svg.setAttribute("height", b.clientHeight);
+  PL.edges.forEach((e) => {
+    const els = PL.edgeEls[e.key]; const fromEl = plEl(e.from), toEl = plEl(e.to);
+    if (!els || !fromEl || !toEl) return;
+    const from = { x: fromEl.offsetLeft, y: fromEl.offsetTop };
+    const to = { x: toEl.offsetLeft, y: toEl.offsetTop };
+    const p0 = plEdgePoint(from, to, fromEl, 4);
+    const p1 = plEdgePoint(to, from, toEl, 10);
+    const dx = p1.x - p0.x, dy = p1.y - p0.y;
+    const len = Math.max(1, Math.hypot(dx, dy));
+    const k = Math.min(len * 0.1, 36) * (dx >= 0 ? 1 : -1);
+    const cx = (p0.x + p1.x) / 2 + (-dy / len) * k;
+    const cy = (p0.y + p1.y) / 2 + (dx / len) * k;
+    const d = `M ${p0.x.toFixed(1)} ${p0.y.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
+    els.base.setAttribute("d", d);
+    if (els.flow) els.flow.setAttribute("d", d);
+    if (els.label) {
+      const mx = 0.25 * p0.x + 0.5 * cx + 0.25 * p1.x;
+      const my = 0.25 * p0.y + 0.5 * cy + 0.25 * p1.y;
+      els.label.setAttribute("x", mx.toFixed(1));
+      els.label.setAttribute("y", (my - 6).toFixed(1));
+    }
+  });
+}
+
+function plHighlight(name, on) {
+  PL.edges.forEach((e) => {
+    if (e.from !== name && e.to !== name) return;
+    const els = PL.edgeEls[e.key]; if (!els || e.broken) return;
+    els.base.setAttribute("stroke", on ? "rgba(139,196,255,0.95)" : "rgba(96,141,205,0.5)");
+    els.base.setAttribute("stroke-width", on ? "2.2" : "1.6");
+    if (els.label) {
+      els.label.setAttribute("fill", on ? "#D6E6F7" : "#8FA6C0");
+      els.label.setAttribute("font-weight", on ? "700" : "500");
+    }
+  });
+}
+
+function plSaveLayout() {
+  const out = {};
+  PL.nodes.forEach((n) => {
+    const el = PL.els[n.id]; if (!el) return;
+    const x = parseFloat(el.style.left), y = parseFloat(el.style.top);
+    if (isFinite(x) && isFinite(y)) out[n.id] = [x, y];
+  });
+  try { localStorage.setItem(PL.KEY, JSON.stringify(out)); } catch (e) { /* quota */ }
+}
+
+function plWireBoardOnce() {
+  if (PL.wired) return; PL.wired = true;
+  const b = PL.board;
+  b.addEventListener("pointerdown", (e) => {
+    const el = e.target && e.target.closest ? e.target.closest("[data-pl-node]") : null;
+    if (!el) return;
+    if (e.button !== undefined && e.button !== 0) return;
+    PL.drag = { el, sx: e.clientX, sy: e.clientY, ox: el.offsetLeft, oy: el.offsetTop, moved: false };
+    el.style.zIndex = "8"; el.style.cursor = "grabbing"; e.preventDefault();
+  });
+  b.addEventListener("pointerover", (e) => {
+    const el = e.target && e.target.closest ? e.target.closest("[data-pl-node]") : null;
+    if (!el) return; const name = el.getAttribute("data-pl-node");
+    if (name === PL.hoverName) return;
+    if (PL.hoverName) plHighlight(PL.hoverName, false);
+    PL.hoverName = name; plHighlight(name, true);
+  });
+  b.addEventListener("pointerout", (e) => {
+    if (!PL.hoverName) return;
+    const rt = e.relatedTarget;
+    if (rt && rt.closest && rt.closest("[data-pl-node]") && rt.closest("[data-pl-node]").getAttribute("data-pl-node") === PL.hoverName) return;
+    plHighlight(PL.hoverName, false); PL.hoverName = null;
+  });
+  const move = (e) => {
+    const d = PL.drag; if (!d) return;
+    const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+    if (!d.moved) { if (Math.hypot(dx, dy) < 5) return; d.moved = true; }
+    const W = b.clientWidth, H = b.clientHeight;
+    const nx = Math.min(W - 70, Math.max(70, d.ox + dx));
+    const ny = Math.min(H - 34, Math.max(34, d.oy + dy));
+    d.el.style.left = ((nx / W) * 100).toFixed(2) + "%";
+    d.el.style.top = ((ny / H) * 100).toFixed(2) + "%";
+    plLayout();
+  };
+  const up = () => {
+    const d = PL.drag; if (!d) return; PL.drag = null;
+    d.el.style.zIndex = "2"; d.el.style.cursor = "grab";
+    if (d.moved) plSaveLayout();
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+  PL.timers.push({ stop: () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); } });
+}
+
+function plRenderAll(nodes) {
+  PL.nodes = nodes; PL.byId = {}; nodes.forEach((n) => { PL.byId[n.id] = n; });
+  PL.board = document.getElementById("pl-board");
+  PL.svg = document.getElementById("pl-svg");
+  const empty = document.getElementById("pl-empty");
+  PL.board.querySelectorAll("[data-pl-node]").forEach((x) => x.remove());
+  PL.els = {};
+  if (!nodes.length) {
+    if (empty) { empty.style.display = "flex"; empty.textContent = "표시할 노드가 없습니다. 관리자 로그인 후 서버를 등록하세요."; }
+    PL.edges = []; plBuildSvg(); return;
+  }
+  if (empty) empty.style.display = "none";
+  PL.edges = plComputeEdges(nodes);
+  const { pos, hubSet } = plComputePositions(nodes, PL.edges);
+  PL.pos = pos; PL.hubSet = hubSet;
+  nodes.forEach((n) => {
+    const div = document.createElement("div");
+    div.setAttribute("data-pl-node", n.id);
+    div.style.cssText = plNodeCss(pos[n.id] || [50, 50], hubSet.has(n.id), n.state);
+    div.innerHTML = plNodeInner(n, hubSet.has(n.id));
+    PL.board.appendChild(div);
+    PL.els[n.id] = div;
+  });
+  plBuildSvg();
+  plLayout();
+  plWireBoardOnce();
+}
+
+function plZoneTick() {
+  const host = document.getElementById("pl-zones"); if (!host) return;
+  const now = new Date();
+  host.innerHTML = PL.ZONES.map((z) => {
+    const parts = new Intl.DateTimeFormat("en-GB", { timeZone: z.tz, hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(now);
+    const g = (t) => { const p = parts.find((x) => x.type === t); return p ? p.value : ""; };
+    let hh = g("hour"); if (hh === "24") hh = "00";
+    const time = hh + ":" + g("minute") + ":" + g("second");
+    const date = g("month") + "-" + g("day");
+    const col = z.accent ? "#58C773" : "#93A5B7";
+    return `<div style="display:flex; align-items:baseline; gap:8px; padding:7px 14px; border:1px solid rgba(148,170,197,0.14); border-radius:999px; background:rgba(148,170,197,0.04);">
+      <span style="font-size:12px; font-weight:600; letter-spacing:0.3px; color:${col};">${z.label}</span>
+      <span style="font-family:${PL.MONO}; font-size:13.5px; font-weight:700; color:#E6EDF3;">${time}</span>
+      <span style="font-family:${PL.MONO}; font-size:10.5px; color:#71808F;">${date}</span>
+    </div>`;
+  }).join("");
+}
+
+async function plRefresh() {
+  let nodes; try { nodes = await plFetch(); } catch (e) { return; }
+  plApplyHero(nodes);
+  const same = nodes.length === PL.nodes.length && nodes.every((n) => PL.byId[n.id]);
+  if (!same) { plRenderAll(nodes); return; }
+  PL.nodes = nodes; nodes.forEach((n) => { PL.byId[n.id] = n; });
+  nodes.forEach((n) => plRestyleNode(n));
+  PL.edges = plComputeEdges(nodes);
+  plBuildSvg();
+  plLayout();
+}
+
+async function renderPublicLanding() {
+  const host = document.getElementById("public-landing");
+  if (!host) return;
+  host.innerHTML = plShell();
+  host.classList.remove("hidden");
+  document.title = "Nexus Service Dashboard";
+  // Login form → real /api/login (username optional).
+  const form = document.getElementById("pl-login-form");
+  if (form) form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const msg = document.getElementById("pl-login-msg");
+    msg.style.color = "#8FA3B8"; msg.textContent = "인증 서버에 연결하는 중…";
+    try {
+      await api("/api/login", { method: "POST", body: JSON.stringify({
+        username: (document.getElementById("pl-id") || {}).value || "",
+        password: (document.getElementById("pl-pw") || {}).value || "" }) });
+      msg.style.color = "#58C773"; msg.textContent = "로그인 성공 — 콘솔로 이동합니다…";
+      setTimeout(() => window.location.reload(), 400);
+    } catch (e) { msg.style.color = "#F85149"; msg.textContent = e.message; }
+  });
+  const reset = document.getElementById("pl-reset");
+  if (reset) reset.addEventListener("click", () => {
+    try { localStorage.removeItem(PL.KEY); } catch (e) { /* ignore */ }
+    plRenderAll(PL.nodes);
+  });
+  plZoneTick();
+  PL.timers.push(setInterval(plZoneTick, 1000));
+  // Live data.
+  let nodes = [];
+  try { nodes = await plFetch(); } catch (e) { /* leave shell */ }
+  plApplyHero(nodes);
+  plRenderAll(nodes);
+  PL.ro = new ResizeObserver(() => plLayout());
+  if (PL.board) PL.ro.observe(PL.board);
+  PL.timers.push(setInterval(plRefresh, 15000));
+}
+
 // ---- bootstrap -----------------------------------------------------------
 
 async function init() {
@@ -5620,14 +6160,17 @@ async function init() {
   } catch (e) { /* auth-status unavailable — proceed */ }
   state.publicMode = publicMode;
   if (publicMode) {
-    enterPublicMode();
-  } else {
-    try {
-      state.instances = await api("/api/instances");
-    } catch (e) {
-      toast(`인스턴스 목록 로드 실패: ${e.message}`, "err");
-      return;
-    }
+    // Non-logged-in visitors get the public "Nexus Service Dashboard" landing
+    // (status hero + world clocks + live 계위 상황판 + admin login) instead of
+    // the app shell. Logging in there reloads into the authenticated console.
+    await renderPublicLanding();
+    return;
+  }
+  try {
+    state.instances = await api("/api/instances");
+  } catch (e) {
+    toast(`인스턴스 목록 로드 실패: ${e.message}`, "err");
+    return;
   }
   setupRepositories();
   setupCleanup();

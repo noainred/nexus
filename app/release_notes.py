@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.42",
+        "date": "2026-06-20",
+        "changes": [
+            {"type": "added", "text": "비로그인 공개 상태 랜딩 'Nexus Service Dashboard' 추가 — 로그인이 필요한데 미로그인인 방문자에게 전체화면 공개 상태 페이지를 표시. 상태 히어로(전체 정상/경고/다운 배지 + 정상 노드 수 + 평균 응답 ms), 세계 시각 칩(폴란드/중국/한국/애리조나/오하이오/온타리오), 실데이터 계위 상황판(/api/topology·/api/status 연동, 드래그 배치·지연 라벨·흐름 애니메이션, 15초 자동 갱신), 관리자 로그인 폼(실제 /api/login) 구성"},
+            {"type": "changed", "text": "공개 랜딩은 폐쇄망 원칙에 맞춰 외부 웹폰트(CDN) 없이 시스템 폰트로 렌더링. 노드 드래그 배치는 이 브라우저(localStorage)에 저장(공개 사용자는 서버 공유 배치를 변경하지 않음), '기본 배치로 초기화' 지원"},
+        ],
+    },
+    {
         "version": "1.7.41",
         "date": "2026-06-20",
         "changes": [
