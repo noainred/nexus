@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.44",
+        "date": "2026-06-20",
+        "changes": [
+            {"type": "changed", "text": "테스트용 버전 — 자동 업데이트/릴리스 파이프라인 확인용(기능 변경 없음)"},
+        ],
+    },
+    {
         "version": "1.7.43",
         "date": "2026-06-20",
         "changes": [
