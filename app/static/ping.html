@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>네트워크 Ping 상태 · Nexus</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <style>
+      /* 독립 페이지 전용 최소 여백 */
+      .ping-wrap { max-width: 1560px; margin: 0 auto; padding: 20px 28px 64px; box-sizing: border-box; }
+      .ping-top { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+        flex-wrap: wrap; padding: 14px 28px; border-bottom: 1px solid var(--border, rgba(148,170,197,0.12)); }
+      .ping-top h1 { margin: 0; font-size: 18px; font-weight: 700; }
+      .ping-badge { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: var(--accent);
+        border: 1px solid var(--accent); border-radius: 999px; padding: 3px 9px 2px; }
+    </style>
+  </head>
+  <body>
+    <header class="ping-top">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <h1>네트워크 Ping 상태</h1>
+        <span class="ping-badge">STATUS</span>
+      </div>
+      <a href="/" class="version-badge" title="대시보드로">← 대시보드</a>
+    </header>
+
+    <main class="ping-wrap">
+      <div class="matrix-header">
+        <h2>네트워크 체크 (서버 Ping)</h2>
+        <div class="matrix-controls">
+          <div id="infra-range" class="infra-range">
+            <button data-days="1">1일</button>
+            <button data-days="7">7일</button>
+            <button data-days="30">30일</button>
+            <button data-days="90">90일</button>
+            <button data-days="365">365일</button>
+          </div>
+          <button id="infra-refresh">새로고침</button>
+        </div>
+      </div>
+      <p class="hint">매니저에서 각 서버로의 TCP 연결 지연(ms)을 주기적으로 측정해 누적합니다. 평소(중앙값) 대비 <span id="infra-warn-label">+20% 이상</span> 노랑, <span id="infra-crit-label">+50% 이상</span> 빨강으로 표시됩니다. 로그인 없이 열람할 수 있으며 30초마다 자동 갱신됩니다.</p>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--accent)"></i> 정상</span>
+        <span><i class="sw" style="background:var(--amber)"></i> 주의</span>
+        <span><i class="sw" style="background:var(--red)"></i> 위험</span>
+        <span><i class="sw" style="border-top:2px dashed var(--muted);background:transparent"></i> 평소(중앙값)</span>
+      </div>
+      <div id="infra-charts"></div>
+    </main>
+
+    <script src="/static/ping.js"></script>
+  </body>
+</html>

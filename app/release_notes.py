@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.45",
+        "date": "2026-06-20",
+        "changes": [
+            {"type": "added", "text": "네트워크 Ping 상태를 로그인 없이 볼 수 있는 독립 페이지 추가 — /ping 주소로 접속하면 앱 셸·로그인 없이 네트워크 체크(서버 Ping) 지연 차트를 열람(공개 엔드포인트 /api/ping-history 사용, 30초 자동 갱신, 1/7/30/90/365일 범위). 기존 앱의 '네트워크 체크' 탭과 동일한 차트를 재사용하고, 공개 상태 랜딩 푸터에 '네트워크 Ping 상태 →' 링크 추가"},
+        ],
+    },
+    {
         "version": "1.7.44",
         "date": "2026-06-20",
         "changes": [

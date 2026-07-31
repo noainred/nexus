@@ -33,6 +33,24 @@ def test_appjs_wires_landing():
     assert "/api/login" in js
 
 
+def test_ping_page_public_no_login(client, monkeypatch):
+    """The standalone /ping page and its data endpoint must be reachable with
+    no login even when auth is required."""
+    s = Settings(admin_password="boss")
+    monkeypatch.setattr(main_mod, "get_settings", lambda: s)
+    monkeypatch.setattr("app.routers.auth.get_settings", lambda: s)
+    page = client.get("/ping")
+    assert page.status_code == 200
+    assert 'id="infra-charts"' in page.text and "/static/ping.js" in page.text
+    assert client.get("/static/ping.js").status_code == 200
+    assert client.get("/api/ping-history?days=1").status_code == 200
+
+
+def test_ping_js_reads_public_endpoint():
+    js = (STATIC / "ping.js").read_text(encoding="utf-8")
+    assert "/api/ping-history" in js
+
+
 def test_landing_endpoints_public_when_auth_required(client, monkeypatch):
     """When auth is required and the visitor is anonymous, the endpoints the
     landing reads must stay open (else the public page can't render)."""

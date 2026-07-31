@@ -224,7 +224,7 @@ async def no_cache_dashboard(request: Request, call_next):
     """
     response = await call_next(request)
     path = request.url.path
-    if path == "/" or path.startswith("/static"):
+    if path == "/" or path == "/ping" or path.startswith("/static"):
         response.headers["Cache-Control"] = "no-cache"
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
@@ -242,6 +242,13 @@ async def healthz() -> dict[str, str]:
 @app.get("/", include_in_schema=False)
 async def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/ping", include_in_schema=False)
+async def ping_page() -> FileResponse:
+    """Standalone public 네트워크 Ping 상태 page — no login (reads the public
+    /api/ping-history). Not under /api, so the auth middleware never gates it."""
+    return FileResponse(STATIC_DIR / "ping.html")
 
 
 # Serve the single-page dashboard assets.

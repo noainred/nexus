@@ -5735,6 +5735,8 @@ function plShell() {
     <footer style="border-top:1px solid rgba(148,170,197,0.1); padding:22px 32px; display:flex; align-items:center; justify-content:center; gap:14px; font-size:12.5px; color:#71808F;">
       <span>Nexus Repository 계위 모니터링</span>
       <span style="width:3px; height:3px; border-radius:50%; background:#3A4654;"></span>
+      <a href="/ping" style="color:#9FB0C0; font-weight:600;">네트워크 Ping 상태 →</a>
+      <span style="width:3px; height:3px; border-radius:50%; background:#3A4654;"></span>
       <span>지연 시간(ms)은 수 초 간격으로 자동 갱신됩니다</span>
     </footer>
   </div>`;
