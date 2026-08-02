@@ -29,6 +29,31 @@
   function pingColor(c) {
     return c === "crit" ? "var(--red)" : c === "warn" ? "var(--amber)" : "var(--accent)";
   }
+  // Time-axis separators per selected range: 1일=1시간, 7일=0.5일, 30일=7일,
+  // 90일=14일, 365일=1개월. Ticks are aligned to natural boundaries (hour/day/
+  // month) so the divisions line up with real clock/calendar marks.
+  function timeTicks(days, tmin, tmax) {
+    var ticks = [], d, t;
+    if (days >= 365) {
+      d = new Date(tmin * 1000); d.setDate(1); d.setHours(0, 0, 0, 0);
+      while (d.getTime() / 1000 < tmin) d.setMonth(d.getMonth() + 1);
+      while (d.getTime() / 1000 <= tmax) { ticks.push(d.getTime() / 1000); d.setMonth(d.getMonth() + 1); }
+      return ticks;
+    }
+    var step = days <= 1 ? 3600 : days <= 7 ? 43200 : days <= 30 ? 604800 : 1209600;
+    d = new Date(tmin * 1000);
+    if (days <= 1) d.setMinutes(0, 0, 0); else d.setHours(0, 0, 0, 0);
+    t = d.getTime() / 1000;
+    while (t < tmin) t += step;
+    for (; t <= tmax; t += step) ticks.push(t);
+    return ticks;
+  }
+  function fmtTick(days, t) {
+    var d = new Date(t * 1000);
+    if (days <= 1) return d.getHours() + "시";
+    if (days >= 365) return (d.getMonth() + 1) + "월";
+    return (d.getMonth() + 1) + "/" + d.getDate();
+  }
   async function api(path) {
     var res = await fetch(path, { headers: { "Accept": "application/json" } });
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -60,6 +85,18 @@
     var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, class: "infra-svg" });
     svg.append(svgEl("line", { x1: padL, y1: H - padB, x2: W - padR, y2: H - padB, class: "axis" }));
     svg.append(svgEl("line", { x1: padL, y1: padT, x2: padL, y2: H - padB, class: "axis" }));
+    // Range separators (behind the data line).
+    var days = state.days || 1;
+    var ticks = timeTicks(days, tmin, tmax);
+    var lstep = Math.max(1, Math.ceil(ticks.length / 8));
+    ticks.forEach(function (tk, i) {
+      if (tk <= tmin || tk >= tmax) return;
+      var gx = xOf(tk).toFixed(1);
+      svg.append(svgEl("line", { x1: gx, y1: padT, x2: gx, y2: H - padB, stroke: "rgba(148,170,197,0.16)", "stroke-width": "1", "stroke-dasharray": "2 4" }));
+      if (i % lstep === 0) {
+        svg.append(svgEl("text", { x: gx, y: H - padB + 13, class: "axis-label", "text-anchor": "middle" }, fmtTick(days, tk)));
+      }
+    });
     if (s.baseline != null) {
       var by = yOf(s.baseline);
       svg.append(svgEl("line", { x1: padL, y1: by, x2: W - padR, y2: by, class: "baseline" }));
@@ -74,8 +111,6 @@
     var hi = svgEl("circle", { cx: 0, cy: 0, r: 5, class: "hi", style: "display:none" });
     svg.append(crosshair); svg.append(hi);
     svg.append(svgEl("text", { x: 4, y: padT + 8, class: "axis-label" }, Math.round(vmax) + unit));
-    svg.append(svgEl("text", { x: padL, y: H - 8, class: "axis-label" }, new Date(tmin * 1000).toLocaleString()));
-    svg.append(svgEl("text", { x: W - padR, y: H - 8, class: "axis-label", "text-anchor": "end" }, new Date(tmax * 1000).toLocaleString()));
     wrap.append(svg);
 
     var tip = el("div", { class: "infra-tip", style: "display:none" });
