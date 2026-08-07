@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.48",
+        "date": "2026-08-07",
+        "changes": [
+            {"type": "changed", "text": "탭 바와 콘텐츠 제목/컨트롤(기간 버튼 등) 사이 상단 간격 축소 — 각 탭의 첫 제목 블록 상단 여백을 28px→4px로 줄여 전 탭에 일관 적용, 독립 Ping 페이지(/ping) 헤더에도 동일 적용"},
+        ],
+    },
+    {
         "version": "1.7.47",
         "date": "2026-08-07",
         "changes": [
