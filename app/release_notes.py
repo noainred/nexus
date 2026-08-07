@@ -7,6 +7,13 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.47",
+        "date": "2026-08-07",
+        "changes": [
+            {"type": "added", "text": "네트워크 Ping 독립 페이지(/ping)에 서버 이름 필터 추가 — 상단 입력창에 단어를 입력하면 이름에 해당 단어가 포함된 차트만 표시. 공백으로 여러 단어를 입력하면 각 단어가 포함된 서버를 모두 표시(OR 매칭, 대소문자 무시, 예: 'WA NA' → WA·NA 포함 서버). 필터 중에는 그룹 구분 없이 한 그리드로 표시하며, 입력 즉시 재조회 없이 반영"},
+        ],
+    },
+    {
         "version": "1.7.46",
         "date": "2026-06-20",
         "changes": [

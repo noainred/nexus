@@ -13,6 +13,10 @@
       .ping-top h1 { margin: 0; font-size: 18px; font-weight: 700; }
       .ping-badge { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: var(--accent);
         border: 1px solid var(--accent); border-radius: 999px; padding: 3px 9px 2px; }
+      .ping-filter { background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+        border-radius: 6px; padding: 5px 10px; font-size: 13px; width: 230px; }
+      .ping-filter:focus { outline: none; border-color: var(--accent); }
+      .ping-filter::placeholder { color: var(--muted); }
     </style>
   </head>
   <body>
@@ -28,6 +32,8 @@
       <div class="matrix-header">
         <h2>네트워크 체크 (서버 Ping)</h2>
         <div class="matrix-controls">
+          <input id="infra-filter" class="ping-filter" type="search"
+                 placeholder="서버 이름 필터 (공백으로 여러 단어)" autocomplete="off" />
           <div id="infra-range" class="infra-range">
             <button data-days="1">1일</button>
             <button data-days="7">7일</button>

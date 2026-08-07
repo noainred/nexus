@@ -3,7 +3,7 @@
 // charts as the app's 네트워크 체크 탭, without the app shell or any auth.
 (function () {
   "use strict";
-  var state = { days: 1 };
+  var state = { days: 1, filter: "", data: null };
   var SVGNS = "http://www.w3.org/2000/svg";
 
   function el(tag, props, children) {
@@ -134,16 +134,16 @@
     return wrap;
   }
 
-  async function load() {
+  // Space-separated, case-insensitive OR filter on server names:
+  // "WA NA" → charts whose name contains "WA" or "NA".
+  function filterTerms() {
+    return state.filter.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  }
+
+  function render() {
     var container = document.getElementById("infra-charts");
-    if (!container.firstChild) container.append(el("div", { class: "empty" }, "불러오는 중…"));
-    var data;
-    try { data = await api("/api/ping-history?days=" + (state.days || 1)); }
-    catch (e) {
-      container.innerHTML = "";
-      container.append(el("div", { class: "empty" }, "조회 실패: " + e.message));
-      return;
-    }
+    var data = state.data;
+    if (!data) return;
     var wl = document.getElementById("infra-warn-label"), cl = document.getElementById("infra-crit-label");
     if (wl) wl.textContent = "+" + data.warn_pct + "% 이상";
     if (cl) cl.textContent = "+" + data.crit_pct + "% 이상";
@@ -152,20 +152,46 @@
       container.append(el("div", { class: "empty" }, "측정 데이터가 아직 없습니다. 잠시 후 다시 확인하세요. (백그라운드에서 누적 중)"));
       return;
     }
-    var groups = new Map();
-    data.series.forEach(function (s) {
-      var g = (s.group || "").trim() || "(그룹 미지정)";
-      if (!groups.has(g)) groups.set(g, []);
-      groups.get(g).push(s);
+    var terms = filterTerms();
+    var series = !terms.length ? data.series : data.series.filter(function (s) {
+      var name = (s.name || "").toLowerCase();
+      return terms.some(function (t) { return name.indexOf(t) !== -1; });
     });
-    var names = Array.from(groups.keys()).sort(function (a, b) { return a.localeCompare(b, "ko"); });
-    var showHeads = names.length > 1 || (names.length === 1 && names[0] !== "(그룹 미지정)");
+    if (!series.length) {
+      container.append(el("div", { class: "empty" }, "필터와 일치하는 서버가 없습니다."));
+      return;
+    }
     var grid = el("div", { class: "infra-grid" });
-    names.forEach(function (g) {
-      if (showHeads) grid.append(el("div", { class: "infra-grouphead" }, g));
-      groups.get(g).forEach(function (s) { grid.append(renderChart(s)); });
-    });
+    if (terms.length) {
+      // Filtered view: one flat grid, no group separation.
+      series.forEach(function (s) { grid.append(renderChart(s)); });
+    } else {
+      var groups = new Map();
+      series.forEach(function (s) {
+        var g = (s.group || "").trim() || "(그룹 미지정)";
+        if (!groups.has(g)) groups.set(g, []);
+        groups.get(g).push(s);
+      });
+      var names = Array.from(groups.keys()).sort(function (a, b) { return a.localeCompare(b, "ko"); });
+      var showHeads = names.length > 1 || (names.length === 1 && names[0] !== "(그룹 미지정)");
+      names.forEach(function (g) {
+        if (showHeads) grid.append(el("div", { class: "infra-grouphead" }, g));
+        groups.get(g).forEach(function (s) { grid.append(renderChart(s)); });
+      });
+    }
     container.append(grid);
+  }
+
+  async function load() {
+    var container = document.getElementById("infra-charts");
+    if (!container.firstChild) container.append(el("div", { class: "empty" }, "불러오는 중…"));
+    try { state.data = await api("/api/ping-history?days=" + (state.days || 1)); }
+    catch (e) {
+      container.innerHTML = "";
+      container.append(el("div", { class: "empty" }, "조회 실패: " + e.message));
+      return;
+    }
+    render();
   }
 
   function setup() {
@@ -179,6 +205,11 @@
     });
     var rb = document.getElementById("infra-refresh");
     if (rb) rb.addEventListener("click", load);
+    var fi = document.getElementById("infra-filter");
+    if (fi) fi.addEventListener("input", function () {
+      state.filter = fi.value;
+      render();   // re-draw from cached data — no refetch
+    });
     var first = document.querySelector('#infra-range button[data-days="1"]');
     if (first) first.classList.add("active");
     load();
