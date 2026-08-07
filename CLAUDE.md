@@ -32,3 +32,14 @@ Sonatype Nexus Repository 여러 인스턴스를 한곳에서 모니터링·비�
 - 워크플로가 아직 진행 중이면 완료될 때까지 확인한 뒤 결과를 알린다.
 - 캐시로 옛 zip이 받아질 수 있으므로, 필요하면 버전 고정 URL
   (`releases/download/v<version>/nexus-manager-offline-v<version>.zip`)을 함께 안내한다.
+
+## 업그레이드 소스 (어디를 바라보나 — 사용자 요청 기억, 2026-08-07)
+- 매니저 자동 업데이터는 **`versions.json` + `nexus-manager-offline.zip`이 있는 위치**를
+  바라본다. 설정 위치: **대시보드 → 설정 → ⬆ 자동 업그레이드**의 `소스` + `Site Info(URL)`.
+- 환경별 지정:
+  - 인터넷 직접(GitHub): 소스 `GitHub`, URL `github:noainred/nexus`
+  - 폐쇄망·사내 Nexus가 GitHub 릴리스를 프록시(권장): 소스 `Update Server`,
+    URL `http://<사내-Nexus>:8081/repository/<프록시>/nexus/releases/download/latest/` (끝에 `/`)
+  - 사내 raw 미러(mirror-to-nexus.sh 업로드): 소스 `Update Server`,
+    URL `http://<사내-Nexus>:8081/repository/manager-upgrade/nexus-manager/`
+- 비공개 GitHub면 인증토큰(PAT) 함께 저장. 저장 후 "지금 확인"→감지, "지금 적용"→설치·재시작.
