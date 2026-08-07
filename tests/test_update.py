@@ -63,6 +63,29 @@ def test_config_rejects_bogus_github_url(tmp_path, monkeypatch):
     assert resp.status_code == 400
 
 
+def test_config_empty_url_keeps_existing(tmp_path, monkeypatch):
+    """빈 URL 저장이 동작 중인 소스를 지워 자동 업데이트가 조용히 멈추는 사고 방지."""
+    from pathlib import Path
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    monkeypatch.setattr(up, "_cfg_path", lambda: Path(tmp_path) / "update-config.json")
+    client = TestClient(app)
+    resp = client.post("/api/update/config", json={"source": "github", "url": "github:noainred/nexus"})
+    assert resp.status_code == 200
+
+    # 빈 URL로 다시 저장 → 기존 URL 유지.
+    resp = client.post("/api/update/config", json={"source": "github", "url": "", "interval": 60})
+    assert resp.status_code == 200
+    assert resp.json()["config"]["url"] == "github:noainred/nexus"
+    assert resp.json()["config"]["interval"] == 60
+
+    # clear_url을 명시해야 실제로 지워진다.
+    resp = client.post("/api/update/config", json={"source": "github", "url": "", "clear_url": True})
+    assert resp.status_code == 200
+    assert resp.json()["config"]["url"] == ""
+
+
 def test_column_order_roundtrip(tmp_path, monkeypatch):
     from pathlib import Path
     from fastapi.testclient import TestClient

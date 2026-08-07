@@ -7,6 +7,14 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.49",
+        "date": "2026-08-07",
+        "changes": [
+            {"type": "changed", "text": "자동 업데이트 소스 URL 보호 — 설정 저장 시 URL 칸이 비어 있으면 기존 소스 URL을 유지(토큰과 동일 규약)하고, 저장된 URL이 있는 상태에서 비워 저장하면 삭제 여부를 확인창으로 물어봄(명시적 clear_url 플래그로만 삭제). 빈 URL 저장으로 소스가 소리 없이 지워져 자동 업데이트가 멈추던 사고 방지"},
+            {"type": "changed", "text": "auto-update.sh 워처가 소스(URL) 미설정 상태를 로그에 남김 — 기존에는 로그 없이 원격 확인을 건너뛰어 멈춘 것처럼 보였음(상태 변화 시 1회 기록)"},
+        ],
+    },
+    {
         "version": "1.7.48",
         "date": "2026-08-07",
         "changes": [

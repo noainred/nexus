@@ -83,7 +83,15 @@ PY
 #   github:owner/repo        (GitHub releases, tag=UPDATE_TAG|latest)
 #   https://host/path/       (internal mirror: versions.json, else dir listing)
 remote_fetch() {
-  [ -z "${UPDATE_URL:-}" ] && return 0
+  if [ -z "${UPDATE_URL:-}" ]; then
+    # URL이 비면 조용히 멈춘 것처럼 보이므로, 상태가 바뀔 때 한 번은 로그를 남긴다.
+    if [ "${_WARNED_NO_URL:-0}" != 1 ]; then
+      log "소스(URL) 미설정 — 원격 확인 건너뜀 (포탈 '자동 업그레이드' 탭에서 URL 저장)"
+    fi
+    _WARNED_NO_URL=1
+    return 0
+  fi
+  _WARNED_NO_URL=0
   if ! command -v curl >/dev/null 2>&1; then log "curl 없음 — 원격 확인 건너뜀"; return 0; fi
   local cur auth=(); cur=$(current_version)
   [ -n "${GITHUB_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")

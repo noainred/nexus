@@ -4637,6 +4637,8 @@ async function importSettings(file) {
 
 // ---- 자동 업데이트 (포탈) -------------------------------------------------
 
+let _updSavedUrl = "";   // 마지막으로 조회된 저장 소스 URL — 실수 삭제 방지용
+
 async function loadUpdateStatus() {
   const line = document.getElementById("update-statusline");
   const logEl = document.getElementById("update-log");
@@ -4671,6 +4673,7 @@ async function loadUpdateStatus() {
   line.innerHTML = `현재 <b>v${r.current}</b> · 최신 <b>v${latest}</b> ${state} · 확인 ${escapeHtml(r.checked_at || "")}${edgeTxt}`;
   if (deployEl) deployEl.innerHTML = `엣지에 보낼 배포 코드 <b>v${r.deploy_code || r.current}</b> (실행 버전과 일치)`;
   const c = r.config || {};
+  _updSavedUrl = c.url || "";
   if (srcEl) srcEl.textContent = c.url ? `소스: ${c.url}` : "소스 미설정 — 아래에서 URL을 입력하세요.";
 
   // Per-edge list (only when configured).
@@ -4705,14 +4708,22 @@ async function saveUpdateConfig(ev) {
   ev.preventDefault();
   const form = ev.target;
   const fd = new FormData(form);
+  const url = String(fd.get("url") || "").trim();
   const body = {
     source: fd.get("source"),
-    url: String(fd.get("url") || "").trim(),
+    url,
     interval: Number(fd.get("interval")) || 60,
     auto_install: form.auto_install.checked,
     clear_token: form.clear_token.checked,
     edges: String(fd.get("edges") || "").split(/[\n,]+/).map((x) => x.trim()).filter(Boolean),
   };
+  // 빈 URL은 서버가 기존 값을 유지한다. 정말 지우려는 경우만 명시 플래그를 보낸다.
+  if (!url && _updSavedUrl) {
+    body.clear_url = confirm(
+      `저장된 소스 URL이 있습니다:\n${_updSavedUrl}\n\n` +
+      "URL 칸이 비어 있습니다. 소스를 지우시겠습니까?\n" +
+      "[취소]하면 기존 URL을 유지한 채 나머지 설정만 저장합니다.");
+  }
   const tok = String(fd.get("token") || "");
   if (tok) body.token = tok;          // omit → keep existing
   try {

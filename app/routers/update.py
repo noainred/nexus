@@ -273,18 +273,25 @@ async def update_status() -> dict:
 
 class UpdateConfig(BaseModel):
     source: str = "server"
-    url: str = ""
+    url: str = ""                     # "" = keep existing (accidental-wipe guard)
     token: Optional[str] = None       # None = keep existing; "" = clear
     interval: int = 300
     auto_install: bool = True
     clear_token: bool = False
+    clear_url: bool = False           # explicit opt-in to erase the source URL
     edges: Optional[List[str]] = None  # None = keep existing
 
 
 @router.post("/config")
 async def update_config(body: UpdateConfig) -> dict:
     src = body.source if body.source in ("server", "github") else "server"
+    cur = _load_cfg()
     url = (body.url or "").strip()
+    if body.clear_url:
+        url = ""
+    elif not url:
+        # 빈 URL 저장으로 동작 중인 소스가 소리 없이 지워지는 사고 방지.
+        url = (cur.get("url") or "").strip()
     if url and src == "github":
         if not (url.startswith("github:") or "github.com" in url or "raw.githubusercontent.com" in url):
             raise HTTPException(
@@ -292,7 +299,6 @@ async def update_config(body: UpdateConfig) -> dict:
                 detail="GitHub 소스는 'github:owner/repo', github.com 또는 raw.githubusercontent.com 주소여야 합니다.")
     if url and src == "server" and not (url.startswith("http://") or url.startswith("https://")):
         raise HTTPException(status_code=400, detail="Update Server 소스는 http(s):// 주소여야 합니다.")
-    cur = _load_cfg()
     token = cur.get("token", "")
     if body.clear_token:
         token = ""
