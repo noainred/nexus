@@ -85,9 +85,11 @@ main:has(#matrix.active), main:has(#topology.active), main:has(#content.active) 
 .panel { display: none; }
 .panel.active { display: block; }
 h2 { font-size: 16px; margin-top: 28px; }
-/* 탭 바 바로 아래 첫 제목 블록은 상단 여백을 줄인다(탭↔컨트롤 간격 축소). */
+/* 탭 바 바로 아래 첫 제목 블록은 상단 여백을 줄인다(탭↔컨트롤 간격 축소).
+   /ping 독립 페이지의 헤더도 같은 규칙을 공유한다. */
 .panel > h2:first-child,
-.panel > .matrix-header:first-child h2 { margin-top: 4px; }
+.panel > .matrix-header:first-child h2,
+.ping-wrap > .matrix-header:first-child h2 { margin-top: 4px; }
 h3 { font-size: 14px; color: var(--muted); }
 
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }

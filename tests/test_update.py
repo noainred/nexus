@@ -86,6 +86,79 @@ def test_config_empty_url_keeps_existing(tmp_path, monkeypatch):
     assert resp.json()["config"]["url"] == ""
 
 
+def test_config_source_switch_with_blank_url_keeps_pair(tmp_path, monkeypatch):
+    """URL 없이 소스 종류만 바꾼 저장이 400으로 전부 실패하는 대신,
+    소스·URL 쌍을 유지하고 나머지 설정만 반영해야 한다."""
+    from pathlib import Path
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    monkeypatch.setattr(up, "_cfg_path", lambda: Path(tmp_path) / "update-config.json")
+    client = TestClient(app)
+    resp = client.post("/api/update/config",
+                       json={"source": "server", "url": "http://mirror/", "interval": 120})
+    assert resp.status_code == 200
+
+    # 소스만 github로 바꾸고 URL은 빈 채 저장 → 쌍 유지 + interval 반영.
+    resp = client.post("/api/update/config", json={"source": "github", "url": "", "interval": 90})
+    assert resp.status_code == 200, resp.text
+    cfg = resp.json()["config"]
+    assert cfg["source"] == "server"
+    assert cfg["url"] == "http://mirror/"
+    assert cfg["interval"] == 90
+
+
+def test_config_empty_url_does_not_persist_env_fallback(tmp_path, monkeypatch):
+    """빈 URL 저장이 env 폴백 URL을 파일에 고착시키면 안 된다."""
+    import json as _json
+    from pathlib import Path
+    from types import SimpleNamespace
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    cfg_file = Path(tmp_path) / "update-config.json"
+    monkeypatch.setattr(up, "_cfg_path", lambda: cfg_file)
+    monkeypatch.setattr(up, "get_settings", lambda: SimpleNamespace(update_url="http://env-mirror/"))
+    client = TestClient(app)
+    resp = client.post("/api/update/config", json={"source": "server", "url": "", "interval": 45})
+    assert resp.status_code == 200, resp.text
+    assert _json.loads(cfg_file.read_text("utf-8"))["url"] == ""   # env URL이 기록되면 안 됨
+    # 읽기 경로에서는 env 폴백이 여전히 동적으로 적용된다.
+    assert up._load_cfg()["url"] == "http://env-mirror/"
+
+
+def test_config_source_switch_env_only_url_keeps_source(tmp_path, monkeypatch):
+    """URL이 env 폴백으로만 설정된 배포에서 소스만 바꿔 빈 URL로 저장해도
+    env URL과 어긋난 소스가 저장되지 않아야 한다."""
+    from pathlib import Path
+    from types import SimpleNamespace
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    monkeypatch.setattr(up, "_cfg_path", lambda: Path(tmp_path) / "update-config.json")
+    monkeypatch.setattr(up, "get_settings", lambda: SimpleNamespace(update_url="http://env-mirror/"))
+    client = TestClient(app)
+    resp = client.post("/api/update/config", json={"source": "github", "url": "", "interval": 60})
+    assert resp.status_code == 200, resp.text
+    cfg = resp.json()["config"]
+    assert cfg["source"] == "server"   # env http URL과 맞는 기존 소스 유지
+    assert cfg["url"] == ""            # env URL은 파일에 고착되지 않음
+    assert cfg["interval"] == 60
+
+
+def test_config_rejects_url_with_clear_url(tmp_path, monkeypatch):
+    """새 URL과 clear_url을 함께 보내면 모호하므로 400."""
+    from pathlib import Path
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    monkeypatch.setattr(up, "_cfg_path", lambda: Path(tmp_path) / "update-config.json")
+    client = TestClient(app)
+    resp = client.post("/api/update/config",
+                       json={"source": "server", "url": "http://mirror/", "clear_url": True})
+    assert resp.status_code == 400
+
+
 def test_column_order_roundtrip(tmp_path, monkeypatch):
     from pathlib import Path
     from fastapi.testclient import TestClient

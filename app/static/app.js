@@ -4637,7 +4637,8 @@ async function importSettings(file) {
 
 // ---- 자동 업데이트 (포탈) -------------------------------------------------
 
-let _updSavedUrl = "";   // 마지막으로 조회된 저장 소스 URL — 실수 삭제 방지용
+let _updSavedUrl = "";     // 마지막으로 조회된 저장 소스 URL — 실수 삭제 방지용
+let _updCfgLoaded = false; // 상태 조회 성공으로 폼이 저장값으로 채워졌는지
 
 async function loadUpdateStatus() {
   const line = document.getElementById("update-statusline");
@@ -4699,6 +4700,9 @@ async function loadUpdateStatus() {
     form.edges.value = (c.edges || []).join("\n");
     form.token.value = "";
     form.token.placeholder = c.token ? "(저장된 토큰 있음 — 바꿀 때만 입력)" : "GitHub PAT 등 — 공개 소스면 비움";
+    form.clear_token.checked = false;
+    if (form.clear_url) form.clear_url.checked = false;
+    _updCfgLoaded = true;
   }
   if (r.remote_error) msg.textContent = `원격 확인 경고: ${r.remote_error}`;
   logEl.textContent = (r.log || []).join("\n") || "(업데이트 로그 없음)";
@@ -4709,20 +4713,26 @@ async function saveUpdateConfig(ev) {
   const form = ev.target;
   const fd = new FormData(form);
   const url = String(fd.get("url") || "").trim();
+  const edges = String(fd.get("edges") || "").split(/[\n,]+/).map((x) => x.trim()).filter(Boolean);
   const body = {
     source: fd.get("source"),
     url,
     interval: Number(fd.get("interval")) || 60,
     auto_install: form.auto_install.checked,
     clear_token: form.clear_token.checked,
-    edges: String(fd.get("edges") || "").split(/[\n,]+/).map((x) => x.trim()).filter(Boolean),
   };
-  // 빈 URL은 서버가 기존 값을 유지한다. 정말 지우려는 경우만 명시 플래그를 보낸다.
-  if (!url && _updSavedUrl) {
-    body.clear_url = confirm(
-      `저장된 소스 URL이 있습니다:\n${_updSavedUrl}\n\n` +
-      "URL 칸이 비어 있습니다. 소스를 지우시겠습니까?\n" +
-      "[취소]하면 기존 URL을 유지한 채 나머지 설정만 저장합니다.");
+  // 상태 조회 전에는 폼에 저장된 엣지 목록이 없으므로, 빈 목록 전송으로
+  // 엣지가 통째로 지워지는 사고를 막는다(필드 생략 = 서버가 기존 유지).
+  if (_updCfgLoaded || edges.length) body.edges = edges;
+  // 빈 URL은 서버가 기존 값을 유지한다. 삭제는 체크박스(확실) 또는 확인창으로만.
+  if (form.clear_url && form.clear_url.checked) {
+    if (url) { toast("URL 입력과 '저장된 소스 URL 지우기'를 함께 쓸 수 없습니다", "err"); return; }
+    body.clear_url = true;
+  } else if (!url && _updSavedUrl && confirm(
+    `저장된 소스 URL이 있습니다:\n${_updSavedUrl}\n\n` +
+    "URL 칸이 비어 있습니다. 소스를 지우시겠습니까?\n" +
+    "[취소]하면 기존 URL을 유지한 채 나머지 설정만 저장합니다.")) {
+    body.clear_url = true;
   }
   const tok = String(fd.get("token") || "");
   if (tok) body.token = tok;          // omit → keep existing

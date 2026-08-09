@@ -60,7 +60,7 @@
     return res.json();
   }
 
-  function renderChart(s) {
+  function renderChart(s, days) {
     var unit = "ms";
     var wrap = el("div", { class: "infra-chart" });
     var headNote = s.baseline != null ? ("평소(중앙값) " + s.baseline + " " + unit)
@@ -85,8 +85,10 @@
     var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, class: "infra-svg" });
     svg.append(svgEl("line", { x1: padL, y1: H - padB, x2: W - padR, y2: H - padB, class: "axis" }));
     svg.append(svgEl("line", { x1: padL, y1: padT, x2: padL, y2: H - padB, class: "axis" }));
-    // Range separators (behind the data line).
-    var days = state.days || 1;
+    // Range separators (behind the data line). `days` comes from the response
+    // the data belongs to — not state.days — so cached data from a previous
+    // range is never drawn with the wrong tick spacing.
+    days = days || state.days || 1;
     var ticks = timeTicks(days, tmin, tmax);
     var lstep = Math.max(1, Math.ceil(ticks.length / 8));
     ticks.forEach(function (tk, i) {
@@ -164,7 +166,7 @@
     var grid = el("div", { class: "infra-grid" });
     if (terms.length) {
       // Filtered view: one flat grid, no group separation.
-      series.forEach(function (s) { grid.append(renderChart(s)); });
+      series.forEach(function (s) { grid.append(renderChart(s, data.days)); });
     } else {
       var groups = new Map();
       series.forEach(function (s) {
@@ -176,21 +178,28 @@
       var showHeads = names.length > 1 || (names.length === 1 && names[0] !== "(그룹 미지정)");
       names.forEach(function (g) {
         if (showHeads) grid.append(el("div", { class: "infra-grouphead" }, g));
-        groups.get(g).forEach(function (s) { grid.append(renderChart(s)); });
+        groups.get(g).forEach(function (s) { grid.append(renderChart(s, data.days)); });
       });
     }
     container.append(grid);
   }
 
+  var loadSeq = 0;   // 범위 클릭/자동 갱신 경합 시 뒤늦은 이전 응답 폐기용
   async function load() {
     var container = document.getElementById("infra-charts");
     if (!container.firstChild) container.append(el("div", { class: "empty" }, "불러오는 중…"));
-    try { state.data = await api("/api/ping-history?days=" + (state.days || 1)); }
+    var mySeq = ++loadSeq;
+    var data;
+    try { data = await api("/api/ping-history?days=" + (state.days || 1)); }
     catch (e) {
+      if (mySeq !== loadSeq) return;   // 더 새 요청이 이미 나감 — 이 실패는 무시
+      state.data = null;               // 실패 시 캐시 폐기 — 필터 입력이 죽은 데이터를 되살리지 않도록
       container.innerHTML = "";
       container.append(el("div", { class: "empty" }, "조회 실패: " + e.message));
       return;
     }
+    if (mySeq !== loadSeq) return;     // 뒤늦게 도착한 이전 범위 응답 폐기
+    state.data = data;
     render();
   }
 
@@ -206,9 +215,13 @@
     var rb = document.getElementById("infra-refresh");
     if (rb) rb.addEventListener("click", load);
     var fi = document.getElementById("infra-filter");
+    var filterTimer = null;
     if (fi) fi.addEventListener("input", function () {
       state.filter = fi.value;
-      render();   // re-draw from cached data — no refetch
+      // 디바운스: 타이핑(특히 한글 IME 자모 단위 input)마다 전체 차트를
+      // 파괴·재구축하지 않도록 잠깐 모아서 한 번만 다시 그린다. 재조회 없음.
+      clearTimeout(filterTimer);
+      filterTimer = setTimeout(render, 150);
     });
     var first = document.querySelector('#infra-range button[data-days="1"]');
     if (first) first.classList.add("active");

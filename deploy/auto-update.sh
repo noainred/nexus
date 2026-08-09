@@ -27,6 +27,14 @@ PORT="${PORT:-8000}"
 SERVICE="${SERVICE:-nexus-manager}"
 LOG="${LOG:-$INSTALL_DIR/auto-update.log}"
 PROCESSED="$WATCH_DIR/processed"
+NOURL_STAMP="$WATCH_DIR/.no-url-logged"
+
+# 설치 시 환경값 원본 보관 — 포탈 설정에서 값이 지워지면 여기로 되돌린다.
+# (--watch 루프에서 이전 반복에 로드된 URL/토큰이 셸 변수에 남아, 포탈에서
+#  지운 소스로 계속 설치가 진행되는 문제 방지)
+_ENV_UPDATE_URL="${UPDATE_URL:-}"
+_ENV_GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+_ENV_AUTO_INSTALL="${AUTO_INSTALL:-}"
 
 log() { echo "[$(date '+%F %T')] $*" | tee -a "$LOG" >&2; }
 
@@ -51,6 +59,10 @@ ver_gt() {
 # Portal-saved config (update-config.json) overrides env, so the dashboard can
 # change the source/token/auto-install without touching systemd.
 load_portal_config() {
+  # 매 호출마다 환경값 기준으로 리셋한 뒤 포탈 저장값(비어 있지 않은 것만)을 덮는다.
+  UPDATE_URL="$_ENV_UPDATE_URL"
+  GITHUB_TOKEN="$_ENV_GITHUB_TOKEN"
+  AUTO_INSTALL="$_ENV_AUTO_INSTALL"
   local f="$INSTALL_DIR/update-config.json"
   [ -f "$f" ] || return 0
   command -v python3 >/dev/null 2>&1 || return 0
@@ -84,14 +96,15 @@ PY
 #   https://host/path/       (internal mirror: versions.json, else dir listing)
 remote_fetch() {
   if [ -z "${UPDATE_URL:-}" ]; then
-    # URL이 비면 조용히 멈춘 것처럼 보이므로, 상태가 바뀔 때 한 번은 로그를 남긴다.
-    if [ "${_WARNED_NO_URL:-0}" != 1 ]; then
+    # URL이 비면 조용히 멈춘 것처럼 보이므로 한 번은 로그를 남긴다. 운영 배포는
+    # 5분 타이머 oneshot(새 프로세스)이므로 셸 변수가 아닌 파일 마커로 기억한다.
+    if [ ! -e "$NOURL_STAMP" ]; then
       log "소스(URL) 미설정 — 원격 확인 건너뜀 (포탈 '자동 업그레이드' 탭에서 URL 저장)"
+      : > "$NOURL_STAMP" 2>/dev/null || true
     fi
-    _WARNED_NO_URL=1
     return 0
   fi
-  _WARNED_NO_URL=0
+  rm -f "$NOURL_STAMP" 2>/dev/null || true
   if ! command -v curl >/dev/null 2>&1; then log "curl 없음 — 원격 확인 건너뜀"; return 0; fi
   local cur auth=(); cur=$(current_version)
   [ -n "${GITHUB_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")

@@ -80,7 +80,10 @@ def _cfg_path() -> Path:
     return _abs(get_settings().update_config_file)
 
 
-def _load_cfg() -> dict:
+def _load_cfg(include_env: bool = True) -> dict:
+    """Effective update config. ``include_env=False`` returns only what is
+    stored in the file — use it for read-modify-write so the env-var fallback
+    URL never gets materialized into the persisted config."""
     cfg = dict(_DEFAULTS)
     p = _cfg_path()
     if p.is_file():
@@ -88,9 +91,15 @@ def _load_cfg() -> dict:
             cfg.update({k: v for k, v in json.loads(p.read_text("utf-8")).items() if k in _DEFAULTS})
         except Exception:  # noqa: BLE001
             pass
-    if not cfg.get("url"):
+    if include_env and not cfg.get("url"):
         cfg["url"] = get_settings().update_url or ""
     return cfg
+
+
+def _url_fits_source(url: str, src: str) -> bool:
+    if src == "github":
+        return url.startswith("github:") or "github.com" in url or "raw.githubusercontent.com" in url
+    return url.startswith("http://") or url.startswith("https://")
 
 
 def _masked(cfg: dict) -> dict:
@@ -274,7 +283,7 @@ async def update_status() -> dict:
 class UpdateConfig(BaseModel):
     source: str = "server"
     url: str = ""                     # "" = keep existing (accidental-wipe guard)
-    token: Optional[str] = None       # None = keep existing; "" = clear
+    token: Optional[str] = None       # None/"" = keep existing; clear via clear_token
     interval: int = 300
     auto_install: bool = True
     clear_token: bool = False
@@ -285,19 +294,28 @@ class UpdateConfig(BaseModel):
 @router.post("/config")
 async def update_config(body: UpdateConfig) -> dict:
     src = body.source if body.source in ("server", "github") else "server"
-    cur = _load_cfg()
+    # 파일에 저장된 값만 기준으로 병합 — env 폴백 URL이 파일에 고착되는 것 방지.
+    cur = _load_cfg(include_env=False)
     url = (body.url or "").strip()
     if body.clear_url:
-        url = ""
+        if url:
+            raise HTTPException(
+                status_code=400,
+                detail="url과 clear_url을 함께 보낼 수 없습니다 — 새 URL 저장과 삭제 중 하나만 지정하세요.")
     elif not url:
         # 빈 URL 저장으로 동작 중인 소스가 소리 없이 지워지는 사고 방지.
         url = (cur.get("url") or "").strip()
-    if url and src == "github":
-        if not (url.startswith("github:") or "github.com" in url or "raw.githubusercontent.com" in url):
+        # URL 없이 소스 종류만 바꾼 저장: 유효 URL(파일에 없으면 env 폴백)과 어긋나는
+        # 소스로 400을 내거나 어긋난 쌍을 저장하는 대신, 소스·URL 쌍을 통째로
+        # 기존 값으로 유지하고 나머지 설정만 반영한다.
+        eff = url or (get_settings().update_url or "").strip()
+        if eff and not _url_fits_source(eff, src):
+            src = cur.get("source") if cur.get("source") in ("server", "github") else src
+    if url and not _url_fits_source(url, src):
+        if src == "github":
             raise HTTPException(
                 status_code=400,
                 detail="GitHub 소스는 'github:owner/repo', github.com 또는 raw.githubusercontent.com 주소여야 합니다.")
-    if url and src == "server" and not (url.startswith("http://") or url.startswith("https://")):
         raise HTTPException(status_code=400, detail="Update Server 소스는 http(s):// 주소여야 합니다.")
     token = cur.get("token", "")
     if body.clear_token:
