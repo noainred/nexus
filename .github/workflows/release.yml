@@ -37,10 +37,15 @@ jobs:
       # image = CentOS 7 compatible). Markers + wheel tags resolve correctly here.
       - name: Build cp36 wheelhouse (python:3.6 container)
         run: |
+          # pip wheel (not pip download --only-binary): builds pure-Python
+          # sdist-only transitive deps (e.g. the contextvars backport that
+          # sniffio needs on 3.6) into wheels, so the offline target installs
+          # with no compiler. C-extension deps still use their prebuilt cp36
+          # manylinux wheels.
           docker run --rm -v "$PWD":/w -w /w python:3.6 \
-            sh -c 'python -m pip install -q --upgrade "pip==21.3.1" && \
+            sh -c 'python -m pip install -q --upgrade "pip==21.3.1" "wheel<0.38" && \
                    rm -rf wheelhouse && mkdir -p wheelhouse && \
-                   python -m pip download --only-binary=:all: -r requirements.txt -d wheelhouse'
+                   python -m pip wheel -r requirements.txt -w wheelhouse'
           echo "wheelhouse files: $(ls wheelhouse | wc -l)"
 
       - name: Package offline bundle (source + prebuilt wheelhouse)

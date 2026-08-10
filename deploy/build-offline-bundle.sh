@@ -29,12 +29,12 @@ if [ "${WHEELHOUSE_READY:-0}" = "1" ] && [ -d wheelhouse ]; then
 else
   rm -rf wheelhouse
   mkdir -p wheelhouse
-  echo "==> Downloading dependency wheels into ./wheelhouse ..."
-  # --only-binary=:all: keeps everything as pre-built wheels so the target
-  # needs no compiler. If a package has no wheel for your platform, drop the
-  # flag and ensure the target has build tools.
-  python3 -m pip download --only-binary=:all: \
-    -r requirements.txt -d wheelhouse
+  echo "==> Building dependency wheels into ./wheelhouse ..."
+  # `pip wheel` (not `pip download --only-binary`): uses prebuilt wheels where
+  # available and BUILDS pure-Python sdist-only deps into wheels (e.g. the
+  # contextvars backport sniffio needs on Python 3.6). The target then installs
+  # entirely from wheels with no compiler.
+  python3 -m pip wheel -r requirements.txt -w wheelhouse
 fi
 
 # Version marker file so the archive's version is unambiguous.
