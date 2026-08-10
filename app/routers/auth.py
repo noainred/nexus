@@ -47,6 +47,20 @@ def _sign(password: str, msg: str) -> str:
     return hmac.new(password.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+def _consteq(a: str, b: str) -> bool:
+    """Constant-time string compare that tolerates non-ASCII. hmac.compare_digest
+    raises TypeError on non-ASCII str args, so compare UTF-8 bytes instead — a
+    Korean admin_password must not 500 the login."""
+    return hmac.compare_digest((a or "").encode("utf-8"), (b or "").encode("utf-8"))
+
+
+def _user_pv(u: Optional[dict]) -> str:
+    """Short fingerprint of a user's stored password hash, embedded in the
+    session token so a password change invalidates existing sessions."""
+    h = (u or {}).get("hash", "")
+    return hashlib.sha256(("pv|" + h).encode("utf-8")).hexdigest()[:16]
+
+
 def make_token(password: str, ttl: int = _SESSION_TTL) -> str:
     """Signed session token of the form ``<exp_hex>.<hmac>`` bound to expiry."""
     exp = int(time.time()) + ttl
@@ -77,8 +91,9 @@ def make_user_token(username: str, role: str, ttl: int = _SESSION_TTL) -> str:
     """Signed named-account token: ``<payload_b64>.<hmac>`` where payload holds
     the subject, role and expiry. Signed with the persisted server secret."""
     exp = int(time.time()) + ttl
+    pv = _user_pv(userstore.get(username))
     payload = base64.urlsafe_b64encode(
-        json.dumps({"sub": username, "role": role, "exp": exp}).encode("utf-8")
+        json.dumps({"sub": username, "role": role, "exp": exp, "pv": pv}).encode("utf-8")
     ).decode("ascii").rstrip("=")
     return payload + "." + _sign(userstore.server_secret(), "nexus-user-v1|" + payload)
 
@@ -101,6 +116,11 @@ def verify_user_token(tok: str) -> Optional[Principal]:
     # must not keep elevated access.
     u = userstore.get(sub)
     if u is None:
+        return None
+    # Bind to the current password: a password change rotates the fingerprint,
+    # invalidating sessions issued before the change (tokens without pv, i.e.
+    # issued by an older build, also fail here and force a fresh login).
+    if not hmac.compare_digest(str(data.get("pv", "")), _user_pv(u)):
         return None
     return Principal(username=sub, role=u.get("role", "viewer"))
 
@@ -188,7 +208,7 @@ async def login(body: LoginBody, request: Request, response: Response) -> dict:
         _set_session(response, make_user_token(un, role))
         return {"ok": True, "username": un, "role": role, "bootstrap": False}
     # Bootstrap admin (no username) — the env admin_password.
-    if not settings.admin_password or not hmac.compare_digest(body.password, settings.admin_password):
+    if not settings.admin_password or not _consteq(body.password, settings.admin_password):
         _LOGIN_FAILS.setdefault(ip, []).append(time.time())
         raise HTTPException(status_code=401, detail="비밀번호가 올바르지 않습니다.")
     _LOGIN_FAILS.pop(ip, None)  # clear throttle on success

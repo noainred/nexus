@@ -8,7 +8,7 @@ dashboard can show it even when no webhook is configured.
 from __future__ import annotations
 
 import asyncio
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import httpx
 
@@ -109,21 +109,32 @@ class AlertManager:
     def __init__(self) -> None:
         self.alerts: List[Alert] = []
         self._prev_keys: set[str] = set()
+        self._lock: Optional[asyncio.Lock] = None
 
     async def evaluate(self, registry, settings: Settings) -> List[Alert]:
-        current = await _current_alerts(registry, settings)
-        by_key: Dict[str, Alert] = {a.key: a for a in current}
-        keys = set(by_key)
-        if settings.alert_webhook:
-            for key in keys - self._prev_keys:
-                a = by_key[key]
-                icon = "🔴" if a.severity == "critical" else "🟠"
-                await _send(settings.alert_webhook, f"{icon} [발생] {a.message}")
-            for key in self._prev_keys - keys:
-                await _send(settings.alert_webhook, f"✅ [해제] {key}")
-        self._prev_keys = keys
-        self.alerts = current
-        return current
+        # 백그라운드 run_loop와 GET /api/alerts?refresh=true가 동시에 호출하므로,
+        # _prev_keys/alerts의 읽기-수정-쓰기와 웹훅 발송을 락으로 직렬화해
+        # 중복 발송·상태 유실(마지막-쓰기 승리)을 막는다.
+        # 락은 실행 중인 이벤트 루프에서 지연 생성한다 — 모듈 import 시점에 만들면
+        # (manager = AlertManager()) Python 3.9에서 그때의 기본 루프에 묶여, uvicorn이
+        # 만든 다른 루프에서 경합 시 'Future attached to a different loop'로 터진다.
+        # evaluate는 항상 실행 루프 안에서 호출되고, 이 검사는 await가 없어 원자적이다.
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        async with self._lock:
+            current = await _current_alerts(registry, settings)
+            by_key: Dict[str, Alert] = {a.key: a for a in current}
+            keys = set(by_key)
+            if settings.alert_webhook:
+                for key in keys - self._prev_keys:
+                    a = by_key[key]
+                    icon = "🔴" if a.severity == "critical" else "🟠"
+                    await _send(settings.alert_webhook, f"{icon} [발생] {a.message}")
+                for key in self._prev_keys - keys:
+                    await _send(settings.alert_webhook, f"✅ [해제] {key}")
+            self._prev_keys = keys
+            self.alerts = current
+            return current
 
 
 manager = AlertManager()

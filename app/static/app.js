@@ -1221,19 +1221,23 @@ function renderInfraSkeleton(insts) {
   container.append(grid);
 }
 
+let _infraSeq = 0;
 async function loadInfra() {
   const container = document.getElementById("infra-charts");
   // 1) Frame first — group heads + placeholders from the known instance list.
   renderInfraSkeleton(state.instances);
   const days = state.infraDays || 1;
+  const mySeq = ++_infraSeq;   // 범위 전환·자동갱신 경합 시 늦은 이전 응답 폐기
   let data;
   try {
     data = await api(`/api/ping-history?days=${days}`);
   } catch (e) {
+    if (mySeq !== _infraSeq) return;
     container.innerHTML = "";
     container.append(el("div", { class: "empty" }, `조회 실패: ${e.message}`));
     return;
   }
+  if (mySeq !== _infraSeq) return;   // 더 새 요청이 이미 진행 중 — 이 응답은 버림
   const wl = document.getElementById("infra-warn-label");
   const cl = document.getElementById("infra-crit-label");
   if (wl) wl.textContent = `+${data.warn_pct}% 이상`;
@@ -2386,6 +2390,12 @@ function onMatrixDragStart(e, repo, inst, present) {
     e.dataTransfer.effectAllowed = "copy";
     try { e.dataTransfer.setData("text/plain", `${repo}@${inst}`); } catch (_) {}
   }
+  // Clear on dragend so a cancelled drag (Esc / dropped outside a cell) doesn't
+  // leave a stale source that a later unrelated drop onto a cell would consume
+  // and mistakenly pop a config-copy confirm.
+  if (e.target && e.target.addEventListener) {
+    e.target.addEventListener("dragend", () => { state.matrixDrag = null; }, { once: true });
+  }
 }
 
 // Stepped progress popup (also used as the completion popup). Closing it does
@@ -3036,6 +3046,7 @@ async function warmRepoCache(repo, sourceId, targetId, srcSel, tgtSel, status) {
   }
 }
 
+let _repoDiffSeq = 0;
 async function openRepoDiff(name) {
   document.getElementById("repo-modal-title").textContent = `저장소 설정 비교 — ${name}`;
   state.repoDiffName = name;
@@ -3044,13 +3055,18 @@ async function openRepoDiff(name) {
   modal.classList.remove("hidden");
   body.innerHTML = "";
   body.append(el("div", { class: "empty" }, "불러오는 중…"));
+  const mySeq = ++_repoDiffSeq;   // 다른 저장소를 연속 열 때 늦은 이전 응답 폐기
+  let data;
   try {
-    state.repoDiff = await api(`/api/repository-detail?repository=${encodeURIComponent(name)}`);
+    data = await api(`/api/repository-detail?repository=${encodeURIComponent(name)}`);
   } catch (e) {
+    if (mySeq !== _repoDiffSeq) return;
     body.innerHTML = "";
     body.append(el("div", { class: "empty" }, `비교 정보를 불러오지 못했습니다: ${e.message}`));
     return;
   }
+  if (mySeq !== _repoDiffSeq) return;   // 더 최근에 연 저장소가 있음 — 이 응답은 버림
+  state.repoDiff = data;
   renderRepoDiff();
 }
 
@@ -3083,10 +3099,14 @@ function byName(a, b) {
 }
 
 async function fillRepoSelect(instanceId, repoSel) {
+  // 인스턴스 셀렉트를 빠르게 두 번 바꾸면 느린 이전 응답이 잘못된 인스턴스의
+  // 저장소로 드롭다운을 채울 수 있다 — 요청별 토큰(마지막 요청 우선)으로 폐기.
+  repoSel.dataset.loadingFor = String(instanceId);
   repoSel.innerHTML = "";
   repoSel.append(el("option", { value: "" }, "불러오는 중…"));
   try {
     const repos = await api(`/api/instances/${instanceId}/repositories`);
+    if (repoSel.dataset.loadingFor !== String(instanceId)) return;
     repoSel.innerHTML = "";
     if (!repos.length) {
       repoSel.append(el("option", { value: "" }, "저장소 없음"));
@@ -3096,6 +3116,7 @@ async function fillRepoSelect(instanceId, repoSel) {
       repoSel.append(el("option", { value: r.name }, `${r.name} (${r.format || "?"}/${r.type || "?"})`))
     );
   } catch (e) {
+    if (repoSel.dataset.loadingFor !== String(instanceId)) return;
     repoSel.innerHTML = "";
     repoSel.append(el("option", { value: "" }, "조회 실패"));
   }
@@ -3234,6 +3255,7 @@ function renderDltForIp(ip, repoFilter) {
 
 // Server-side: the manager reads a request.log it has access to (configured in
 // settings.request_log_paths) and analyzes it — no manual upload needed.
+let _dltSeq = 0;
 async function dltServerRender() {
   const box = document.getElementById("dlt-result");
   const src = state.dltSource;
@@ -3242,9 +3264,11 @@ async function dltServerRender() {
   const repo = (document.getElementById("dlt-repo").value || "").trim();
   box.innerHTML = "";
   box.append(el("p", { class: "hint" }, "서버에서 분석 중…"));
+  const mySeq = ++_dltSeq;   // dlt-ip/dlt-repo 키 입력마다 호출 — 늦은 응답 폐기
   try {
     const q = `${src.url}&ip=${encodeURIComponent(ip)}&repo=${encodeURIComponent(repo)}`;
     const r = await api(q);
+    if (mySeq !== _dltSeq) return;   // 더 새 필터 요청이 진행 중 — 이 응답은 버림
     box.innerHTML = "";
     if (ip) {
       box.append(el("button", { class: "ghost", onclick: () => { document.getElementById("dlt-ip").value = ""; dltServerRender(); } }, "← 최근 IP 목록"));
@@ -3261,6 +3285,7 @@ async function dltServerRender() {
             el("td", {}, (e.top_repos || []).map((t) => `${t[0]}(${t[1]})`).join(", "))]))));
     }
   } catch (e) {
+    if (mySeq !== _dltSeq) return;
     box.innerHTML = "";
     box.append(el("div", { class: "empty" }, `서버 분석 실패: ${e.message}`));
   }
@@ -3511,6 +3536,10 @@ async function fillDownloadRepoSelect(instanceId, repoSel) {
 }
 
 function clearDownloads() {
+  // 진행 중인 청크 스캔 무효화 + 캐시 비움 — 서버/저장소를 바꿨는데 이전
+  // 인스턴스의 스캔이 비워진 화면을 계속 다시 채우지 않도록 한다.
+  state.dlRunId = (state.dlRunId || 0) + 1;
+  state.downloadSummary = null;
   document.getElementById("dl-summary").innerHTML = "";
   document.getElementById("dl-note").textContent = "";
   document.getElementById("dl-table").innerHTML = "";
@@ -3744,6 +3773,7 @@ async function loadRepoDownloadDetail(instId, repo) {
   const summary = document.getElementById("dl-summary");
   const note = document.getElementById("dl-note");
   const table = document.getElementById("dl-table");
+  const token = state.dlRunId;   // runDownloadsView/clearDownloads로 무효화 감지
   summary.innerHTML = "";
   note.textContent = "";
   table.innerHTML = "";
@@ -3755,10 +3785,14 @@ async function loadRepoDownloadDetail(instId, repo) {
       `/api/instances/${instId}/downloads?repository=${encodeURIComponent(repo)}`
     );
   } catch (e) {
+    if (state.dlRunId !== token) return;
     table.innerHTML = "";
     table.append(el("div", { class: "empty" }, `조회 실패: ${e.message}`));
     return;
   }
+  // 조회 중 서버/저장소를 바꾸거나 초기화했으면 이 응답은 폐기(오래된 저장소
+  // 데이터가 현재 화면을 덮어쓰지 않도록).
+  if (state.dlRunId !== token) return;
 
   summary.append(
     summaryCard("전체 자산", report.total_assets.toLocaleString()),
@@ -5853,6 +5887,7 @@ function plOrb(worst) {
     ok: { a: "#53CD69", b: "#1E7A33", ring: "rgba(63,185,80,0.5)", glow: "rgba(63,185,80,0.5)", d: "M4.5 12.5 l 4.8 4.8 L 19.5 7" },
     warn: { a: "#E3B341", b: "#8A6D1B", ring: "rgba(210,153,34,0.5)", glow: "rgba(210,153,34,0.45)", d: "M12 6.5 V 13.5 M12 17.4 l 0.02 0" },
     down: { a: "#F87171", b: "#8A1F1F", ring: "rgba(248,81,73,0.5)", glow: "rgba(248,81,73,0.45)", d: "M7.5 7.5 L 16.5 16.5 M16.5 7.5 L 7.5 16.5" },
+    unknown: { a: "#9BA9B7", b: "#3A4652", ring: "rgba(139,155,171,0.4)", glow: "rgba(139,155,171,0.35)", d: "M12 6.5 V 13.5 M12 17.4 l 0.02 0" },
   }[worst] || {};
   return `
     <span style="position:absolute; inset:0; border:1.5px solid ${map.ring}; border-radius:50%; animation:pl-ripple 3s ease-out infinite;"></span>
@@ -5869,18 +5904,22 @@ function plApplyHero(nodes) {
   const up = total - down;
   const mss = nodes.map((n) => n.ms).filter((v) => v != null);
   const avg = mss.length ? Math.round(mss.reduce((a, b) => a + b, 0) / mss.length) : null;
-  const worst = down ? "down" : (warn ? "warn" : "ok");
-  const tone = { ok: "#58C773", warn: "#D29922", down: "#F85149" }[worst];
-  const line = { ok: "ALL SYSTEMS OPERATIONAL", warn: "PARTIAL — PERMISSION WARNINGS", down: "SERVICE DEGRADED" }[worst];
+  // total===0 은 노드 미구성 또는 초기 조회 실패 상태 — 데이터가 없는데도
+  // '전 시스템 정상(초록)'으로 오표시하지 않도록 중립(unknown)으로 둔다.
+  const worst = !total ? "unknown" : (down ? "down" : (warn ? "warn" : "ok"));
+  const tone = { ok: "#58C773", warn: "#D29922", down: "#F85149", unknown: "#8b9bab" }[worst];
+  const line = { ok: "ALL SYSTEMS OPERATIONAL", warn: "PARTIAL — PERMISSION WARNINGS", down: "SERVICE DEGRADED", unknown: "STATUS UNKNOWN" }[worst];
   const head = {
     ok: "모든 시스템이 정상 운영 중입니다",
     warn: "일부 노드에 권한 경고가 있습니다",
     down: "일부 노드가 응답하지 않습니다",
+    unknown: "상태를 확인할 수 없습니다",
   }[worst];
   const sub = {
     ok: "Nexus Repository 전 계위 노드가 정상적으로 응답하고 있습니다.<br>별도 조치 없이 서비스를 이용하실 수 있습니다.",
     warn: "도달은 되지만 조회 권한이 제한된 노드가 있습니다.<br>서비스 이용에는 영향이 없을 수 있습니다.",
     down: `${down}개 노드가 응답하지 않습니다.<br>지속되면 시스템 관리자에게 문의하세요.`,
+    unknown: "상태 데이터를 불러오지 못했습니다.<br>잠시 후 자동으로 다시 시도합니다.",
   }[worst];
   const set = (id, prop, val) => { const e = document.getElementById(id); if (e) e[prop] = val; };
   const orb = document.getElementById("pl-orb"); if (orb) orb.innerHTML = plOrb(worst);
@@ -5890,7 +5929,7 @@ function plApplyHero(nodes) {
   set("pl-nodecount", "textContent", `${up} / ${total}`);
   set("pl-avg", "textContent", avg != null ? `${avg} ms` : "– ms");
   const dot = document.getElementById("pl-nodedot");
-  if (dot) { const c = { ok: "#3FB950", warn: "#D29922", down: "#F85149" }[worst]; dot.style.background = c; dot.style.boxShadow = `0 0 8px ${c}`; }
+  if (dot) { const c = { ok: "#3FB950", warn: "#D29922", down: "#F85149", unknown: "#8b9bab" }[worst]; dot.style.background = c; dot.style.boxShadow = `0 0 8px ${c}`; }
 }
 
 async function plFetch() {

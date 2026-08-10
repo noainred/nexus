@@ -7,6 +7,20 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.55",
+        "date": "2026-08-10",
+        "changes": [
+            {"type": "changed", "text": "[보안패치 3 · 안정성] 리버스프록시/SSO가 200+HTML 등 비-JSON 응답을 줄 때 JSON 파싱 오류가 그대로 새어 나가 상태/매트릭스/모니터링 엔드포인트가 통째로 500 나던 문제 수정 — NexusClient가 비-JSON 응답을 NexusError로 정규화(호출부가 일관 처리), /status/check가 객체가 아니어도 방어. 잘못된 base_url(InvalidURL)도 NexusError로 정규화"},
+            {"type": "changed", "text": "[보안패치 3 · 안정성] 이벤트 루프를 막던 동기 파일 I/O를 스레드로 offload — 대용량 request.log 분석, 1년치 Ping CSV 정리·조회가 단일 워커 환경에서 대시보드·헬스체크·핑 수집을 멈추던 문제 해소"},
+            {"type": "changed", "text": "[보안패치 3 · 보안] 비ASCII(한글 등) 관리자 비밀번호로 로그인 시 500 나던 문제 수정(UTF-8 바이트 비교). 사용자 비밀번호 변경 시 기존 세션 토큰을 무효화(변경한 본인 세션은 재발급해 유지) — 비밀번호 변경 후에도 옛 세션이 살아있던 문제 해소"},
+            {"type": "changed", "text": "[보안패치 3 · 안정성] 토폴로지가 잘못된 포트/IPv6 URL 하나로 전체 500 나던 문제, 캐시 워밍 실패가 500으로 새던 문제, 스케줄 워밍이 다른 작업을 막던 문제, 알림 평가 동시 호출 경합(중복 발송), 설정 백업 파일명 충돌(비ASCII 이름)·스케줄 백업 실패 무로그 문제 수정. 런타임 추가 인스턴스에도 전역 verify_tls 설정이 적용되도록 보정"},
+            {"type": "changed", "text": "[보안패치 3 · UI] 네트워크 체크 탭·저장소 diff·다운로드 상세·IP 추적·1:1 비교 드롭다운에 요청 순서 가드를 추가해, 빠른 전환 시 늦게 온 이전 응답이 최신 화면을 덮어쓰던 문제 수정. 공개 상태 랜딩이 데이터 조회 실패 시 초록 'ALL SYSTEMS OPERATIONAL'로 오표시되던 문제를 '상태 확인 불가'로 수정. 매트릭스 셀 드래그 취소 후 잔여 소스가 오작동하던 문제 수정"},
+            {"type": "changed", "text": "[보안패치 3 · 배포] 자동 업데이트 서비스 유닛의 GITHUB_TOKEN 평문 파일을 0600으로 제한, mirror-to-nexus.sh가 구버전 bash(3.2/4.2)에서 빈 배열 전개로 죽던 문제, auto-update.sh가 손상된 설정에서 set -e로 조기 종료하던 문제 수정"},
+            {"type": "changed", "text": "[호환성] 블로킹 I/O offload에 쓰던 asyncio.to_thread(Python 3.9 전용)를 run_in_executor 기반 헬퍼(storage.run_in_thread, 3.7+)로 교체 — 앱 코드가 3.9 전용 API에 불필요하게 묶이지 않도록 정리"},
+            {"type": "changed", "text": "[배포] install-service.sh에 Python 버전 사전 점검 추가 — 3.9 미만이면 파일을 건드리기 전에 명확한 안내(설치 방법 포함)로 즉시 중단(암호 같은 pip 오류·반쪽 설치 방지). CentOS 7(기본 python3=3.6.8)용 Python 3.9 설치 안내를 deploy/AIRGAP.md에 추가"},
+        ],
+    },
+    {
         "version": "1.7.54",
         "date": "2026-08-10",
         "changes": [

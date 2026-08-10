@@ -46,6 +46,19 @@ echo "==> 소스:       $SRC"
 echo "==> 설치 위치:  $INSTALL_DIR   (user=$SERVICE_USER, port=$PORT)"
 echo "==> Python:     $($PYTHON --version 2>&1)"
 
+# Preflight: the app + offline wheelhouse target Python 3.9. CentOS 7's system
+# python3 is 3.6.8 (fastapi requires >=3.8, wheels are cp39) — fail EARLY with an
+# actionable message here, before touching anything, instead of a cryptic pip
+# error deep in the install (which the log then buries).
+if ! "$PYTHON" -c 'import sys; sys.exit(0 if sys.version_info[:2] >= (3, 9) else 1)' 2>/dev/null; then
+  echo "ERROR: Python 3.9 이상이 필요합니다 (현재 '$PYTHON' = $($PYTHON --version 2>&1))." >&2
+  echo "       CentOS 7 기본 python3(3.6.8)로는 실행할 수 없습니다(fastapi≥3.8, 번들 휠=cp39)." >&2
+  echo "       Python 3.9 설치 후 PYTHON 을 지정해 다시 실행하세요. 예:" >&2
+  echo "         sudo PYTHON=/opt/rh/rh-python39/root/usr/bin/python3.9 bash deploy/install-service.sh" >&2
+  echo "       (설치 방법은 deploy/AIRGAP.md 의 'CentOS 7' 절 참고)" >&2
+  exit 1
+fi
+
 # 1) Dedicated, non-login system account.
 if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
   echo "==> 시스템 계정 생성: $SERVICE_USER"
@@ -195,6 +208,9 @@ ${GITHUB_TOKEN:+Environment=GITHUB_TOKEN=$GITHUB_TOKEN}
 ExecStartPre=-/bin/rm -f $INSTALL_DIR/.update-now
 ExecStart=/usr/bin/env bash $INSTALL_DIR/deploy/auto-update.sh
 UPDEOF
+  # 유닛 파일에 GITHUB_TOKEN(PAT)이 평문으로 들어가므로 소유자 전용으로 제한한다
+  # (기본 umask면 0644 world-readable + `systemctl show -p Environment`로도 노출).
+  chmod 600 /etc/systemd/system/nexus-manager-update.service 2>/dev/null || true
   # Path unit: the portal "지금 적용" button (non-root app) just writes
   # $INSTALL_DIR/.update-now; this root-owned watcher starts the update unit
   # immediately — no sudo needed (works on nosuid mounts).

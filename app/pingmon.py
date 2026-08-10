@@ -259,7 +259,9 @@ async def run_loop() -> None:
                 await record_once(registry, settings)
                 count += 1
                 if count % 60 == 0:
-                    _prune(settings)
+                    # 연 단위 CSV 전체 재작성은 이벤트 루프를 막으므로 스레드로 offload.
+                    from .storage import run_in_thread
+                    await run_in_thread(_prune, settings)
         except Exception:  # pragma: no cover - defensive
             pass
         await asyncio.sleep(max(10.0, registry.ping_interval()))

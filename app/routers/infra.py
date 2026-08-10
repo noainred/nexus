@@ -7,6 +7,7 @@ from .. import diskmon, pingmon
 from ..config import get_settings
 from ..deps import InstanceRegistry, get_registry
 from ..models import PingHistory
+from ..storage import run_in_thread
 
 router = APIRouter(prefix="/api", tags=["infra"])
 
@@ -43,7 +44,11 @@ async def ping_history(
     names = {i.id: i.name for i in registry.all()}
     groups = {i.id: i.group for i in registry.all()}
     cfg = registry.ping_config()
-    res = pingmon.query(days, names, cfg["warn_pct"], cfg["crit_pct"], known_ids=set(names))
+    # query()는 큰 CSV를 통째로 읽어 파싱하므로 스레드로 offload — 이벤트 루프가
+    # 한 사용자의 넓은 기간 조회에 막혀 대시보드 전체가 멈추지 않도록 한다.
+    res = await run_in_thread(
+        pingmon.query, days, names, cfg["warn_pct"], cfg["crit_pct"], None, set(names)
+    )
     for s in res["series"]:
         s["group"] = groups.get(s["id"], "")
     return PingHistory(**res)

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from .. import userstore
@@ -93,7 +93,7 @@ class MyPasswordBody(BaseModel):
 
 
 @router.post("/me/password")
-async def change_my_password(body: MyPasswordBody, request: Request) -> dict:
+async def change_my_password(body: MyPasswordBody, request: Request, response: Response) -> dict:
     """Let the logged-in named user change their own password."""
     settings = get_settings()
     p = auth.current_principal(request, settings)
@@ -110,4 +110,9 @@ async def change_my_password(body: MyPasswordBody, request: Request) -> dict:
         userstore.update(p.username, _now(), password=body.new_password)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    # A password change rotates the token fingerprint, which invalidates ALL of
+    # this user's existing sessions (including this one). Re-issue the caller's
+    # cookie with a fresh token so they aren't logged out of the session that
+    # just made the change — other sessions still get invalidated.
+    auth._set_session(response, auth.make_user_token(p.username, p.role))
     return {"ok": True}

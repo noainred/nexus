@@ -66,8 +66,33 @@ class NexusClient:
         self.instance = instance
         self._timeout = timeout
 
+    def _verify_tls(self) -> bool:
+        """Resolve the effective TLS-verify flag. A per-instance ``None`` (the
+        default for instances added at runtime via import / POST) falls back to
+        the global setting, so a fleet-wide ``verify_tls=false`` for internal
+        self-signed certs applies to every instance, not just YAML-loaded ones."""
+        if self.instance.verify_tls is not None:
+            return self.instance.verify_tls
+        from .config import get_settings
+        return get_settings().verify_tls
+
+    @staticmethod
+    def _json(resp: httpx.Response) -> Any:
+        """Parse a JSON response, turning a non-JSON 2xx body (e.g. an SSO/HTML
+        login page returned with 200 by a reverse proxy) into a NexusError
+        instead of a raw JSONDecodeError that escapes callers' ``except
+        NexusError`` and 500s the whole fleet endpoint."""
+        try:
+            return resp.json()
+        except ValueError as exc:  # includes json.JSONDecodeError
+            body = (resp.text or "")[:120]
+            raise NexusError(
+                f"Nexus returned a non-JSON response for {resp.request.method} "
+                f"{resp.request.url.path}: {body}"
+            ) from exc
+
     def _client(self) -> httpx.AsyncClient:
-        verify = True if self.instance.verify_tls is None else self.instance.verify_tls
+        verify = self._verify_tls()
         # Cap the *connect* phase well below the overall timeout so an
         # unreachable host (wrong port / firewall DROP / different subnet)
         # fails in a few seconds instead of hanging the whole request_timeout.
@@ -116,7 +141,9 @@ class NexusClient:
         checks: dict[str, bool] = {}
         try:
             resp = await self._request("GET", "/status/check")
-            data = resp.json()
+            data = self._json(resp)
+            if not isinstance(data, dict):
+                raise NexusError("Unexpected /status/check payload (not an object)")
             for subsystem, payload in data.items():
                 if isinstance(payload, dict) and "healthy" in payload:
                     checks[subsystem] = bool(payload["healthy"])
@@ -147,7 +174,7 @@ class NexusClient:
     async def list_blobstores(self) -> list[BlobStore]:
         resp = await self._request("GET", "/blobstores")
         result: list[BlobStore] = []
-        for item in resp.json():
+        for item in self._json(resp):
             result.append(
                 BlobStore(
                     name=item.get("name", "unknown"),
@@ -164,7 +191,7 @@ class NexusClient:
     async def list_repositories(self) -> list[Repository]:
         resp = await self._request("GET", "/repositories")
         repos: list[Repository] = []
-        for item in resp.json():
+        for item in self._json(resp):
             repos.append(
                 Repository(
                     name=item.get("name", "unknown"),
@@ -187,7 +214,7 @@ class NexusClient:
         much cheaper than fetching each repo's config individually.
         """
         resp = await self._request("GET", "/repositorySettings")
-        data = resp.json()
+        data = self._json(resp)
         return data if isinstance(data, list) else []
 
     async def repo_statuses(self) -> list[dict[str, Any]]:
@@ -198,7 +225,7 @@ class NexusClient:
         versions; callers should degrade gracefully.
         """
         url = self.instance.base_url.rstrip("/") + "/service/rest/internal/ui/repositories"
-        verify = True if self.instance.verify_tls is None else self.instance.verify_tls
+        verify = self._verify_tls()
         try:
             async with httpx.AsyncClient(
                 auth=(self.instance.username, self.instance.password),
@@ -207,14 +234,14 @@ class NexusClient:
                 headers={"Accept": "application/json"},
             ) as client:
                 resp = await client.get(url, params={"withAll": "true"})
-        except httpx.HTTPError as exc:
+        except (httpx.InvalidURL, httpx.HTTPError) as exc:
             raise NexusError(f"Connection error: {_describe(exc)}") from exc
         if resp.status_code >= 400:
             raise NexusError(
                 f"Nexus returned {resp.status_code} for internal repositories",
                 status_code=resp.status_code,
             )
-        data = resp.json()
+        data = self._json(resp)
         return data if isinstance(data, list) else []
 
     # -- Repository provisioning (speed-test infra) -------------------------
@@ -268,7 +295,7 @@ class NexusClient:
         """PUT raw bytes to a hosted raw repo's content path."""
         base = self.instance.base_url.rstrip("/")
         url = f"{base}/repository/{repo}/{path.lstrip('/')}"
-        verify = True if self.instance.verify_tls is None else self.instance.verify_tls
+        verify = self._verify_tls()
         try:
             async with httpx.AsyncClient(
                 auth=(self.instance.username, self.instance.password),
@@ -278,7 +305,7 @@ class NexusClient:
                 resp = await client.put(
                     url, content=data, headers={"Content-Type": "application/octet-stream"}
                 )
-        except httpx.HTTPError as exc:
+        except (httpx.InvalidURL, httpx.HTTPError) as exc:
             raise NexusError(f"Upload failed: {_describe(exc)}") from exc
         if resp.status_code >= 400:
             raise NexusError(
@@ -298,7 +325,7 @@ class NexusClient:
         resp = await self._request(
             "GET", f"/repositories/{_fmt_seg(fmt)}/{type_}/{name}"
         )
-        return resp.json()
+        return self._json(resp)
 
     # -- Configuration export ----------------------------------------------
 
@@ -317,7 +344,7 @@ class NexusClient:
         async def grab(key: str, path: str) -> None:
             try:
                 resp = await self._request("GET", path)
-                sections[key] = resp.json()
+                sections[key] = self._json(resp)
             except NexusError as exc:
                 errors[key] = exc.message
 
@@ -332,7 +359,7 @@ class NexusClient:
                         resp = await self._request(
                             "GET", f"/blobstores/file/{bs.get('name')}"
                         )
-                        bs["detail"] = resp.json()
+                        bs["detail"] = self._json(resp)
                     except NexusError:
                         pass
         await grab("routingRules", "/routing-rules")
@@ -387,7 +414,7 @@ class NexusClient:
             resp = await self._request("GET", path)
         except NexusError:
             return set()
-        data = resp.json()
+        data = self._json(resp)
         if not isinstance(data, list):
             return set()
         return {str(item.get(key)) for item in data if isinstance(item, dict)}
@@ -458,7 +485,7 @@ class NexusClient:
         if continuation_token:
             params["continuationToken"] = continuation_token
         resp = await self._request("GET", "/components", params=params)
-        data = resp.json()
+        data = self._json(resp)
         items = [
             Component(
                 id=item["id"],
@@ -489,7 +516,7 @@ class NexusClient:
             if token:
                 p["continuationToken"] = token
             resp = await self._request("GET", "/search", params=p)
-            data = resp.json()
+            data = self._json(resp)
             for it in data.get("items", []):
                 out.append({
                     "repository": it.get("repository"),
@@ -514,7 +541,7 @@ class NexusClient:
         if continuation_token:
             params["continuationToken"] = continuation_token
         resp = await self._request("GET", "/assets", params=params)
-        data = resp.json()
+        data = self._json(resp)
         items = [
             Asset(
                 id=item["id"],
@@ -538,7 +565,7 @@ class NexusClient:
         and falls back to the legacy path.
         """
         base = self.instance.base_url.rstrip("/")
-        verify = True if self.instance.verify_tls is None else self.instance.verify_tls
+        verify = self._verify_tls()
         last_status: Optional[int] = None
         for path in ("/service/rest/metrics/data", "/service/metrics/data"):
             try:
@@ -549,10 +576,10 @@ class NexusClient:
                     headers={"Accept": "application/json"},
                 ) as client:
                     resp = await client.get(base + path)
-            except httpx.HTTPError as exc:
+            except (httpx.InvalidURL, httpx.HTTPError) as exc:
                 raise NexusError(f"Connection error: {_describe(exc)}") from exc
             if resp.status_code < 400:
-                return resp.json()
+                return self._json(resp)
             last_status = resp.status_code
             if resp.status_code != 404:
                 break
@@ -564,17 +591,17 @@ class NexusClient:
 
     async def get_anonymous(self) -> dict[str, Any]:
         resp = await self._request("GET", "/security/anonymous")
-        return resp.json()
+        return self._json(resp)
 
     async def list_users(self) -> list[dict[str, Any]]:
         resp = await self._request("GET", "/security/users")
-        return resp.json()
+        return self._json(resp)
 
     # -- Scheduled tasks ----------------------------------------------------
 
     async def list_tasks(self) -> list[Task]:
         resp = await self._request("GET", "/tasks")
-        data = resp.json()
+        data = self._json(resp)
         tasks: list[Task] = []
         for item in data.get("items", []):
             state = item.get("currentState")
@@ -631,7 +658,7 @@ class NexusClient:
                 resp = await self._request_beta("GET", f"/cleanup-policies{suffix}")
             else:
                 raise
-        return resp.json()
+        return self._json(resp)
 
     async def _cleanup_post(self, suffix: str, payload: dict[str, Any]) -> None:
         try:
@@ -649,7 +676,7 @@ class NexusClient:
     ) -> httpx.Response:
         """Issue a request against the legacy ``/service/rest/beta`` namespace."""
         beta_root = self.instance.base_url.rstrip("/") + "/service/rest/beta"
-        verify = True if self.instance.verify_tls is None else self.instance.verify_tls
+        verify = self._verify_tls()
         try:
             async with httpx.AsyncClient(
                 base_url=beta_root,

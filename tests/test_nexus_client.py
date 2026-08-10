@@ -139,6 +139,26 @@ async def test_list_blobstores(client):
 
 
 @respx.mock
+async def test_non_json_200_becomes_nexus_error(client):
+    """리버스프록시/SSO가 200+HTML을 주면 JSONDecodeError가 아니라 NexusError로
+    정규화돼, 호출부의 except NexusError가 잡고 엔드포인트가 500되지 않아야 한다."""
+    respx.get(f"{API}/blobstores").mock(
+        return_value=httpx.Response(200, text="<html>login</html>",
+                                    headers={"content-type": "text/html"}))
+    with pytest.raises(NexusError):
+        await client.list_blobstores()
+
+
+@respx.mock
+async def test_ping_non_dict_status_check(client):
+    """/status/check가 dict가 아닌 JSON을 주어도 AttributeError로 터지지 않는다."""
+    respx.get(f"{API}/status").mock(return_value=httpx.Response(200))
+    respx.get(f"{API}/status/check").mock(return_value=httpx.Response(200, json=["oops"]))
+    out = await client.ping()   # must not raise
+    assert out["checks"] == {}
+
+
+@respx.mock
 async def test_cleanup_policies_fallback_to_beta(client):
     # v1 path returns 404 -> client should retry against beta namespace.
     respx.get(f"{API}/cleanup-policies").mock(return_value=httpx.Response(404))

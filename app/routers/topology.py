@@ -18,8 +18,14 @@ router = APIRouter(prefix="/api", tags=["topology"])
 
 
 def _host_key(url: str) -> Tuple[str, Optional[int]]:
-    parsed = urlparse(url if "://" in url else f"http://{url}")
-    return (parsed.hostname or "").lower(), parsed.port
+    # urlparse(...).port raises ValueError on a malformed port ('...:abc',
+    # ':99999') and urlparse itself raises on a bad IPv6 literal ('http://[bad').
+    # A single typo'd remoteUrl/base_url must not 500 the whole topology board.
+    try:
+        parsed = urlparse(url if "://" in url else f"http://{url}")
+        return (parsed.hostname or "").lower(), parsed.port
+    except ValueError:
+        return "", None
 
 
 def _remote_url(repo: Repository) -> Optional[str]:

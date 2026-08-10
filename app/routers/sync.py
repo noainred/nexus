@@ -171,7 +171,11 @@ async def run_sync_job_now(
     tgt = by_id.get(job.get("target_id"))
     if not src or not tgt or not job.get("repository"):
         raise HTTPException(status_code=400, detail="원본/대상/저장소가 올바르지 않습니다.")
-    res = await warm_full(src, tgt, job["repository"], get_settings())
+    try:
+        res = await warm_full(src, tgt, job["repository"], get_settings())
+    except NexusError as exc:
+        raise HTTPException(status_code=exc.status_code or 502,
+                            detail=f"캐시 워밍 실패: {exc.message}")
     return {"id": id, **res}
 
 
@@ -199,7 +203,23 @@ async def run_loop() -> None:
                     src = by_id.get(job.get("source_id"))
                     tgt = by_id.get(job.get("target_id"))
                     if src and tgt and job.get("repository"):
-                        await warm_full(src, tgt, job["repository"], get_settings())
+                        # 백그라운드로 실행 — 한 작업의 긴 캐시 워밍이 스케줄러
+                        # 루프를 막아, 같은 분에 예약된 다른 작업이 그 분을
+                        # 놓쳐 하루 종일 건너뛰어지는 문제를 방지한다.
+                        asyncio.create_task(
+                            _run_job_safe(src, tgt, job["repository"], get_settings())
+                        )
         except Exception:  # pragma: no cover - defensive
             pass
         await asyncio.sleep(30)
+
+
+async def _run_job_safe(src, tgt, repository: str, settings: Settings) -> None:
+    """Scheduled warm wrapper — swallow NexusError so a failing job doesn't
+    surface as an unretrieved-task-exception warning, but keep the loop alive."""
+    try:
+        await warm_full(src, tgt, repository, settings)
+    except NexusError:
+        pass
+    except Exception:  # pragma: no cover - defensive
+        pass

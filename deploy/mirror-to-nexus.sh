@@ -30,7 +30,7 @@ base="${NEXUS_RAW_URL%/}/"
 gh_auth=(); [ -n "${GITHUB_TOKEN:-}" ] && gh_auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
 
 echo "==> GitHub 릴리스 조회: $GITHUB_REPO@$TAG"
-json=$(curl -fsSL "${gh_auth[@]}" "https://api.github.com/repos/$GITHUB_REPO/releases/tags/$TAG")
+json=$(curl -fsSL ${gh_auth[@]+"${gh_auth[@]}"} "https://api.github.com/repos/$GITHUB_REPO/releases/tags/$TAG")
 ver=$(printf '%s' "$json" | grep -oE 'ver_[0-9]+\.[0-9]+\.[0-9]+\.md' | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
 durl=$(printf '%s' "$json" | grep -oE 'https://[^"]*nexus-manager-offline\.zip' | head -1 || true)
 [ -n "$ver" ] && [ -n "$durl" ] || { echo "ERROR: 릴리스 자산(버전/zip) 식별 실패" >&2; exit 1; }
@@ -42,10 +42,10 @@ echo "==> 최신 버전 v$ver  ($file)"
 
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 echo "==> 다운로드(GitHub) ..."
-curl -fsSL "${gh_auth[@]}" -o "$tmp/$file" "$durl"
+curl -fsSL ${gh_auth[@]+"${gh_auth[@]}"} -o "$tmp/$file" "$durl"
 # versions.json 은 릴리스 워크플로가 자동 생성한다 — 있으면 그대로 복사, 없으면(구버전 릴리스) 생성.
 if [ -n "$vjurl" ]; then
-  curl -fsSL "${gh_auth[@]}" -o "$tmp/versions.json" "$vjurl"
+  curl -fsSL ${gh_auth[@]+"${gh_auth[@]}"} -o "$tmp/versions.json" "$vjurl"
 else
   printf '{"version":"%s","file":"%s"}\n' "$ver" "$file" > "$tmp/versions.json"
 fi

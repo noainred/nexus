@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import shutil
 from datetime import datetime, timezone
@@ -23,6 +24,7 @@ from .storage import atomic_write_text, restrict_mode
 
 # 백업 실행 폴더 이름 형식: datetime.strftime("%Y%m%d-%H%M%S") → 8자리-6자리.
 _TS_DIR_RE = re.compile(r"\d{8}-\d{6}")
+_log = logging.getLogger(__name__)
 
 
 def resolve_root(path: str, settings: Settings) -> Path:
@@ -87,9 +89,11 @@ async def run_backup(registry, settings: Settings) -> dict:
     restrict_mode(root, 0o700)
     restrict_mode(out, 0o700)
     items: List[dict] = []
+    used_names: set = set()
     # Portal's own config first, so a full setup is always recoverable.
     try:
         items.append(_write_portal_backup(out, settings))
+        used_names.add("_portal.json")
     except Exception as exc:  # noqa: BLE001
         items.append({"id": "_portal", "name": "포탈 설정", "ok": False, "error": str(exc)})
     for inst in registry.all():
@@ -102,7 +106,12 @@ async def run_backup(registry, settings: Settings) -> dict:
                 "exported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 **cfg,
             }
+            # 이름 정규화(_safe) 후 서로 다른 서버가 같은 파일명이 되면(예: 비ASCII만
+            # 다른 이름) 서로 덮어쓰므로, 충돌 시 고유한 인스턴스 id를 붙여 구분한다.
             fname = f"{_safe(inst.name)}.json"
+            if fname in used_names:
+                fname = f"{_safe(inst.name)}__{_safe(inst.id)}.json"
+            used_names.add(fname)
             # 서버 설정 스냅샷에 자격증명이 포함될 수 있어 0600으로 기록한다.
             atomic_write_text(
                 out / fname, json.dumps(payload, ensure_ascii=False, indent=2), mode=0o600
@@ -179,7 +188,9 @@ async def run_loop() -> None:
                 today = now.date().isoformat()
                 if now.hour == hh and now.minute == mm and last_date != today:
                     last_date = today
-                    await run_backup(registry, get_settings())
+                    result = await run_backup(registry, get_settings())
+                    if result.get("ok", 0) < result.get("total", 0):
+                        _log.warning("scheduled backup partial/failed: %s", result)
         except Exception:  # pragma: no cover - defensive
-            pass
+            _log.exception("scheduled backup loop error")
         await asyncio.sleep(30)

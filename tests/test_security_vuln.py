@@ -104,6 +104,31 @@ class _CapClient:
         raise self._err
 
 
+def test_alert_manager_lock_not_bound_at_import(monkeypatch):
+    """AlertManager를 (import처럼) 실행 루프 밖에서 생성한 뒤 asyncio.run 안에서
+    경합(동시 evaluate)시켜도 'Future attached to a different loop'로 터지지 않아야
+    한다 — 락은 import 시점이 아니라 실행 루프에서 지연 생성돼야 한다."""
+    import asyncio
+    import app.alerts as alerts_mod
+
+    mgr = alerts_mod.AlertManager()   # 실행 루프 없는 시점(모듈 import와 동일)
+
+    async def slow_current(registry, settings):
+        await asyncio.sleep(0.05)     # 락 보유 중 await → 두 번째 호출이 대기(slow path)
+        return []
+
+    monkeypatch.setattr(alerts_mod, "_current_alerts", slow_current)
+    settings = Settings()
+
+    async def contend():
+        # 동시 두 호출: 한쪽이 락을 잡고 sleep하는 동안 다른 쪽이 락을 기다린다.
+        return await asyncio.gather(
+            mgr.evaluate(None, settings), mgr.evaluate(None, settings)
+        )
+
+    asyncio.run(contend())   # RuntimeError 없이 완료돼야 통과
+
+
 @pytest.mark.parametrize("verify_tls", [True, False])
 def test_alert_send_honors_verify_tls(monkeypatch, verify_tls):
     import asyncio

@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..config import get_settings
 from ..deps import InstanceRegistry, get_registry
+from ..storage import run_in_thread
 
 router = APIRouter(prefix="/api/access-log", tags=["access-log"])
 
@@ -177,7 +178,7 @@ async def by_instance(
         raise HTTPException(status_code=400, detail="서버별 로그 경로 템플릿이 설정되지 않았습니다(설정 → 모니터링·백업에서 지정).")
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail=f"로그 파일이 없습니다: {path}")
-    out = _parse(path, ip.strip() or None, repo, limit)
+    out = await run_in_thread(_parse, path, ip.strip() or None, repo, limit)
     out["path"] = path
     return out
 
@@ -193,4 +194,6 @@ async def analyze(
         raise HTTPException(status_code=400, detail="허용되지 않은 로그 경로입니다(설정 request_log_paths에 등록 필요).")
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="로그 파일이 없습니다.")
-    return _parse(path, ip.strip() or None, repo, limit)
+    # 대용량 request.log 전체 파싱을 스레드로 offload — 이벤트 루프(다른 요청·핑
+    # 수집·헬스체크)가 파싱 동안 멈추지 않도록 한다.
+    return await run_in_thread(_parse, path, ip.strip() or None, repo, limit)

@@ -88,6 +88,9 @@ PY
   [ -n "$t" ] && GITHUB_TOKEN="$t"
   [ -n "$a" ] && AUTO_INSTALL="$a"
   [ -n "$iv" ] && INTERVAL="${INTERVAL:-$iv}"
+  # 마지막 [ -n ... ] && ... 가 거짓이면 함수가 1을 반환한다. set -e(oneshot)에서
+  # 이 함수를 bare 호출하면 스크립트가 조기 종료되므로 명시적으로 0을 반환.
+  return 0
 }
 
 # Optional remote source: when UPDATE_URL is set, fetch a newer bundle into the
