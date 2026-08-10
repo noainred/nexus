@@ -3,9 +3,18 @@
 Each entry groups changes as added / changed / removed. The newest version
 must stay first and match ``app.__version__``.
 """
-from __future__ import annotations
 
 RELEASE_NOTES = [
+    {
+        "version": "1.7.56",
+        "date": "2026-08-10",
+        "changes": [
+            {"type": "changed", "text": "CentOS 7.9 시스템 Python 3.6.8에서 그대로 실행되도록 전면 호환 작업 — 별도 Python 설치 없이 설치·구동됩니다. (v1.7.55에서 안내했던 'Python 3.9 필요'는 이 버전에서 3.6.8 지원으로 대체)"},
+            {"type": "changed", "text": "런타임 의존성을 3.6.8 마지막 호환 버전으로 고정 — fastapi 0.68.1 / starlette 0.14.2 / pydantic 1.9.2 / uvicorn 0.13.4 / httpx 0.22.0 / aiofiles 0.8.0 / PyYAML 6.0.1 (+ dataclasses backport). 개발·테스트 도구는 requirements-dev.txt로 분리해 대상 설치에 섞이지 않도록 함"},
+            {"type": "changed", "text": "코드 3.6 호환 개편 — pydantic v2→v1 API 전환, 전 모듈 `from __future__ import annotations` 제거 및 빌트인 제네릭(list[]/dict[])→typing 환원, 백그라운드 루프를 ASGI lifespan→on_event, datetime.fromisoformat→strptime, asyncio.get_running_loop→get_event_loop, Principal의 @dataclass는 3.6 backport로 충당"},
+            {"type": "changed", "text": "오프라인 번들 빌드를 릴리스 CI의 python:3.6 컨테이너에서 수행하도록 변경(cp36 wheel·환경 마커 정합). install-service.sh 사전 점검을 Python 3.6+로 조정, deploy/AIRGAP.md의 CentOS 7 안내를 '시스템 3.6.8에서 그대로 실행'으로 갱신"},
+        ],
+    },
     {
         "version": "1.7.55",
         "date": "2026-08-10",

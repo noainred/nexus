@@ -21,7 +21,19 @@ Sonatype Nexus Repository 여러 인스턴스를 한곳에서 모니터링·비�
 서버에는 8081(HTTP) 포트만 열려 있다고 가정한다.
 
 ## 코드 규칙
-- Python 3.9 호환 필수 (PEP 604 `X | None` 평가형 어노테이션 금지, `Optional[...]` 사용).
+- **Python 3.6.8 호환 필수** (대상: CentOS 7.9 시스템 python3). 다음 금지:
+  - `from __future__ import annotations` (3.7+), 빌트인 제네릭 `list[...]`/`dict[...]`
+    (3.9+) → `typing.List/Dict/...` 사용. PEP 604 `X | None` (3.10 평가형) → `Optional[...]`.
+  - `@dataclass`는 3.6에 stdlib 없음 → requirements의 `dataclasses` backport 유지.
+  - 3.7+ stdlib 금지: `asyncio.run`/`get_running_loop`(→`get_event_loop`),
+    `datetime.fromisoformat`(→`strptime`), `contextlib.asynccontextmanager` 등.
+    3.8+ 금지: walrus `:=`, f-string `=` 디버그, `typing.Literal/TypedDict`. 블로킹
+    I/O offload는 `storage.run_in_thread`(run_in_executor 기반) 사용.
+  - pydantic은 **v1** API (fastapi 0.68.1 계열). `model_dump→dict`, `model_validate→
+    parse_obj`, `model_copy→copy`, `field_validator→validator`, `Field(pattern=)→regex=`,
+    `Query(pattern=)→regex=`, `BaseSettings`는 `pydantic`에서 import + `class Config`.
+- 런타임 의존성은 3.6 마지막 호환 버전으로 `requirements.txt`에 고정(개발 도구는
+  `requirements-dev.txt`). 오프라인 번들은 릴리스 CI가 `python:3.6` 컨테이너에서 빌드.
 - 변경/업데이트마다 `app/__init__.py`의 `__version__`을 올리고
   `app/release_notes.py`의 `RELEASE_NOTES` 맨 앞에 항목을 추가한다(테스트가 일치 검증).
 

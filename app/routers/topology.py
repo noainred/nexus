@@ -1,5 +1,4 @@
 """Topology derived from proxy repositories (parent/child links)."""
-from __future__ import annotations
 
 import asyncio
 from typing import Dict, List, Optional, Tuple
@@ -288,7 +287,7 @@ async def proxy_diagnose(
 async def proxy_fix(
     instance_id: str = Query(...),
     repository: str = Query(...),
-    action: str = Query(..., pattern="^(reset|timeout|autoblock_off)$"),
+    action: str = Query(..., regex="^(reset|timeout|autoblock_off)$"),
     registry: InstanceRegistry = Depends(get_registry),
 ) -> dict:
     """Apply a fix to a blocked proxy.

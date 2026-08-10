@@ -4,7 +4,6 @@ Aggregates per-asset ``lastDownloaded`` / ``fileSize`` to show which packages
 users actually downloaded and how much storage they account for — for a single
 repository (detail) or for every repository on a server (overview).
 """
-from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone

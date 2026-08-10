@@ -12,7 +12,6 @@ screens only). A leaked cookie stops working after the TTL. Both cookie kinds
 share the ``nm_session`` cookie; :func:`current_principal` resolves whichever
 one is present into a :class:`Principal`.
 """
-from __future__ import annotations
 
 import base64
 import hashlib

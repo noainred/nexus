@@ -36,31 +36,21 @@ sudo dnf install -y python3 python3-pip git
 
 위 `dnf install` 이 성공하면(= 사내 dnf 미러가 이미 구성된 것) A-2로.
 
-> ### ⚠️ CentOS 7 (7.9 등) — 기본 python3 는 3.6.8 이라 실행 불가
-> CentOS 7의 시스템 `python3` 는 **3.6.8** 이고, 이 앱은 **Python 3.9** 를 씁니다
-> (fastapi 는 3.8+, 오프라인 번들 wheel 은 cp39). `yum` 기본 저장소에는 3.9 가
-> 없으므로 아래 중 하나로 **3.9 를 별도 설치**한 뒤, 설치 시 `PYTHON` 으로 지정하세요.
-> 시스템 3.6 과 공존하며 서비스는 지정한 3.9 venv 로만 동작합니다.
->
-> **방법 1 — SCL rh-python39 (사내 yum 미러/오프라인 RPM):**
+> ### CentOS 7 (7.9 등) — 시스템 python3(3.6.8)에서 그대로 실행
+> 런타임 스택이 **Python 3.6.8** 을 지원하도록 고정돼 있어(fastapi 0.68.1 /
+> starlette 0.14.2 / pydantic 1.9.2 / uvicorn 0.13.4 …), CentOS 7 기본 `python3`
+> 로 별도 파이썬 설치 없이 설치·실행됩니다.
 > ```bash
-> sudo yum install -y centos-release-scl        # 또는 사내 미러의 SCL 저장소
-> sudo yum install -y rh-python39
-> # 설치 시 이 파이썬을 지정:
-> sudo PYTHON=/opt/rh/rh-python39/root/usr/bin/python3.9 bash deploy/install-service.sh
+> python3 --version        # 3.6.8 (CentOS 7 기본) 이면 그대로 진행
+> sudo bash deploy/install-service.sh
 > ```
+> ⚠️ **오프라인 번들은 대상 Python 태그로 빌드**됩니다. CentOS 7(3.6)용 번들은
+> 대상과 같은 3.6 환경에서 빌드해야 cp36 wheel(uvloop/httptools 등)이 맞습니다.
+> 릴리스 CI는 `python:3.6` 컨테이너에서 번들을 만들어 이 조건을 자동으로 맞춥니다.
 >
-> **방법 2 — 독립 실행형 Python (완전 폐쇄망 권장):**
-> 인터넷 되는 PC에서 glibc 2.17(CentOS 7) 호환 standalone Python 3.9 tarball을 받아
-> USB로 반입 → 추출 후 그 경로를 `PYTHON` 으로 지정. 시스템 패키지·빌드도구가 전혀
-> 필요 없어 폐쇄망에서 가장 확실합니다.
-> ```bash
-> sudo tar -C /opt -xf cpython-3.9-x86_64-linux.tar.gz     # 예: /opt/python3.9
-> sudo PYTHON=/opt/python3.9/bin/python3.9 bash deploy/install-service.sh
-> ```
->
-> 설치 스크립트는 시작 시 파이썬 버전을 검사해 3.9 미만이면 **파일을 건드리기 전에
-> 명확한 메시지로 중단**합니다(반쪽 설치 방지). 자동 업데이터도 같은 `PYTHON` 을 이어씁니다.
+> 참고: CentOS 7 은 2024-06 EOL 이므로, 스택을 3.6 에 고정하면 fastapi/uvicorn/httpx
+> 등도 EOL·보안패치 종료 버전에 묶입니다. 중장기적으로는 Rocky/RHEL 9(기본 3.9)
+> 이전을 권장합니다.
 
 **만약 dnf가 "repo에 접근 불가"로 실패**하면, dnf가 Nexus yum 프록시를 보도록
 저장소를 추가합니다. (URL은 본인 Nexus의 rocky 프록시 저장소 주소로 교체)

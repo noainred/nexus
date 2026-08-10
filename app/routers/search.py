@@ -1,5 +1,4 @@
 """Fleet-wide component search across all managed Nexus instances."""
-from __future__ import annotations
 
 import asyncio
 from typing import Dict, List
@@ -20,7 +19,7 @@ async def search_all(
     q: str = Query("", description="Keyword (component/artifact)."),
     format: str = Query("", description="Optional format filter (maven2, npm, …)."),
     repository: str = Query("", description="Optional repository name filter."),
-    scope: str = Query("monitoring", pattern="^(monitoring|all)$"),
+    scope: str = Query("monitoring", regex="^(monitoring|all)$"),
     registry: InstanceRegistry = Depends(get_registry),
 ) -> dict:
     """Search every managed instance for components matching the query."""

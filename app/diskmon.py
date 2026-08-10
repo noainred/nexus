@@ -6,7 +6,6 @@ blob stores periodically into a small CSV and fit a linear growth rate to
 predict when each store will reach 90% — surfacing "DMZ2: ~18일 후 90%"
 *before* it happens.
 """
-from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone

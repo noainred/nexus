@@ -1,5 +1,4 @@
 """App metadata endpoints (version, release notes, portal branding)."""
-from __future__ import annotations
 
 import json
 import os

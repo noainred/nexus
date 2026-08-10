@@ -18,7 +18,6 @@ a snapshot (Nexus redacts them), so restored users get a temporary password and
 restored proxy repositories may need their remote credentials re-entered. Tasks
 and externally-sourced (LDAP/SAML) users/roles are not recreated.
 """
-from __future__ import annotations
 
 import secrets
 from typing import Any, Dict, List, Optional, Set

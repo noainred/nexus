@@ -1,7 +1,6 @@
 """Proxy cache-warming: pull a source repo's asset paths through a target
 proxy so the target caches the same content (best-effort, resumable), plus
 scheduled cache-warming jobs (daily at HH:MM)."""
-from __future__ import annotations
 
 import asyncio
 import uuid
@@ -150,7 +149,7 @@ async def set_sync_jobs(
 ) -> SyncJobs:
     jobs = []
     for j in body.jobs:
-        d = j.model_dump()
+        d = j.dict()
         if not d.get("id"):
             d["id"] = uuid.uuid4().hex[:12]
         jobs.append(d)

@@ -7,7 +7,6 @@ wiped server can be recovered quickly via the existing config import/restore.
 Backups are grouped per run under ``<backup_dir>/<timestamp>/<server>.json``.
 Only configuration is captured (not artifact/blob data) — see the restore docs.
 """
-from __future__ import annotations
 
 import asyncio
 import json

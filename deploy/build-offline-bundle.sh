@@ -18,17 +18,24 @@ cd "$HERE"
 OUT="${1:-nexus-manager-offline.tar.gz}"
 
 echo "==> Build machine Python: $(python3 --version)"
-echo "    (Must match the target server's Python, e.g. 3.9)"
+echo "    (Must match the target server's Python — CentOS 7.9 target = 3.6.8;"
+echo "     the release CI builds this inside a python:3.6 container.)"
 
-rm -rf wheelhouse
-mkdir -p wheelhouse
-
-echo "==> Downloading dependency wheels into ./wheelhouse ..."
-# --only-binary=:all: keeps everything as pre-built wheels so the target
-# needs no compiler. If a package has no wheel for your platform, drop the
-# flag and ensure the target has build tools.
-python3 -m pip download --only-binary=:all: \
-  -r requirements.txt -d wheelhouse
+# WHEELHOUSE_READY=1 lets CI pre-populate ./wheelhouse inside a python:3.6
+# container (so cp36 wheels + environment markers resolve correctly) and then
+# run this script on the host only to package. Otherwise download here.
+if [ "${WHEELHOUSE_READY:-0}" = "1" ] && [ -d wheelhouse ]; then
+  echo "==> Using pre-built ./wheelhouse ($(ls wheelhouse | wc -l | tr -d ' ') files)"
+else
+  rm -rf wheelhouse
+  mkdir -p wheelhouse
+  echo "==> Downloading dependency wheels into ./wheelhouse ..."
+  # --only-binary=:all: keeps everything as pre-built wheels so the target
+  # needs no compiler. If a package has no wheel for your platform, drop the
+  # flag and ensure the target has build tools.
+  python3 -m pip download --only-binary=:all: \
+    -r requirements.txt -d wheelhouse
+fi
 
 # Version marker file so the archive's version is unambiguous.
 VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' app/__init__.py | head -1)

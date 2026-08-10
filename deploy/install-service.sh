@@ -46,16 +46,14 @@ echo "==> 소스:       $SRC"
 echo "==> 설치 위치:  $INSTALL_DIR   (user=$SERVICE_USER, port=$PORT)"
 echo "==> Python:     $($PYTHON --version 2>&1)"
 
-# Preflight: the app + offline wheelhouse target Python 3.9. CentOS 7's system
-# python3 is 3.6.8 (fastapi requires >=3.8, wheels are cp39) — fail EARLY with an
-# actionable message here, before touching anything, instead of a cryptic pip
-# error deep in the install (which the log then buries).
-if ! "$PYTHON" -c 'import sys; sys.exit(0 if sys.version_info[:2] >= (3, 9) else 1)' 2>/dev/null; then
-  echo "ERROR: Python 3.9 이상이 필요합니다 (현재 '$PYTHON' = $($PYTHON --version 2>&1))." >&2
-  echo "       CentOS 7 기본 python3(3.6.8)로는 실행할 수 없습니다(fastapi≥3.8, 번들 휠=cp39)." >&2
-  echo "       Python 3.9 설치 후 PYTHON 을 지정해 다시 실행하세요. 예:" >&2
-  echo "         sudo PYTHON=/opt/rh/rh-python39/root/usr/bin/python3.9 bash deploy/install-service.sh" >&2
-  echo "       (설치 방법은 deploy/AIRGAP.md 의 'CentOS 7' 절 참고)" >&2
+# Preflight: the runtime stack targets Python 3.6+ (CentOS 7.9's system python3
+# is 3.6.8). The offline wheelhouse is built for the target's Python tag, so the
+# installing Python must match it. Fail EARLY with an actionable message here,
+# before touching anything, instead of a cryptic pip error deep in the install.
+if ! "$PYTHON" -c 'import sys; sys.exit(0 if sys.version_info[:2] >= (3, 6) else 1)' 2>/dev/null; then
+  echo "ERROR: Python 3.6 이상이 필요합니다 (현재 '$PYTHON' = $($PYTHON --version 2>&1))." >&2
+  echo "       PYTHON 환경변수로 인터프리터를 지정할 수 있습니다. 예:" >&2
+  echo "         sudo PYTHON=/usr/bin/python3 bash deploy/install-service.sh" >&2
   exit 1
 fi
 

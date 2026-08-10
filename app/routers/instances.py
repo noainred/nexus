@@ -1,5 +1,4 @@
 """Instance listing and management (CRUD) endpoints."""
-from __future__ import annotations
 
 import json
 import os
@@ -206,7 +205,7 @@ async def export_instances(
 @router.post("/import", response_model=List[InstanceSummary])
 async def import_instances(
     request: Request,
-    mode: str = Query("replace", pattern="^(replace|merge)$"),
+    mode: str = Query("replace", regex="^(replace|merge)$"),
     registry: InstanceRegistry = Depends(get_registry),
 ) -> List[InstanceSummary]:
     """Import a previously exported server list (YAML or JSON).
@@ -369,7 +368,7 @@ async def restore_instance_config(
     instance_id: str,
     request: Request,
     sections: str = Query("", description="Comma-separated sections to restore; empty = repositories + dependencies."),
-    mode: str = Query("merge", pattern="^(merge|overwrite)$"),
+    mode: str = Query("merge", regex="^(merge|overwrite)$"),
     registry: InstanceRegistry = Depends(get_registry),
 ) -> dict:
     """Recreate configuration on a target server from an uploaded snapshot.

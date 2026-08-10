@@ -5,7 +5,6 @@ appends every sample to a CSV text log (kept ~1 year), and serves time-windowed,
 down-sampled series for charting. Each charted point is coloured by how far it
 deviates from the window baseline (>=+20% warn, >=+50% crit).
 """
-from __future__ import annotations
 
 import asyncio
 import statistics

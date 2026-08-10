@@ -5,10 +5,9 @@ each managed instance (DMZ, Core, Site1..N) have it, and is its configuration
 identical? Core lives in a different region, so configuration drift between
 Core and the DMZ/site instances is exactly what we want to surface.
 """
-from __future__ import annotations
 
 from collections import Counter
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
 
 from .models import (
     MatrixCell,
@@ -50,7 +49,7 @@ def _cell_from_repo(repo: Repository) -> MatrixCell:
 
 def build_matrix(
     columns: Sequence[MatrixColumn],
-    repos_by_instance: dict[str, Optional[list[Repository]]],
+    repos_by_instance: Dict[str, Optional[List[Repository]]],
 ) -> RepositoryMatrix:
     """Assemble the comparison grid.
 
@@ -59,8 +58,8 @@ def build_matrix(
     and its cells become "unknown", excluded from drift detection).
     """
     # Build per-instance lookup of repo name -> cell.
-    cells_by_instance: dict[str, dict[str, MatrixCell]] = {}
-    reachable_ids: list[str] = []
+    cells_by_instance: Dict[str, Dict[str, MatrixCell]] = {}
+    reachable_ids: List[str] = []
     for column in columns:
         repos = repos_by_instance.get(column.id)
         if repos is None:
@@ -72,14 +71,14 @@ def build_matrix(
         }
 
     # Union of every repository name across reachable instances, sorted.
-    repo_names: set[str] = set()
+    repo_names: Set[str] = set()
     for instance_id in reachable_ids:
         repo_names.update(cells_by_instance[instance_id].keys())
 
-    rows: list[MatrixRow] = []
+    rows: List[MatrixRow] = []
     for name in sorted(repo_names):
-        cells: dict[str, MatrixCell] = {}
-        present_signatures: list[str] = []
+        cells: Dict[str, MatrixCell] = {}
+        present_signatures: List[str] = []
 
         for column in columns:
             repos = repos_by_instance.get(column.id)
@@ -129,9 +128,9 @@ def build_matrix(
 _DIFF_EXCLUDED_KEYS = {"name", "url"}
 
 
-def _flatten_config(obj: Any, prefix: str = "") -> dict[str, str]:
+def _flatten_config(obj: Any, prefix: str = "") -> Dict[str, str]:
     """Flatten a nested repository config into dotted-path -> string values."""
-    flat: dict[str, str] = {}
+    flat: Dict[str, str] = {}
     if isinstance(obj, dict):
         for key, value in obj.items():
             path = f"{prefix}.{key}" if prefix else key
@@ -158,7 +157,7 @@ def build_repo_diff(
     is absent on that instance or the instance was unreachable (the column's
     ``reachable`` flag distinguishes the two for the UI).
     """
-    flat_by_instance: dict[str, dict[str, str]] = {}
+    flat_by_instance: Dict[str, Dict[str, str]] = {}
     for column in columns:
         cfg = configs.get(column.id)
         flat_by_instance[column.id] = (
@@ -167,14 +166,14 @@ def build_repo_diff(
 
     present_ids = [c.id for c in columns if isinstance(configs.get(c.id), Mapping)]
 
-    keys: set[str] = set()
+    keys: Set[str] = set()
     for column in columns:
         keys.update(flat_by_instance[column.id].keys())
     keys -= _DIFF_EXCLUDED_KEYS
 
-    fields: list[RepoDiffField] = []
+    fields: List[RepoDiffField] = []
     for key in sorted(keys):
-        values: dict[str, Optional[str]] = {}
+        values: Dict[str, Optional[str]] = {}
         for column in columns:
             if column.id in present_ids:
                 values[column.id] = flat_by_instance[column.id].get(key)

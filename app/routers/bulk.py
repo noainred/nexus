@@ -1,7 +1,6 @@
 """Bulk repository-config editing: read every repo's settings on one
 instance, group them by field, and apply one value to all repos at once
 (e.g. turn httpClient.autoBlock off everywhere)."""
-from __future__ import annotations
 
 import asyncio
 import json

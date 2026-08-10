@@ -4,10 +4,9 @@ Each method maps to one or more endpoints under ``/service/rest/v1`` and
 returns plain dictionaries / typed models. Network and HTTP-status errors are
 normalised into :class:`NexusError` so routers can translate them uniformly.
 """
-from __future__ import annotations
 
 import time
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -127,7 +126,7 @@ class NexusClient:
 
     # -- Status / monitoring ------------------------------------------------
 
-    async def ping(self) -> dict[str, Any]:
+    async def ping(self) -> Dict[str, Any]:
         """Return reachability + latency + per-subsystem health.
 
         Uses the read-only ``/status`` endpoint (writable instances) and the
@@ -138,7 +137,7 @@ class NexusClient:
         await self._request("GET", "/status")
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        checks: dict[str, bool] = {}
+        checks: Dict[str, bool] = {}
         try:
             resp = await self._request("GET", "/status/check")
             data = self._json(resp)
@@ -171,9 +170,9 @@ class NexusClient:
         # Drop the "Nexus/" prefix for a cleaner display ("3.68.0-04 (OSS)").
         return srv[6:].strip() if srv.lower().startswith("nexus/") else srv
 
-    async def list_blobstores(self) -> list[BlobStore]:
+    async def list_blobstores(self) -> List[BlobStore]:
         resp = await self._request("GET", "/blobstores")
-        result: list[BlobStore] = []
+        result: List[BlobStore] = []
         for item in self._json(resp):
             result.append(
                 BlobStore(
@@ -188,9 +187,9 @@ class NexusClient:
 
     # -- Repositories -------------------------------------------------------
 
-    async def list_repositories(self) -> list[Repository]:
+    async def list_repositories(self) -> List[Repository]:
         resp = await self._request("GET", "/repositories")
-        repos: list[Repository] = []
+        repos: List[Repository] = []
         for item in self._json(resp):
             repos.append(
                 Repository(
@@ -207,7 +206,7 @@ class NexusClient:
     async def delete_repository(self, name: str) -> None:
         await self._request("DELETE", f"/repositories/{name}")
 
-    async def list_repository_settings(self) -> list[dict[str, Any]]:
+    async def list_repository_settings(self) -> List[Dict[str, Any]]:
         """All repositories with full settings in one call (incl. cleanup).
 
         ``GET /repositorySettings`` (3.21+) returns every repo's config —
@@ -217,7 +216,7 @@ class NexusClient:
         data = self._json(resp)
         return data if isinstance(data, list) else []
 
-    async def repo_statuses(self) -> list[dict[str, Any]]:
+    async def repo_statuses(self) -> List[Dict[str, Any]]:
         """Per-repository runtime status (online / 'Remote Auto Blocked' …).
 
         Uses the internal UI endpoint the Nexus web UI itself relies on —
@@ -267,7 +266,7 @@ class NexusClient:
         auth: Optional[tuple] = None,
     ) -> None:
         """Create a raw(proxy) repository pointing at ``remote_url``."""
-        http_client: dict[str, Any] = {"blocked": False, "autoBlock": True}
+        http_client: Dict[str, Any] = {"blocked": False, "autoBlock": True}
         if auth:
             http_client["authentication"] = {
                 "type": "username",
@@ -315,7 +314,7 @@ class NexusClient:
 
     async def get_repository_config(
         self, fmt: str, type_: str, name: str
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         """Return the full configuration for a single repository.
 
         Uses the admin endpoint ``/repositories/{format}/{type}/{name}`` which
@@ -329,7 +328,7 @@ class NexusClient:
 
     # -- Configuration export ----------------------------------------------
 
-    async def export_configuration(self) -> dict[str, Any]:
+    async def export_configuration(self) -> Dict[str, Any]:
         """Collect the readable Nexus configuration into one JSON-able dict.
 
         Every section is best-effort: a section the account cannot read (or
@@ -338,8 +337,8 @@ class NexusClient:
         these read endpoints (Nexus redacts them), so the result is safe to
         store as a configuration snapshot/backup.
         """
-        sections: dict[str, Any] = {}
-        errors: dict[str, str] = {}
+        sections: Dict[str, Any] = {}
+        errors: Dict[str, str] = {}
 
         async def grab(key: str, path: str) -> None:
             try:
@@ -387,7 +386,7 @@ class NexusClient:
         for repo in repos:
             fmt = (repo.format or "").strip()
             type_ = (repo.type or "").strip()
-            entry: dict[str, Any] = {
+            entry: Dict[str, Any] = {
                 "name": repo.name,
                 "format": repo.format,
                 "type": repo.type,
@@ -419,19 +418,19 @@ class NexusClient:
             return set()
         return {str(item.get(key)) for item in data if isinstance(item, dict)}
 
-    async def create_blobstore_file(self, payload: dict[str, Any]) -> None:
+    async def create_blobstore_file(self, payload: Dict[str, Any]) -> None:
         await self._request("POST", "/blobstores/file", json=payload)
 
-    async def create_content_selector(self, payload: dict[str, Any]) -> None:
+    async def create_content_selector(self, payload: Dict[str, Any]) -> None:
         await self._request("POST", "/security/content-selectors", json=payload)
 
-    async def create_privilege(self, ptype: str, payload: dict[str, Any]) -> None:
+    async def create_privilege(self, ptype: str, payload: Dict[str, Any]) -> None:
         await self._request("POST", f"/security/privileges/{ptype}", json=payload)
 
-    async def create_role(self, payload: dict[str, Any]) -> None:
+    async def create_role(self, payload: Dict[str, Any]) -> None:
         await self._request("POST", "/security/roles", json=payload)
 
-    async def create_user(self, payload: dict[str, Any]) -> None:
+    async def create_user(self, payload: Dict[str, Any]) -> None:
         await self._request("POST", "/security/users", json=payload)
 
     async def change_password(self, user_id: str, new_password: str) -> None:
@@ -444,33 +443,33 @@ class NexusClient:
             headers={"Content-Type": "text/plain"},
         )
 
-    async def create_routing_rule(self, payload: dict[str, Any]) -> None:
+    async def create_routing_rule(self, payload: Dict[str, Any]) -> None:
         await self._request("POST", "/routing-rules", json=payload)
 
     async def create_repository(
-        self, fmt: str, type_: str, payload: dict[str, Any]
+        self, fmt: str, type_: str, payload: Dict[str, Any]
     ) -> None:
         await self._request("POST", f"/repositories/{_fmt_seg(fmt)}/{type_}", json=payload)
 
     # -- Configuration restore: update existing (overwrite mode) -----------
 
-    async def update_content_selector(self, name: str, payload: dict[str, Any]) -> None:
+    async def update_content_selector(self, name: str, payload: Dict[str, Any]) -> None:
         await self._request("PUT", f"/security/content-selectors/{name}", json=payload)
 
-    async def update_privilege(self, ptype: str, name: str, payload: dict[str, Any]) -> None:
+    async def update_privilege(self, ptype: str, name: str, payload: Dict[str, Any]) -> None:
         await self._request("PUT", f"/security/privileges/{ptype}/{name}", json=payload)
 
-    async def update_role(self, role_id: str, payload: dict[str, Any]) -> None:
+    async def update_role(self, role_id: str, payload: Dict[str, Any]) -> None:
         await self._request("PUT", f"/security/roles/{role_id}", json=payload)
 
-    async def update_user(self, user_id: str, payload: dict[str, Any]) -> None:
+    async def update_user(self, user_id: str, payload: Dict[str, Any]) -> None:
         await self._request("PUT", f"/security/users/{user_id}", json=payload)
 
-    async def update_routing_rule(self, name: str, payload: dict[str, Any]) -> None:
+    async def update_routing_rule(self, name: str, payload: Dict[str, Any]) -> None:
         await self._request("PUT", f"/routing-rules/{name}", json=payload)
 
     async def update_repository(
-        self, fmt: str, type_: str, name: str, payload: dict[str, Any]
+        self, fmt: str, type_: str, name: str, payload: Dict[str, Any]
     ) -> None:
         await self._request(
             "PUT", f"/repositories/{_fmt_seg(fmt)}/{type_}/{name}", json=payload
@@ -481,7 +480,7 @@ class NexusClient:
     async def list_components(
         self, repository: str, continuation_token: Optional[str] = None
     ) -> ComponentPage:
-        params: dict[str, str] = {"repository": repository}
+        params: Dict[str, str] = {"repository": repository}
         if continuation_token:
             params["continuationToken"] = continuation_token
         resp = await self._request("GET", "/components", params=params)
@@ -505,10 +504,10 @@ class NexusClient:
         await self._request("DELETE", f"/components/{component_id}")
 
     async def search_components(
-        self, params: dict[str, str], max_pages: int = 5
-    ) -> list[dict[str, Any]]:
+        self, params: Dict[str, str], max_pages: int = 5
+    ) -> List[Dict[str, Any]]:
         """Search components via /search, returning a few pages of matches."""
-        out: list[dict[str, Any]] = []
+        out: List[Dict[str, Any]] = []
         token: Optional[str] = None
         pages = 0
         while True:
@@ -537,7 +536,7 @@ class NexusClient:
         self, repository: str, continuation_token: Optional[str] = None
     ) -> AssetPage:
         """One page of assets, each carrying fileSize and lastDownloaded."""
-        params: dict[str, str] = {"repository": repository}
+        params: Dict[str, str] = {"repository": repository}
         if continuation_token:
             params["continuationToken"] = continuation_token
         resp = await self._request("GET", "/assets", params=params)
@@ -558,7 +557,7 @@ class NexusClient:
 
     # -- Metrics ------------------------------------------------------------
 
-    async def get_metrics(self) -> dict[str, Any]:
+    async def get_metrics(self) -> Dict[str, Any]:
         """Dropwizard metrics JSON from the (non-v1) /service/metrics endpoint.
 
         Requires the ``nx-metrics-all`` privilege. Tries the 3.81+ path first
@@ -589,20 +588,20 @@ class NexusClient:
 
     # -- Security -----------------------------------------------------------
 
-    async def get_anonymous(self) -> dict[str, Any]:
+    async def get_anonymous(self) -> Dict[str, Any]:
         resp = await self._request("GET", "/security/anonymous")
         return self._json(resp)
 
-    async def list_users(self) -> list[dict[str, Any]]:
+    async def list_users(self) -> List[Dict[str, Any]]:
         resp = await self._request("GET", "/security/users")
         return self._json(resp)
 
     # -- Scheduled tasks ----------------------------------------------------
 
-    async def list_tasks(self) -> list[Task]:
+    async def list_tasks(self) -> List[Task]:
         resp = await self._request("GET", "/tasks")
         data = self._json(resp)
-        tasks: list[Task] = []
+        tasks: List[Task] = []
         for item in data.get("items", []):
             state = item.get("currentState")
             tasks.append(
@@ -632,9 +631,9 @@ class NexusClient:
     # Cleanup policies live under the "beta" REST namespace in Nexus 3. We try
     # v1 first and fall back to the beta path for older releases.
 
-    async def list_cleanup_policies(self) -> list[CleanupPolicy]:
+    async def list_cleanup_policies(self) -> List[CleanupPolicy]:
         data = await self._cleanup_get("")
-        policies: list[CleanupPolicy] = []
+        policies: List[CleanupPolicy] = []
         for item in data or []:
             policies.append(
                 CleanupPolicy(
@@ -647,7 +646,7 @@ class NexusClient:
             )
         return policies
 
-    async def create_cleanup_policy(self, payload: dict[str, Any]) -> None:
+    async def create_cleanup_policy(self, payload: Dict[str, Any]) -> None:
         await self._cleanup_post("", payload)
 
     async def _cleanup_get(self, suffix: str) -> Any:
@@ -660,7 +659,7 @@ class NexusClient:
                 raise
         return self._json(resp)
 
-    async def _cleanup_post(self, suffix: str, payload: dict[str, Any]) -> None:
+    async def _cleanup_post(self, suffix: str, payload: Dict[str, Any]) -> None:
         try:
             await self._request("POST", f"/cleanup-policies{suffix}", json=payload)
         except NexusError as exc:

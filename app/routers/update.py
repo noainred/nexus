@@ -6,7 +6,6 @@ so both this app and the ``deploy/auto-update.sh`` watcher use the same source.
 The actual upgrade is performed by the ``nexus-manager-update.service`` systemd
 unit (it rebuilds the venv and restarts the service).
 """
-from __future__ import annotations
 
 import asyncio
 import glob

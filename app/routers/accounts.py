@@ -5,7 +5,6 @@ When the target user is the very account the manager uses to connect, the
 stored credential is updated in lockstep so a password change never locks the
 manager out of that node.
 """
-from __future__ import annotations
 
 import asyncio
 from typing import List
@@ -119,7 +118,7 @@ async def change_password(
         # to connect, store the new password.
         if (inst.username or "") == uid:
             try:
-                registry.update(inst.id, inst.model_copy(update={"password": body.password}))
+                registry.update(inst.id, inst.copy(update={"password": body.password}))
                 synced = True
             except Exception:  # noqa: BLE001 - password changed regardless
                 synced = False

@@ -5,10 +5,9 @@ instances. Alerts fire on transition (not every poll) and resolve when the
 condition clears. The current set is also exposed via /api/alerts so the
 dashboard can show it even when no webhook is configured.
 """
-from __future__ import annotations
 
 import asyncio
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 import httpx
 
@@ -108,7 +107,7 @@ async def _send(webhook: str, text: str) -> None:
 class AlertManager:
     def __init__(self) -> None:
         self.alerts: List[Alert] = []
-        self._prev_keys: set[str] = set()
+        self._prev_keys: Set[str] = set()
         self._lock: Optional[asyncio.Lock] = None
 
     async def evaluate(self, registry, settings: Settings) -> List[Alert]:

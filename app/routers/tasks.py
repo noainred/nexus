@@ -1,5 +1,4 @@
 """Scheduled task monitoring and execution endpoints."""
-from __future__ import annotations
 
 from typing import List
 

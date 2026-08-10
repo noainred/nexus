@@ -1,5 +1,4 @@
 """Repository comparison-matrix endpoint."""
-from __future__ import annotations
 
 import asyncio
 import re

@@ -4,7 +4,6 @@ The manager reads request.log files it has local access to — but only those
 listed in ``settings.request_log_paths`` (no arbitrary path reads) — and returns
 per-IP download aggregates, so the operator doesn't have to upload the log.
 """
-from __future__ import annotations
 
 import glob
 import gzip

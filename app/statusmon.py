@@ -5,7 +5,6 @@ Continuously probes every monitoring-enabled instance and caches the latest
 instantly instead of probing on demand (which stalls on slow/unreachable
 nodes). The UI reads the cache; a background loop keeps it fresh.
 """
-from __future__ import annotations
 
 import asyncio
 import time

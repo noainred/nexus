@@ -6,7 +6,6 @@ Admin-only CRUD for named accounts, plus self-service endpoints (``/api/me``,
 is allowed for any authenticated principal (so a viewer can change their own
 password). Passwords are hashed in :mod:`app.userstore`.
 """
-from __future__ import annotations
 
 from datetime import datetime, timezone
 

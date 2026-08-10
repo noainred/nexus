@@ -1,10 +1,10 @@
 """FastAPI application entry point for the Nexus integrated manager."""
-from __future__ import annotations
 
 import asyncio
 import contextlib
 import re
 from pathlib import Path
+from typing import Dict
 
 from datetime import datetime, timezone
 
@@ -48,8 +48,23 @@ from .routers import (
 STATIC_DIR = Path(__file__).parent / "static"
 
 
-@contextlib.asynccontextmanager
-async def lifespan(_app: FastAPI):
+app = FastAPI(
+    title="Nexus Integrated Manager",
+    description=(
+        "Unified management dashboard for multiple Sonatype Nexus "
+        "Repository Manager 3 instances: repositories, cleanup policies, "
+        "and health monitoring."
+    ),
+    version=__version__,
+)
+
+# Background loops via startup/shutdown events. (FastAPI 0.83 / Python 3.6 does
+# not support the ASGI-lifespan context manager, so use on_event handlers.)
+_bg_tasks: list = []
+
+
+@app.on_event("startup")
+async def _start_background_loops() -> None:
     """Run the background alert + ping + backup loops for the app's lifetime."""
     if not get_settings().admin_password:
         # Delivery safety: with no admin password the API accepts writes from
@@ -61,34 +76,24 @@ async def lifespan(_app: FastAPI):
             "않았습니다. 이 경우 포트에 접근 가능한 누구나 변경 작업을 수행할 수 "
             "있습니다. 운영 환경에서는 .env에 비밀번호를 반드시 설정하세요."
         )
-    tasks = [
+    _bg_tasks.extend([
         asyncio.create_task(run_loop()),
         asyncio.create_task(ping_run_loop()),
         asyncio.create_task(backup_run_loop()),
         asyncio.create_task(sync_run_loop()),
         asyncio.create_task(disk_run_loop()),
         asyncio.create_task(status_run_loop()),
-    ]
-    try:
-        yield
-    finally:
-        for task in tasks:
-            task.cancel()
-        for task in tasks:
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+    ])
 
 
-app = FastAPI(
-    title="Nexus Integrated Manager",
-    description=(
-        "Unified management dashboard for multiple Sonatype Nexus "
-        "Repository Manager 3 instances: repositories, cleanup policies, "
-        "and health monitoring."
-    ),
-    version=__version__,
-    lifespan=lifespan,
-)
+@app.on_event("shutdown")
+async def _stop_background_loops() -> None:
+    for task in _bg_tasks:
+        task.cancel()
+    for task in _bg_tasks:
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+    _bg_tasks.clear()
 
 # Auth gate + audit trail. Auth activates when a bootstrap password is set OR
 # any named account exists; every write (POST/PUT/DELETE) to /api is appended to
@@ -250,7 +255,7 @@ async def no_cache_dashboard(request: Request, call_next):
 
 
 @app.get("/healthz", tags=["meta"])
-async def healthz() -> dict[str, str]:
+async def healthz() -> Dict[str, str]:
     """Liveness probe for the manager itself (not the Nexus instances)."""
     return {"status": "ok", "version": __version__}
 

@@ -1,5 +1,4 @@
 """Scheduled configuration-backup endpoints."""
-from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
@@ -65,6 +64,7 @@ async def download_backup(
 # -- DR readiness audit ------------------------------------------------------
 
 import asyncio
+import re
 from datetime import datetime, timedelta, timezone
 
 from ..nexus_client import NexusClient, NexusError
@@ -73,10 +73,20 @@ from ..nexus_client import NexusClient, NexusError
 def _parse_dt(s):
     if not s:
         return None
-    try:
-        return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
-    except ValueError:
-        return None
+    # datetime.fromisoformat is 3.7+, but the appliance runs on Python 3.6.8;
+    # parse the common Nexus timestamp shapes with strptime instead.
+    text = str(s).strip().replace("Z", "+0000")
+    # normalize a "+00:00" style offset to strptime's "+0000".
+    m = re.match(r"^(.*[+-]\d{2}):(\d{2})$", text)
+    if m:
+        text = m.group(1) + m.group(2)
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z",
+                "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    return None
 
 
 @router.get("/dr-audit")

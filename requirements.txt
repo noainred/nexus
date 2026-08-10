@@ -1,11 +1,16 @@
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-httpx==0.28.1
-pydantic==2.10.4
-pydantic-settings==2.7.1
-PyYAML==6.0.2
-
-# dev / test
-pytest==8.3.4
-pytest-asyncio==0.25.2
-respx==0.22.0
+# RUNTIME dependencies — pinned to the LAST versions that actually resolve for
+# Python 3.6.8 (CentOS 7.9 system python3), verified via pip's cp36 resolver.
+# This file builds the offline wheelhouse and is installed on the target, so it
+# must stay runtime-only and 3.6-clean. Bumping any of these almost certainly
+# requires Python >= 3.7 (pydantic v2 / fastapi >=0.69 / uvicorn >=0.14 …).
+fastapi==0.68.1
+starlette==0.14.2
+uvicorn[standard]==0.13.4
+httpx==0.22.0
+pydantic==1.9.2
+PyYAML==6.0.1
+# Starlette 0.14's StaticFiles imports aiofiles.
+aiofiles==0.8.0
+# dataclasses is stdlib on 3.7+; this backport supplies it on 3.6 only
+# (used by app/routers/auth.py Principal).
+dataclasses==0.8; python_version < "3.7"

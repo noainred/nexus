@@ -1,5 +1,4 @@
 """Shared dependencies: the instance registry and per-request client factory."""
-from __future__ import annotations
 
 from typing import Dict, List
 

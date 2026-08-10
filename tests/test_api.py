@@ -143,7 +143,7 @@ def test_export_and_import(http_client, monkeypatch):
     )
     imp = http_client.post(
         "/api/instances/import?mode=replace",
-        content=new_yaml,
+        data=new_yaml,
         headers={"Content-Type": "application/x-yaml"},
     )
     assert imp.status_code == 200
@@ -152,7 +152,7 @@ def test_export_and_import(http_client, monkeypatch):
     assert "imported" in deps.registry._instances
 
     # Invalid payload -> 400
-    bad = http_client.post("/api/instances/import", content="not: [valid")
+    bad = http_client.post("/api/instances/import", data="not: [valid")
     assert bad.status_code == 400
 
 

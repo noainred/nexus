@@ -7,7 +7,6 @@ no extra dependency for the air-gapped build), in ``accounts.json`` written
 atomically with 0600 perms. The file also holds a random server secret used to
 sign user session cookies (so sessions survive a restart).
 """
-from __future__ import annotations
 
 import hashlib
 import hmac

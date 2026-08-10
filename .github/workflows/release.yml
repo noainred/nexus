@@ -20,11 +20,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Python 3.9 so the downloaded wheels match CentOS 7 / RHEL 8 targets
-      # (cp39, manylinux2014 -> glibc 2.17 = CentOS 7 compatible).
+      # Host Python (for packaging/zip only). The wheelhouse itself is built
+      # inside a python:3.6 container below so cp36 wheels + environment markers
+      # (e.g. the dataclasses backport) resolve for the CentOS 7.9 target.
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          python-version: "3.11"
 
       - name: Read app version
         id: ver
@@ -32,7 +33,19 @@ jobs:
           V=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' app/__init__.py | head -1)
           echo "version=$V" >> "$GITHUB_OUTPUT"
 
-      - name: Build offline bundle (source + wheels)
+      # Build the cp36 wheelhouse in real Python 3.6 (glibc 2.17 in the debian
+      # image = CentOS 7 compatible). Markers + wheel tags resolve correctly here.
+      - name: Build cp36 wheelhouse (python:3.6 container)
+        run: |
+          docker run --rm -v "$PWD":/w -w /w python:3.6 \
+            sh -c 'python -m pip install -q --upgrade "pip==21.3.1" && \
+                   rm -rf wheelhouse && mkdir -p wheelhouse && \
+                   python -m pip download --only-binary=:all: -r requirements.txt -d wheelhouse'
+          echo "wheelhouse files: $(ls wheelhouse | wc -l)"
+
+      - name: Package offline bundle (source + prebuilt wheelhouse)
+        env:
+          WHEELHOUSE_READY: "1"
         run: bash deploy/build-offline-bundle.sh "nexus-manager-offline-v${{ steps.ver.outputs.version }}.tar.gz"
 
       - name: Build source-only archive

@@ -8,7 +8,6 @@ helpers write to a temp file in the same directory and ``os.replace`` it into
 place (an atomic rename on POSIX), so a reader always sees either the old file
 or the complete new one — never a partial one.
 """
-from __future__ import annotations
 
 import asyncio
 import functools
@@ -24,11 +23,11 @@ async def run_in_thread(fn: Callable[..., Any], *args: Any) -> Any:
     """Offload a blocking call to the default thread pool so it doesn't stall
     the event loop.
 
-    Uses ``loop.run_in_executor`` (Python 3.7+) rather than ``asyncio.to_thread``
-    (3.9+): the appliance targets CentOS 7 where the available Python can be
-    older than 3.9.
+    Uses ``loop.run_in_executor`` rather than ``asyncio.to_thread`` (3.9+), and
+    ``get_event_loop`` rather than ``get_running_loop`` (3.7+): the appliance
+    targets CentOS 7 whose system Python is 3.6.8.
     """
-    loop = asyncio.get_running_loop()
+    loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, functools.partial(fn, *args))
 
 

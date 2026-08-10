@@ -1,5 +1,4 @@
 """Infrastructure ping history + disk-saturation forecast endpoints."""
-from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 

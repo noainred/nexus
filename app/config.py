@@ -1,14 +1,12 @@
 """Application configuration and managed-instance loading."""
-from __future__ import annotations
 
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel, BaseSettings, Field, ValidationError, validator
 
 
 class InstanceConfig(BaseModel):
@@ -62,11 +60,10 @@ class InstanceConfig(BaseModel):
 class Settings(BaseSettings):
     """Process-wide settings, populated from environment variables."""
 
-    model_config = SettingsConfigDict(
-        env_prefix="NEXUS_MANAGER_",
-        env_file=".env",
-        extra="ignore",
-    )
+    class Config:
+        env_prefix = "NEXUS_MANAGER_"
+        env_file = ".env"
+        extra = "ignore"
 
     instances_file: str = "instances.yaml"
     request_timeout: float = 15.0
@@ -119,8 +116,7 @@ class Settings(BaseSettings):
     # Portal branding (dashboard title), editable from 서버 설정.
     portal_config_file: str = "portal-config.json"
 
-    @field_validator("admin_password")
-    @classmethod
+    @validator("admin_password")
     def _clean_admin_password(cls, v: str) -> str:
         """Tolerate the common .env footgun where the password picks up a
         trailing newline, surrounding whitespace, or wrapping quotes — these
@@ -166,10 +162,10 @@ def _instance_path(settings: Settings) -> Path:
 
 def _validate_document(raw: dict, where: str = "config") -> InstancesDocument:
     try:
-        document = InstancesDocument.model_validate(raw)
+        document = InstancesDocument.parse_obj(raw)
     except ValidationError as exc:  # pragma: no cover - surfaced to operator
         raise RuntimeError(f"Invalid instances {where}: {exc}") from exc
-    seen: set[str] = set()
+    seen: Set[str] = set()
     for instance in document.instances:
         if instance.id in seen:
             raise RuntimeError(f"Duplicate instance id in {where}: {instance.id!r}")

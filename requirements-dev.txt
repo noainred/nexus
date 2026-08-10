@@ -1,0 +1,12 @@
+# DEV / TEST dependencies — NOT installed on the air-gapped target (kept out of
+# requirements.txt so the 3.6 runtime install stays clean). Run tests on a dev
+# machine with the runtime stack pinned below.
+#
+# Note: Starlette 0.19's TestClient is requests-based (hence the requests pin),
+# and respx must match the runtime httpx (0.22).
+-r requirements.txt
+
+pytest==7.2.1
+pytest-asyncio==0.20.3
+respx==0.20.0
+requests==2.27.1

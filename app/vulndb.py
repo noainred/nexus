@@ -8,7 +8,6 @@ Version comparison is numeric on the ``X.Y.Z`` release tuple; the build suffix
 (e.g. ``-04``) and edition (OSS/PRO) are ignored. Sources: Sonatype security
 advisories (support.sonatype.com / help.sonatype.com/en/security-advisories).
 """
-from __future__ import annotations
 
 import re
 from typing import Dict, List, Optional, Tuple

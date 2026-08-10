@@ -1,7 +1,6 @@
 """Pydantic models for API requests and responses."""
-from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -26,7 +25,7 @@ class InstanceSummary(BaseModel):
 class InstanceCreate(BaseModel):
     """Payload to add a managed instance."""
 
-    id: str = Field(..., min_length=1, pattern=r"^[A-Za-z0-9_.-]+$")
+    id: str = Field(..., min_length=1, regex=r"^[A-Za-z0-9_.-]+$")
     name: str = Field(..., min_length=1)
     base_url: str = Field(..., min_length=1)
     alt_url: str = ""
@@ -154,7 +153,7 @@ class InstanceStatus(BaseModel):
     healthy: bool
     response_ms: Optional[float] = None
     error: Optional[str] = None
-    checks: dict[str, bool] = Field(default_factory=dict)
+    checks: Dict[str, bool] = Field(default_factory=dict)
     repository_count: Optional[int] = None
     checked_at: Optional[str] = None   # when this status was last measured
     cached: bool = False               # True when served from the poller cache
@@ -186,7 +185,7 @@ class Repository(BaseModel):
     url: Optional[str] = None
     online: Optional[bool] = None
     # Raw attributes passed through for advanced views.
-    attributes: dict[str, Any] = Field(default_factory=dict)
+    attributes: Dict[str, Any] = Field(default_factory=dict)
 
 
 class Component(BaseModel):
@@ -317,7 +316,7 @@ class CleanupPolicy(BaseModel):
     format: str = "*"
     notes: Optional[str] = None
     mode: str = "delete"
-    criteria: dict[str, Any] = Field(default_factory=dict)
+    criteria: Dict[str, Any] = Field(default_factory=dict)
 
 
 class CleanupPolicyCreate(BaseModel):
@@ -396,7 +395,7 @@ class MatrixRow(BaseModel):
     repository: str
     # consistent | drift | partial | unknown
     status: str
-    cells: dict[str, MatrixCell] = Field(default_factory=dict)
+    cells: Dict[str, MatrixCell] = Field(default_factory=dict)
 
 
 class RepositoryMatrix(BaseModel):
@@ -475,7 +474,7 @@ class ContentRow(BaseModel):
     group: Optional[str] = None
     name: Optional[str] = None
     version: Optional[str] = None
-    present: dict[str, bool] = Field(default_factory=dict)
+    present: Dict[str, bool] = Field(default_factory=dict)
     consistent: bool = True
 
 
@@ -493,7 +492,7 @@ class RepoDiffField(BaseModel):
 
     key: str
     # instance id -> stringified value (None when absent / unreachable).
-    values: dict[str, Optional[str]] = Field(default_factory=dict)
+    values: Dict[str, Optional[str]] = Field(default_factory=dict)
     differs: bool = False
 
 
