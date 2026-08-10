@@ -63,7 +63,9 @@
   function renderChart(s, days) {
     var unit = "ms";
     var wrap = el("div", { class: "infra-chart" });
-    var headNote = s.baseline != null ? ("평소(중앙값) " + s.baseline + " " + unit)
+    var headNote = s.baseline != null
+      ? ("평소(중앙값) " + s.baseline + " · 평균 " + (s.mean != null ? s.mean : "-")
+         + " · 최대 " + (s.peak != null ? s.peak : "-") + " " + unit)
       : (s.detail ? "측정 실패" : "데이터 없음");
     wrap.append(el("div", { class: "infra-chart-head" }, [
       el("span", { class: "infra-name" }, s.name),

@@ -649,6 +649,8 @@ def test_ping_query_colors(tmp_path):
     out = pingmon.query(1, {"a": "A"}, settings=S())
     s = out["series"][0]
     assert s["baseline"] == 12.0
+    assert s["mean"] == 18.4          # (10+10+12+20+40)/5
+    assert s["peak"] == 40.0
     colors = {p["v"]: p["color"] for p in s["points"]}
     assert colors.get(40.0) == "crit"   # 3.3x baseline
     assert colors.get(20.0) == "crit"   # 1.67x baseline

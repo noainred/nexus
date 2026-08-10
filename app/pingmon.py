@@ -215,6 +215,9 @@ def query(
         pts = by_inst[iid]
         values = [v for _, v in pts if v is not None]
         baseline = round(statistics.median(values), 1) if values else None
+        # 평균·최대는 다운샘플 이전의 원시값 기준으로 정확히 계산한다.
+        mean = round(sum(values) / len(values), 1) if values else None
+        peak = round(max(values), 1) if values else None
 
         # Bucket by time and average non-null values per bucket.
         buckets: Dict[int, List[float]] = {}
@@ -236,6 +239,8 @@ def query(
             "id": iid,
             "name": names.get(iid, iid),
             "baseline": baseline,
+            "mean": mean,
+            "peak": peak,
             "points": points,
         })
 

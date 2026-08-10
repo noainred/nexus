@@ -87,7 +87,9 @@ class PingSeries(BaseModel):
     id: str
     name: str
     group: str = ""
-    baseline: Optional[float] = None
+    baseline: Optional[float] = None   # 중앙값(median)
+    mean: Optional[float] = None       # 평균값
+    peak: Optional[float] = None       # 최대값
     points: List[PingPoint] = Field(default_factory=list)
 
 
