@@ -61,11 +61,31 @@ if [ "$(readlink -f "$SRC")" = "$(readlink -f "$INSTALL_DIR")" ]; then
   echo "==> 소스가 설치 위치와 동일 — 복사 건너뜀(제자리 업그레이드)"
 else
   echo "==> 파일 복사 (덮어쓰기) ..."
-  rm -rf "$INSTALL_DIR/app"
+  # 롤백 안전장치: 새 코드/의존성 설치 중 실패하면(디스크 부족, 아키텍처 불일치
+  # 휠 등) 이전 app/venv/requirements/deploy를 원상 복구한 뒤 중단한다. 복구 없이
+  # 중단하면 새 코드+옛 의존성이 남고, current_version()이 새 버전을 읽어 업데이터가
+  # 영원히 "새 버전 없음"을 반복하게 된다.
+  ROLLBACK_DIR="$INSTALL_DIR/.rollback.$$"
+  rm -rf "$ROLLBACK_DIR"; mkdir -p "$ROLLBACK_DIR"
+  _rollback() {
+    echo "==> 설치 실패 — 이전 버전으로 롤백 ..." >&2
+    for d in app deploy wheelhouse .venv; do
+      if [ -e "$ROLLBACK_DIR/$d" ]; then rm -rf "$INSTALL_DIR/$d"; mv "$ROLLBACK_DIR/$d" "$INSTALL_DIR/$d"; fi
+    done
+    [ -e "$ROLLBACK_DIR/requirements.txt" ] && mv "$ROLLBACK_DIR/requirements.txt" "$INSTALL_DIR/requirements.txt"
+    rm -rf "$ROLLBACK_DIR"
+    echo "==> 롤백 완료 — 이전 코드/의존성이 유지됩니다." >&2
+  }
+  trap '_rollback' ERR
+  # 기존 자산을 롤백 폴더로 이동(삭제가 아니라 보존).
+  for d in app deploy wheelhouse .venv; do
+    [ -e "$INSTALL_DIR/$d" ] && mv "$INSTALL_DIR/$d" "$ROLLBACK_DIR/$d"
+  done
+  [ -e "$INSTALL_DIR/requirements.txt" ] && cp "$INSTALL_DIR/requirements.txt" "$ROLLBACK_DIR/requirements.txt"
   cp -rf "$SRC/app" "$INSTALL_DIR/"
   cp -f "$SRC/requirements.txt" "$INSTALL_DIR/"
-  if [ -d "$SRC/deploy" ];     then rm -rf "$INSTALL_DIR/deploy";     cp -rf "$SRC/deploy" "$INSTALL_DIR/"; fi
-  if [ -d "$SRC/wheelhouse" ]; then rm -rf "$INSTALL_DIR/wheelhouse"; cp -rf "$SRC/wheelhouse" "$INSTALL_DIR/"; fi
+  if [ -d "$SRC/deploy" ];     then cp -rf "$SRC/deploy" "$INSTALL_DIR/"; fi
+  if [ -d "$SRC/wheelhouse" ]; then cp -rf "$SRC/wheelhouse" "$INSTALL_DIR/"; fi
 fi
 
 if [ ! -f "$INSTALL_DIR/instances.yaml" ]; then
@@ -106,6 +126,12 @@ if [ -d "$INSTALL_DIR/wheelhouse" ]; then
 else
   echo "==> 의존성 설치 (pip) ..."
   "$INSTALL_DIR/.venv/bin/pip" install -r "$INSTALL_DIR/requirements.txt"
+fi
+
+# 코드+의존성까지 성공 — 롤백 안전장치 해제.
+if [ -n "${ROLLBACK_DIR:-}" ]; then
+  trap - ERR
+  rm -rf "$ROLLBACK_DIR"
 fi
 
 # 4) Ownership + tighten secrets.

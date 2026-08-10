@@ -19,6 +19,10 @@ from typing import List, Optional
 
 from .config import Settings, get_settings
 from .nexus_client import NexusClient, NexusError
+from .storage import atomic_write_text, restrict_mode
+
+# 백업 실행 폴더 이름 형식: datetime.strftime("%Y%m%d-%H%M%S") → 8자리-6자리.
+_TS_DIR_RE = re.compile(r"\d{8}-\d{6}")
 
 
 def resolve_root(path: str, settings: Settings) -> Path:
@@ -67,7 +71,8 @@ def _write_portal_backup(out: Path, settings: Settings) -> dict:
     except Exception as exc:  # noqa: BLE001
         payload["update_config_error"] = str(exc)
     fname = "_portal.json"
-    (out / fname).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 관리 노드 평문 비밀번호가 담기므로 소유자 전용(0600)으로 기록한다.
+    atomic_write_text(out / fname, json.dumps(payload, ensure_ascii=False, indent=2), mode=0o600)
     entry.update(ok=True, file=fname)
     return entry
 
@@ -78,6 +83,9 @@ async def run_backup(registry, settings: Settings) -> dict:
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     out = root / ts
     out.mkdir(parents=True, exist_ok=True)
+    # 백업 파일에 서버 자격증명이 담기므로 루트·실행 폴더를 소유자 전용으로 제한.
+    restrict_mode(root, 0o700)
+    restrict_mode(out, 0o700)
     items: List[dict] = []
     # Portal's own config first, so a full setup is always recoverable.
     try:
@@ -95,8 +103,9 @@ async def run_backup(registry, settings: Settings) -> dict:
                 **cfg,
             }
             fname = f"{_safe(inst.name)}.json"
-            (out / fname).write_text(
-                json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+            # 서버 설정 스냅샷에 자격증명이 포함될 수 있어 0600으로 기록한다.
+            atomic_write_text(
+                out / fname, json.dumps(payload, ensure_ascii=False, indent=2), mode=0o600
             )
             repos = len((payload.get("sections") or {}).get("repositories") or [])
             entry.update(ok=True, file=fname, repositories=repos)
@@ -119,7 +128,12 @@ async def run_backup(registry, settings: Settings) -> dict:
 def _prune(root: Path, keep: int) -> None:
     if not root.exists():
         return
-    dirs = sorted((d for d in root.iterdir() if d.is_dir()), reverse=True)
+    # 타임스탬프 형식(YYYYMMDD-HHMMSS) 폴더만 정리 대상 — 백업 경로가 다른 용도의
+    # 디렉터리를 포함하더라도 무관한 하위 폴더는 절대 삭제하지 않는다.
+    dirs = sorted(
+        (d for d in root.iterdir() if d.is_dir() and _TS_DIR_RE.fullmatch(d.name)),
+        reverse=True,
+    )
     for d in dirs[max(1, int(keep)):]:
         shutil.rmtree(d, ignore_errors=True)
 

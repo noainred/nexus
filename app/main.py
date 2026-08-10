@@ -129,6 +129,15 @@ def _is_public_read(method: str, path: str) -> bool:
     return method == "GET" and _PUBLIC_READ_RE.fullmatch(path) is not None
 
 
+# Credential-exposing reads: admin-only. A read-only viewer must never pull
+# plaintext server passwords via the instances export or a config-backup
+# download (backup files embed instances.yaml). GETs, so not covered by the
+# viewer write-block below.
+_ADMIN_READ_RE = re.compile(
+    r"^/api/(?:instances/export|backups/[^/]+/[^/]+)$"
+)
+
+
 @app.middleware("http")
 async def auth_and_audit(request: Request, call_next):
     settings = get_settings()
@@ -151,6 +160,13 @@ async def auth_and_audit(request: Request, call_next):
             if path.startswith("/api/manager-users") and principal.role != "admin":
                 return JSONResponse(
                     {"detail": "관리자만 접근할 수 있습니다."}, status_code=403)
+            # Credential-exposing downloads are admin-only (defeats the viewer's
+            # read-only guarantee otherwise — plaintext passwords via GET).
+            if (method == "GET" and principal.role != "admin"
+                    and _ADMIN_READ_RE.fullmatch(path)):
+                return JSONResponse(
+                    {"detail": "관리자만 내려받을 수 있습니다(자격증명 포함)."},
+                    status_code=403)
             # A viewer is read-only: block every write except self-service ones.
             if (principal.role == "viewer"
                     and method in ("POST", "PUT", "DELETE")

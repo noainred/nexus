@@ -90,6 +90,34 @@ def test_login_tolerates_env_whitespace_and_quotes(client, monkeypatch, tmp_path
     assert client.post("/api/login", json={"password": "pw123"}).status_code == 200
 
 
+def test_viewer_cannot_export_credentials(client, monkeypatch, tmp_path):
+    """읽기 전용 viewer는 자격증명이 담긴 export/백업 다운로드에 접근 불가(403),
+    일반 조회는 가능(200), 관리자는 export 200."""
+    import app.userstore as us
+    from datetime import datetime, timezone
+    from app.routers import auth as auth_mod
+
+    s = Settings(admin_password="pw123", audit_file=str(tmp_path / "audit.log"),
+                 accounts_file=str(tmp_path / "accounts.json"))
+    monkeypatch.setattr(main_mod, "get_settings", lambda: s)
+    monkeypatch.setattr("app.routers.auth.get_settings", lambda: s)
+    monkeypatch.setattr(us, "get_settings", lambda: s)
+
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    us.create("bob", "viewerpw", "viewer", ts)
+
+    # viewer 세션 쿠키
+    client.cookies.set(auth_mod.COOKIE, auth_mod.make_user_token("bob", "viewer"))
+    assert client.get("/api/instances").status_code == 200        # 조회는 허용
+    assert client.get("/api/instances/export").status_code == 403  # 자격증명 export 차단
+    client.cookies.clear()
+
+    # 관리자는 허용
+    assert client.post("/api/login", json={"password": "pw123"}).status_code == 200
+    assert client.get("/api/instances/export").status_code == 200
+    client.cookies.clear()
+
+
 def test_audit_records_writes(client, monkeypatch, tmp_path):
     s = Settings(audit_file=str(tmp_path / "audit.log"))
     monkeypatch.setattr(main_mod, "get_settings", lambda: s)

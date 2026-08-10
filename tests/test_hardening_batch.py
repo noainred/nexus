@@ -66,6 +66,32 @@ def test_portal_backup_redacts_update_token(tmp_path):
     assert "ghp_SECRET" not in json.dumps(written)
 
 
+def test_portal_backup_file_is_owner_only(tmp_path):
+    """자격증명이 담기는 _portal.json은 0600으로 기록돼야 한다."""
+    import os
+    import stat
+    import app.backup as backup_mod
+    s = Settings(update_config_file=str(tmp_path / "u.json"),
+                 instances_file=str(tmp_path / "none.yaml"))
+    entry = backup_mod._write_portal_backup(tmp_path, s)
+    mode = stat.S_IMODE(os.stat(tmp_path / entry["file"]).st_mode)
+    assert mode & 0o077 == 0, oct(mode)   # group/other 권한 없음
+
+
+def test_prune_only_touches_timestamp_dirs(tmp_path):
+    """_prune는 타임스탬프 형식 폴더만 삭제하고 무관한 디렉터리는 보존해야 한다."""
+    import app.backup as backup_mod
+    (tmp_path / "projects").mkdir()
+    (tmp_path / "archive").mkdir()
+    for ts in ("20260101-000000", "20260102-000000", "20260103-000000"):
+        (tmp_path / ts).mkdir()
+    backup_mod._prune(tmp_path, keep=1)
+    names = {p.name for p in tmp_path.iterdir()}
+    assert "projects" in names and "archive" in names      # 무관 폴더 보존
+    assert "20260103-000000" in names                      # 최신 1개 유지
+    assert "20260101-000000" not in names and "20260102-000000" not in names
+
+
 # -- disk-history purge + parse cache ---------------------------------------
 
 def test_diskmon_purge_and_cache(tmp_path, monkeypatch):

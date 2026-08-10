@@ -7,6 +7,16 @@ from __future__ import annotations
 
 RELEASE_NOTES = [
     {
+        "version": "1.7.52",
+        "date": "2026-08-10",
+        "changes": [
+            {"type": "changed", "text": "[보안/데이터 보호] 설정 백업 정리(_prune)가 백업 폴더의 모든 하위 디렉터리를 삭제하던 문제 수정 — 타임스탬프 형식(YYYYMMDD-HHMMSS) 폴더만 정리 대상으로 제한해, 백업 경로를 기존 디렉터리로 지정해도 무관한 폴더가 삭제되지 않음"},
+            {"type": "changed", "text": "[보안] 설정 백업 파일(_portal.json·서버별 스냅샷)에 관리 노드 평문 비밀번호가 담기는데 world-readable(0644)로 기록되던 문제 수정 — 백업 파일 0600, 백업 폴더 0700으로 제한(instances.yaml과 동일 정책)"},
+            {"type": "changed", "text": "[보안] 읽기 전용 viewer 계정이 GET /api/instances/export 및 백업 다운로드로 전 노드 관리자 비밀번호를 열람할 수 있던 권한 우회 수정 — 자격증명이 포함된 다운로드는 관리자 전용(403)으로 제한"},
+            {"type": "changed", "text": "[안정성] 자동 업그레이드 설치 중 실패(디스크 부족·아키텍처 불일치 휠 등) 시 새 코드+옛 의존성이 남아 업데이터가 영구히 멈추던 문제 수정 — install-service.sh에 롤백 안전장치 추가(실패 시 이전 app/venv/requirements를 원상 복구하고 서비스 유지, 이후 정상 재시도)"},
+        ],
+    },
+    {
         "version": "1.7.51",
         "date": "2026-08-10",
         "changes": [
