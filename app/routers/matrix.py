@@ -102,6 +102,13 @@ def _repo_from_remote(url: str) -> str:
     return m.group(1) if m else ""
 
 
+def _auth_has_password(auth) -> bool:
+    """True only if the httpClient.authentication object carries a usable
+    password. Nexus redacts passwords on GET, so an auth object read back from a
+    repo config normally has a username but no (or empty) password."""
+    return bool(isinstance(auth, dict) and auth.get("password"))
+
+
 @router.post("/matrix/sync-slave-config")
 async def sync_slave_config(
     repository: str = Query(..., description="Repository name on the slave."),
@@ -156,19 +163,32 @@ async def sync_slave_config(
     elif s_proxy:
         payload["proxy"] = dict(s_proxy)
     # Keep the slave's proxy credentials (master's are redacted/not applicable).
+    # Nexus redacts the password on every GET, so the slave's authentication read
+    # back here has a username but NO password. Re-submitting it would set an
+    # empty password and break the proxy. Following restore.py's convention, omit
+    # an unusable (password-less) authentication and warn the operator to re-enter
+    # the proxy password rather than silently wiping it.
+    warning = None
     if isinstance(payload.get("httpClient"), dict):
         payload["httpClient"] = dict(payload["httpClient"])
         s_auth = (s_cfg.get("httpClient") or {}).get("authentication")
-        if s_auth:
+        if _auth_has_password(s_auth):
             payload["httpClient"]["authentication"] = s_auth
         else:
             payload["httpClient"].pop("authentication", None)
+            if s_auth:  # a username was configured but its password is redacted
+                warning = ("슬레이브 프록시 인증 비밀번호는 API로 읽을 수 없어 유지되지 "
+                           "않습니다 — 동기화 후 슬레이브 저장소에서 프록시 비밀번호를 "
+                           "다시 입력하세요.")
 
     try:
         await sc.update_repository(sm.format, sm.type, repository, payload)
     except NexusError as exc:
         raise HTTPException(status_code=502, detail=f"슬레이브 설정 업데이트 실패: {exc.message}")
-    return {"ok": True, "repository": repository, "master": master.name, "slave": slave.name}
+    result = {"ok": True, "repository": repository, "master": master.name, "slave": slave.name}
+    if warning:
+        result["warning"] = warning
+    return result
 
 
 async def _fetch_repos(

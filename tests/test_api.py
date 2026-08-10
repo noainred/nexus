@@ -283,6 +283,17 @@ def test_unknown_instance_404(http_client):
 
 
 @respx.mock
+def test_slave_sync_auth_password_guard():
+    """GET으로 읽은 프록시 인증(비밀번호 가려짐)은 재적용 대상이 아니어야 한다 —
+    빈 비밀번호로 덮어쓰면 슬레이브 프록시 인증이 망가진다."""
+    from app.routers.matrix import _auth_has_password
+    assert _auth_has_password({"type": "username", "username": "u", "password": "pw"})
+    assert not _auth_has_password({"type": "username", "username": "u"})          # redacted
+    assert not _auth_has_password({"type": "username", "username": "u", "password": ""})
+    assert not _auth_has_password(None)
+    assert not _auth_has_password("bogus")
+
+
 def test_cleanup_requires_criteria(http_client):
     resp = http_client.post(
         "/api/instances/test/cleanup-policies",
