@@ -239,6 +239,41 @@ def test_topology_layout_roundtrip(tmp_path, monkeypatch):
     assert r2.json()["pos"] == {"d": {"x": 1.0, "y": 2.0}}
 
 
+def test_edge_test_endpoint(tmp_path, monkeypatch):
+    """엣지 연결 테스트: 등록된 URL만 허용(SSRF 차단), 성공 시 버전·지연시간 반환."""
+    import httpx
+    import respx
+    from pathlib import Path
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    monkeypatch.setattr(up, "_cfg_path", lambda: Path(tmp_path) / "update-config.json")
+    client = TestClient(app)
+
+    # 등록된 엣지가 없으면 400
+    assert client.post("/api/update/edge-test", json={}).status_code == 400
+
+    resp = client.post("/api/update/config", json={
+        "source": "server", "url": "http://mirror/", "edges": ["http://edge1:8000"]})
+    assert resp.status_code == 200
+
+    # 미등록 URL은 거부 — 매니저를 내부망 스캐너로 쓰는 SSRF 방지
+    r = client.post("/api/update/edge-test", json={"url": "http://internal-secret:9999"})
+    assert r.status_code == 400
+
+    with respx.mock:
+        respx.get("http://edge1:8000/healthz").mock(
+            return_value=httpx.Response(200, json={"status": "ok", "version": "1.0.0"}))
+        r = client.post("/api/update/edge-test", json={"url": "http://edge1:8000"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["tested"] == 1 and body["connected"] == 1 and body["unreachable"] == 0
+    edge = body["edges"][0]
+    assert edge["version"] == "1.0.0"
+    assert edge["latency_ms"] is not None
+    assert edge["outdated"] is True   # 배포 코드보다 낮은 버전
+
+
 def test_pingmon_tail_read_and_query(tmp_path):
     from app import pingmon
     p = tmp_path / "ping.csv"

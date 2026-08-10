@@ -222,24 +222,38 @@ def _tail(path: Path, lines: int) -> List[str]:
         return []
 
 
-async def _edge_version(client: httpx.AsyncClient, url: str) -> dict:
-    """Read one edge manager's running version from its /healthz (public)."""
+async def _edge_version(client: httpx.AsyncClient, url: str, retries: int = 0) -> dict:
+    """Read one edge manager's running version from its /healthz (public).
+
+    ``retries`` re-probes once after a short pause — used by the explicit
+    connection-test endpoint so a transiently dropped edge reconnects on the
+    spot (the regular status poll keeps retries=0 to stay fast).
+    """
+    import time
     base = url.rstrip("/")
-    try:
-        r = await client.get(base + "/healthz")
-        r.raise_for_status()
-        return {"url": url, "version": (r.json() or {}).get("version"), "error": None}
-    except Exception as exc:  # noqa: BLE001
-        return {"url": url, "version": None, "error": str(exc)[:120]}
+    last_err = None
+    for attempt in range(retries + 1):
+        if attempt:
+            await asyncio.sleep(0.5)
+        start = time.perf_counter()
+        try:
+            r = await client.get(base + "/healthz")
+            r.raise_for_status()
+            ms = round((time.perf_counter() - start) * 1000)
+            return {"url": url, "version": (r.json() or {}).get("version"),
+                    "error": None, "latency_ms": ms}
+        except Exception as exc:  # noqa: BLE001
+            last_err = str(exc)[:120]
+    return {"url": url, "version": None, "error": last_err, "latency_ms": None}
 
 
-async def _check_edges(urls: List[str], deploy_code: str) -> List[dict]:
+async def _check_edges(urls: List[str], deploy_code: str, retries: int = 0) -> List[dict]:
     urls = [u.strip() for u in (urls or []) if u and u.strip()]
     if not urls:
         return []
     verify = get_settings().verify_tls
     async with httpx.AsyncClient(timeout=5.0, follow_redirects=True, verify=verify) as c:
-        edges = list(await asyncio.gather(*(_edge_version(c, u) for u in urls)))
+        edges = list(await asyncio.gather(*(_edge_version(c, u, retries) for u in urls)))
     for e in edges:
         e["outdated"] = bool(e["version"] and _vkey(e["version"]) < _vkey(deploy_code))
     return edges
@@ -278,6 +292,34 @@ async def update_status() -> dict:
         "config": _masked(cfg),
         "log": _tail(_abs(s.update_log), 25),
     }
+
+
+class EdgeTest(BaseModel):
+    url: Optional[str] = None   # None = 등록된 엣지 전체 테스트
+
+
+@router.post("/edge-test")
+async def edge_test(body: EdgeTest) -> dict:
+    """등록된 엣지 노드의 연결을 즉시 재점검한다(연결 분리 시 재연결 확인용).
+
+    설정에 저장된 엣지 URL만 대상으로 허용한다 — 임의 URL을 받으면 매니저가
+    내부망 아무 주소나 찔러보는 SSRF 통로가 되므로, 미등록 URL은 400."""
+    cfg = _load_cfg()
+    registered = [u.strip() for u in (cfg.get("edges") or []) if u and u.strip()]
+    if not registered:
+        raise HTTPException(status_code=400, detail="등록된 엣지가 없습니다 — 설정에서 엣지 목록을 먼저 저장하세요.")
+    target = (body.url or "").strip()
+    if target:
+        if target not in registered:
+            raise HTTPException(status_code=400, detail="등록된 엣지 URL이 아닙니다 — 설정에 저장된 엣지만 테스트할 수 있습니다.")
+        urls = [target]
+    else:
+        urls = registered
+    # 명시적 테스트이므로 1회 재시도 — 일시적 끊김이면 그 자리에서 재연결된다.
+    edges = await _check_edges(urls, __version__, retries=1)
+    ok = sum(1 for e in edges if e.get("version"))
+    return {"deploy_code": __version__, "tested": len(edges), "connected": ok,
+            "unreachable": len(edges) - ok, "edges": edges}
 
 
 class UpdateConfig(BaseModel):

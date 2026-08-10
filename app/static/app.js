@@ -4680,18 +4680,7 @@ async function loadUpdateStatus() {
   if (srcEl) srcEl.textContent = c.url ? `소스: ${c.url}` : "소스 미설정 — 아래에서 URL을 입력하세요.";
 
   // Per-edge list (only when configured).
-  if (edgeBox) {
-    edgeBox.innerHTML = "";
-    if ((r.edges || []).length) {
-      const rows = r.edges.map((e) => el("tr", {}, [
-        el("td", {}, e.url),
-        el("td", {}, e.version
-          ? el("span", { class: `badge ${e.outdated ? "warn" : "up"}` }, "v" + e.version + (e.outdated ? " (구버전)" : ""))
-          : el("span", { class: "badge down", title: e.error || "" }, "미응답")),
-      ]));
-      edgeBox.append(buildTable(["엣지", "버전"], rows));
-    }
-  }
+  if (edgeBox) renderEdgeBox(edgeBox, r.edges || []);
 
   const form = document.getElementById("update-form");
   if (form) {
@@ -4708,6 +4697,64 @@ async function loadUpdateStatus() {
   }
   if (r.remote_error) msg.textContent = `원격 확인 경고: ${r.remote_error}`;
   logEl.textContent = (r.log || []).join("\n") || "(업데이트 로그 없음)";
+}
+
+// ---- 엣지 연결 테스트/재연결 ------------------------------------------------
+
+function _edgeBadge(e) {
+  if (!e.version) {
+    return el("span", { class: "badge down", title: e.error || "" }, "미응답");
+  }
+  const lat = e.latency_ms != null ? ` · ${e.latency_ms}ms` : "";
+  return el("span", { class: `badge ${e.outdated ? "warn" : "up"}` },
+    "v" + e.version + (e.outdated ? " (구버전)" : "") + lat);
+}
+
+function _edgeRow(e) {
+  const btn = el("button", { type: "button", title: "이 엣지의 연결을 즉시 재점검합니다(일시적 끊김이면 재연결)." }, "연결 테스트");
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "테스트 중…";
+    try {
+      const r = await api("/api/update/edge-test", {
+        method: "POST", body: JSON.stringify({ url: e.url }),
+      });
+      const ne = (r.edges || [])[0];
+      if (ne) {
+        btn.closest("tr").replaceWith(_edgeRow(ne));
+        toast(ne.version
+          ? `엣지 연결됨: v${ne.version}${ne.latency_ms != null ? ` (${ne.latency_ms}ms)` : ""}`
+          : `엣지 미응답: ${ne.error || "응답 없음"}`, ne.version ? "ok" : "err");
+      }
+    } catch (err) {
+      toast(`연결 테스트 실패: ${err.message}`, "err");
+      btn.disabled = false;
+      btn.textContent = "연결 테스트";
+    }
+  });
+  return el("tr", {}, [el("td", {}, e.url), el("td", {}, _edgeBadge(e)), el("td", {}, btn)]);
+}
+
+function renderEdgeBox(edgeBox, edges) {
+  edgeBox.innerHTML = "";
+  if (!edges.length) return;
+  edgeBox.append(buildTable(["엣지", "버전", "동작"], edges.map(_edgeRow)));
+  const allBtn = el("button", { type: "button" }, "전체 엣지 연결 테스트");
+  allBtn.addEventListener("click", async () => {
+    allBtn.disabled = true;
+    allBtn.textContent = "테스트 중…";
+    try {
+      const r = await api("/api/update/edge-test", { method: "POST", body: JSON.stringify({}) });
+      renderEdgeBox(edgeBox, r.edges || []);
+      toast(`엣지 테스트 완료 — 연결 ${r.connected} · 미응답 ${r.unreachable}`,
+        r.unreachable ? "err" : "ok");
+    } catch (err) {
+      toast(`엣지 테스트 실패: ${err.message}`, "err");
+      allBtn.disabled = false;
+      allBtn.textContent = "전체 엣지 연결 테스트";
+    }
+  });
+  edgeBox.append(el("div", { style: "margin-top:6px" }, allBtn));
 }
 
 async function saveUpdateConfig(ev) {
